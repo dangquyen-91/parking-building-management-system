@@ -2,10 +2,10 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
-const { connectDB } = require('./src/config/database');
-const routes = require('./src/routes');
-const errorHandler = require('./src/middlewares/error.middleware');
-const response = require('./src/utils/response');
+const { connectDB } = require('./config/database');
+const routes = require('./routes');
+const errorHandler = require('./middlewares/error.middleware');
+const response = require('./utils/response');
 
 const app = express();
 
