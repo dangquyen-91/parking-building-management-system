@@ -1,5 +1,12 @@
 const { Sequelize } = require('sequelize');
 
+const requiredEnv = ['DB_NAME', 'DB_USER', 'DB_PASSWORD', 'DB_HOST'];
+const missingEnv = requiredEnv.filter((key) => !process.env[key]);
+
+if (missingEnv.length > 0) {
+  throw new Error(`Missing required database env: ${missingEnv.join(', ')}`);
+}
+
 const sequelize = new Sequelize(
   process.env.DB_NAME,
   process.env.DB_USER,
