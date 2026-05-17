@@ -10,4 +10,4 @@ const error = (res, msg, status = 500) => {
   return res.status(status).json({ success: false, message: msg });
 };
 
-module.exports = { success, message, error };
+export default { success, message, error };

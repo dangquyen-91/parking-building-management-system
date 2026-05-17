@@ -2,6 +2,7 @@
   "name": "parking-building-management-backend",
   "version": "1.0.0",
   "description": "Parking Building Management System - Backend API",
+  "type": "module",
   "main": "src/app.js",
   "scripts": {
     "start": "node src/app.js",
@@ -30,7 +31,9 @@
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.3",
     "mysql2": "^3.22.3",
-    "sequelize": "^6.37.8"
+    "sequelize": "^6.37.8",
+    "swagger-ui-express": "^5.0.1",
+    "yaml": "^2.9.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"

@@ -1,5 +1,5 @@
-const authService = require('../services/auth.service');
-const response = require('../utils/response');
+import * as authService from '../services/auth.service.js';
+import response from '../utils/response.js';
 
 const register = async (req, res, next) => {
   try {
@@ -37,4 +37,4 @@ const logout = async (req, res, next) => {
   }
 };
 
-module.exports = { register, login, refresh, logout };
+export { register, login, refresh, logout };

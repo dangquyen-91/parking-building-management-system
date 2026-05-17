@@ -1,4 +1,4 @@
-const { Sequelize } = require('sequelize');
+import { Sequelize } from 'sequelize';
 
 const sequelize = new Sequelize(
   process.env.DB_NAME,
@@ -23,4 +23,4 @@ const connectDB = async () => {
   console.log('MySQL connected');
 };
 
-module.exports = { sequelize, connectDB };
+export { sequelize, connectDB };

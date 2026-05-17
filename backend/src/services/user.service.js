@@ -1,5 +1,5 @@
-const User = require('../models/user.model');
-const AppError = require('../utils/appError');
+import User from '../models/user.model.js';
+import AppError from '../utils/appError.js';
 
 const EXCLUDE = ['password', 'refreshToken'];
 
@@ -30,4 +30,4 @@ const remove = async (id) => {
   await user.destroy();
 };
 
-module.exports = { getAll, getById, update, remove };
+export { getAll, getById, update, remove };

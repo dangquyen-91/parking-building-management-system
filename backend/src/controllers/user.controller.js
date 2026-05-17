@@ -1,5 +1,5 @@
-const userService = require('../services/user.service');
-const response = require('../utils/response');
+import * as userService from '../services/user.service.js';
+import response from '../utils/response.js';
 
 const getAll = async (req, res, next) => {
   try {
@@ -37,4 +37,4 @@ const remove = async (req, res, next) => {
   }
 };
 
-module.exports = { getAll, getById, update, remove };
+export { getAll, getById, update, remove };

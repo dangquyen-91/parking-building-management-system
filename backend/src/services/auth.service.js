@@ -1,7 +1,7 @@
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
-const User = require('../models/user.model');
-const AppError = require('../utils/appError');
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
+import User from '../models/user.model.js';
+import AppError from '../utils/appError.js';
 
 const generateTokens = (payload) => {
   const accessToken = jwt.sign(payload, process.env.JWT_ACCESS_SECRET, {
@@ -59,4 +59,4 @@ const logout = async (userId) => {
   await User.update({ refreshToken: null }, { where: { id: userId } });
 };
 
-module.exports = { register, login, refresh, logout };
+export { register, login, refresh, logout };
