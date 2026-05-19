@@ -1,12 +1,29 @@
 import { Router } from 'express';
 import { authenticate, authorize } from '../middlewares/auth.middleware.js';
 import * as userController from '../controllers/user.controller.js';
+import validate from '../middlewares/validate.middleware.js';
+import {
+  updateMeSchema,
+  updateUserSchema,
+  changeRoleSchema,
+  updateStatusSchema,
+} from '../validations/user.validation.js';
 
 const router = Router();
 
-router.get('/', authenticate, authorize('admin'), userController.getAll);
-router.get('/:id', authenticate, userController.getById);
-router.put('/:id', authenticate, userController.update);
-router.delete('/:id', authenticate, authorize('admin'), userController.remove);
+router.use(authenticate);
+
+// Current user profile
+router.get('/me', userController.getMe);
+router.patch('/me', validate(updateMeSchema), userController.updateMe);
+
+// Admin + Manager: list and view users
+router.get('/', authorize('admin', 'manager'), userController.getAll);
+router.get('/:id', authorize('admin', 'manager'), userController.getById);
+
+// Admin only: update info, role, status
+router.patch('/:id', authorize('admin'), validate(updateUserSchema), userController.update);
+router.patch('/:id/role', authorize('admin'), validate(changeRoleSchema), userController.updateRole);
+router.patch('/:id/status', authorize('admin'), validate(updateStatusSchema), userController.updateStatus);
 
 export default router;

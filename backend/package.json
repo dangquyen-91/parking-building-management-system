@@ -6,10 +6,7 @@
   "main": "src/app.js",
   "scripts": {
     "start": "node src/app.js",
-    "dev": "nodemon src/app.js",
-    "db:migrate": "npx sequelize-cli db:migrate",
-    "db:migrate:undo": "npx sequelize-cli db:migrate:undo",
-    "db:seed": "npx sequelize-cli db:seed:all"
+    "dev": "nodemon src/app.js"
   },
   "keywords": [
     "parking",
@@ -28,7 +25,9 @@
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.5.2",
     "helmet": "^8.1.0",
+    "joi": "^18.2.1",
     "jsonwebtoken": "^9.0.3",
     "mysql2": "^3.22.3",
     "sequelize": "^6.37.8",
