@@ -81,8 +81,26 @@ export default function Navbar() {
         </div>
 
         {/* CTA */}
-        <div className="hidden md:block">
-          <Link to="/contact" className="px-6 py-2.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all shadow-[0_0_20px_rgba(37,99,235,0.3)] hover:shadow-[0_0_30px_rgba(37,99,235,0.5)] transform hover:-translate-y-0.5 inline-block">
+        <div className="hidden md:flex items-center gap-4">
+          <Link 
+            to="/signin" 
+            className={`text-sm font-medium transition-colors hover:text-blue-500 ${
+              scrolled || !isHome ? 'text-slate-700' : 'text-slate-200'
+            }`}
+          >
+            Sign In
+          </Link>
+          <Link 
+            to="/signup" 
+            className={`px-4 py-2 rounded-full border text-sm font-medium transition-all ${
+              scrolled || !isHome 
+                ? 'border-slate-300 text-slate-700 hover:bg-slate-50' 
+                : 'border-white/20 text-white hover:bg-white/10'
+            }`}
+          >
+            Sign Up
+          </Link>
+          <Link to="/contact" className="px-5 py-2.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all shadow-[0_0_20px_rgba(37,99,235,0.3)] hover:shadow-[0_0_30px_rgba(37,99,235,0.5)] transform hover:-translate-y-0.5 inline-block">
             Đặt Chỗ Ngay
           </Link>
         </div>
@@ -118,9 +136,20 @@ export default function Navbar() {
                 {link.name}
               </NavLink>
             ))}
-            <Link to="/contact" className="mt-4 px-6 py-3 rounded-full bg-blue-600 text-white font-medium w-full shadow-lg text-center inline-block">
-              Đặt Chỗ Ngay
-            </Link>
+            
+            <div className="mt-4 flex flex-col gap-3">
+              <Link to="/contact" className="px-6 py-3 rounded-full bg-blue-600 text-white font-medium w-full shadow-lg text-center inline-block">
+                Đặt Chỗ Ngay
+              </Link>
+              <div className="grid grid-cols-2 gap-3 mt-1">
+                <Link to="/signin" className="px-4 py-2.5 rounded-full border border-slate-200 bg-white text-slate-800 font-medium text-sm text-center shadow-sm inline-block">
+                  Sign In
+                </Link>
+                <Link to="/signup" className="px-4 py-2.5 rounded-full bg-slate-950 text-white font-medium text-sm text-center shadow-sm inline-block">
+                  Sign Up
+                </Link>
+              </div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
