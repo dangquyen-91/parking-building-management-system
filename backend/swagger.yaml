@@ -28,10 +28,13 @@ components:
         email:
           type: string
           example: user@example.com
+        phone:
+          type: string
+          example: '0901234567'
         role:
           type: string
-          enum: [admin, staff, customer]
-          example: customer
+          enum: [admin, manager, staff, resident]
+          example: resident
         isActive:
           type: boolean
           example: true
@@ -41,6 +44,32 @@ components:
         updatedAt:
           type: string
           format: date-time
+
+    PaginatedUsers:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+        pagination:
+          type: object
+          properties:
+            page:
+              type: integer
+              example: 1
+            limit:
+              type: integer
+              example: 10
+            total:
+              type: integer
+              example: 50
+            totalPages:
+              type: integer
+              example: 5
 
     Tokens:
       type: object
@@ -105,8 +134,8 @@ paths:
                   example: password123
                 role:
                   type: string
-                  enum: [admin, staff, customer]
-                  default: customer
+                  enum: [admin, manager, staff, resident]
+                  default: resident
       responses:
         '201':
           description: Registered successfully
@@ -218,15 +247,15 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
   # ── USERS ─────────────────────────────────────────────
-  /users:
+  /users/me:
     get:
       tags: [Users]
-      summary: Get all users (admin only)
+      summary: Get current user profile
       security:
         - bearerAuth: []
       responses:
         '200':
-          description: List of users
+          description: Current user profile
           content:
             application/json:
               schema:
@@ -235,9 +264,119 @@ paths:
                   - type: object
                     properties:
                       data:
-                        type: array
-                        items:
-                          $ref: '#/components/schemas/User'
+                        $ref: '#/components/schemas/User'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    patch:
+      tags: [Users]
+      summary: Update current user profile (fullName, phone only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fullName:
+                  type: string
+                  minLength: 2
+                  maxLength: 100
+                  example: Nguyen Van B
+                phone:
+                  type: string
+                  example: '0901234567'
+      responses:
+        '200':
+          description: Updated successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/User'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /users:
+    get:
+      tags: [Users]
+      summary: Get all users with pagination, filtering, and sorting (admin, manager)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+          description: Page number
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 100
+          description: Number of results per page
+        - name: role
+          in: query
+          schema:
+            type: string
+            enum: [admin, manager, staff, resident]
+          description: Filter by role
+        - name: isActive
+          in: query
+          schema:
+            type: boolean
+          description: Filter by active status
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [fullName, email, role, createdAt]
+            default: createdAt
+          description: Field to sort by
+        - name: sortOrder
+          in: query
+          schema:
+            type: string
+            enum: [ASC, DESC]
+            default: DESC
+          description: Sort direction
+      responses:
+        '200':
+          description: Paginated list of users
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedUsers'
+        '400':
+          description: Invalid query parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '401':
           description: Unauthorized
           content:
@@ -250,11 +389,17 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too many requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /users/{id}:
     get:
       tags: [Users]
-      summary: Get user by ID
+      summary: Get user by ID (admin, manager)
       security:
         - bearerAuth: []
       parameters:
@@ -276,6 +421,18 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/User'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: User not found
           content:
@@ -283,9 +440,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
-    put:
+    patch:
       tags: [Users]
-      summary: Update user
+      summary: Update user info by ID (admin only — cannot change role or status)
       security:
         - bearerAuth: []
       parameters:
@@ -304,10 +461,15 @@ paths:
               properties:
                 fullName:
                   type: string
+                  minLength: 2
+                  maxLength: 100
                   example: Nguyen Van B
                 email:
                   type: string
                   example: newmail@example.com
+                phone:
+                  type: string
+                  example: '0901234567'
       responses:
         '200':
           description: Updated successfully
@@ -320,6 +482,24 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/User'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: User not found
           content:
@@ -327,9 +507,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
-    delete:
+  /users/{id}/status:
+    patch:
       tags: [Users]
-      summary: Delete user (admin only)
+      summary: Toggle user active status (admin only)
       security:
         - bearerAuth: []
       parameters:
@@ -339,13 +520,97 @@ paths:
           schema:
             type: integer
           example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [isActive]
+              properties:
+                isActive:
+                  type: boolean
+                  example: false
       responses:
         '200':
-          description: Deleted successfully
+          description: Status toggled successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MessageResponse'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/User'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /users/{id}/role:
+    patch:
+      tags: [Users]
+      summary: Update user role (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role:
+                  type: string
+                  enum: [admin, manager, staff, resident]
+                  example: staff
+      responses:
+        '200':
+          description: Role updated successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/User'
+        '400':
+          description: Invalid role
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '403':
           description: Access denied
           content:

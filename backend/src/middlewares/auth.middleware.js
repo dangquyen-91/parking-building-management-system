@@ -1,4 +1,4 @@
-import jwt from 'jsonwebtoken';
+import { verifyAccess } from '../utils/jwt.js';
 import response from '../utils/response.js';
 
 const authenticate = (req, res, next) => {
@@ -7,13 +7,11 @@ const authenticate = (req, res, next) => {
     return response.error(res, 'No token provided', 401);
   }
 
-  const token = authHeader.split(' ')[1];
   try {
-    const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
-    req.user = decoded;
+    req.user = verifyAccess(authHeader.split(' ')[1]);
     next();
   } catch (err) {
-    return response.error(res, 'Invalid or expired token', 401);
+    return response.error(res, err.message, 401);
   }
 };
 
