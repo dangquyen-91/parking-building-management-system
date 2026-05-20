@@ -1,10 +1,11 @@
+import { Op } from 'sequelize';
 import User from '../models/user.model.js';
 import AppError from '../utils/appError.js';
 import { ROLES, USER_SORT_FIELDS } from '../constants/roles.js';
 
 const EXCLUDE = ['password', 'refreshToken'];
 
-const getAll = async ({ page = 1, limit = 10, role, isActive, sortBy = 'createdAt', sortOrder = 'DESC' } = {}) => {
+const getAll = async ({ page = 1, limit = 10, role, isActive, search, sortBy = 'createdAt', sortOrder = 'DESC' } = {}) => {
   const pageNum = Math.max(1, parseInt(page));
   const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
   const offset = (pageNum - 1) * limitNum;
@@ -16,6 +17,12 @@ const getAll = async ({ page = 1, limit = 10, role, isActive, sortBy = 'createdA
   }
   if (isActive !== undefined) {
     where.isActive = isActive === 'true' || isActive === true;
+  }
+  if (search) {
+    where[Op.or] = [
+      { fullName: { [Op.like]: `%${search}%` } },
+      { email: { [Op.like]: `%${search}%` } },
+    ];
   }
 
   const orderField = USER_SORT_FIELDS.includes(sortBy) ? sortBy : 'createdAt';
@@ -58,6 +65,15 @@ const update = async (id, data, requesterId, requesterRole) => {
   if (!user) throw new AppError('User not found', 404);
 
   const { password, refreshToken, role, isActive, ...safeData } = data;
+
+  if (safeData.email) {
+    safeData.email = safeData.email.toLowerCase().trim();
+    const conflict = await User.findOne({ where: { email: safeData.email } });
+    if (conflict && conflict.id !== parseInt(id)) {
+      throw new AppError('Email already in use', 409);
+    }
+  }
+
   await user.update(safeData);
 
   const { password: _p, refreshToken: _r, ...updated } = user.toJSON();

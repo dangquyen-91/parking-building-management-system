@@ -21,9 +21,10 @@ router.patch('/me', validate(updateMeSchema), userController.updateMe);
 router.get('/', authorize('admin', 'manager'), userController.getAll);
 router.get('/:id', authorize('admin', 'manager'), userController.getById);
 
-// Admin only: update info, role, status
+// Admin only: update info, role, status, delete
 router.patch('/:id', authorize('admin'), validate(updateUserSchema), userController.update);
 router.patch('/:id/role', authorize('admin'), validate(changeRoleSchema), userController.updateRole);
 router.patch('/:id/status', authorize('admin'), validate(updateStatusSchema), userController.updateStatus);
+router.delete('/:id', authorize('admin'), userController.remove);
 
 export default router;

@@ -3,8 +3,8 @@ import response from '../utils/response.js';
 
 const getAll = async (req, res, next) => {
   try {
-    const { page, limit, role, isActive, sortBy, sortOrder } = req.query;
-    const result = await userService.getAll({ page, limit, role, isActive, sortBy, sortOrder });
+    const { page, limit, role, isActive, search, sortBy, sortOrder } = req.query;
+    const result = await userService.getAll({ page, limit, role, isActive, search, sortBy, sortOrder });
     response.paginated(res, result.users, result.pagination);
   } catch (err) {
     next(err);
