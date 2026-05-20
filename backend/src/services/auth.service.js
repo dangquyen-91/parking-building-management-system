@@ -50,4 +50,22 @@ const logout = async (userId) => {
   await User.update({ refreshToken: null }, { where: { id: userId } });
 };
 
-export { register, login, refresh, logout };
+const changePassword = async (userId, { currentPassword, newPassword }) => {
+  const user = await User.findByPk(userId);
+  if (!user || !user.isActive) throw new AppError('User not found', 404);
+
+  const isMatch = await comparePassword(currentPassword, user.password);
+  if (!isMatch) throw new AppError('Current password is incorrect', 400);
+
+  const isSamePassword = await comparePassword(newPassword, user.password);
+  if (isSamePassword) throw new AppError('New password must be different from current password', 400);
+
+  const hashed = await hashPassword(newPassword);
+  const { accessToken, refreshToken } = generateTokens({ id: user.id, role: user.role });
+
+  await user.update({ password: hashed, refreshToken });
+
+  return { accessToken, refreshToken };
+};
+
+export { register, login, refresh, logout, changePassword };
