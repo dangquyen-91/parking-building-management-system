@@ -10,6 +10,7 @@ import './models/index.js';
 import authRoutes from './routes/auth.routes.js';
 import userRoutes from './routes/user.routes.js';
 import buildingRoutes from './routes/building.routes.js';
+import floorRoutes from './routes/floor.routes.js';
 import errorHandler from './middlewares/error.middleware.js';
 import { apiLimiter, authLimiter } from './middlewares/rateLimiter.middleware.js';
 
@@ -37,6 +38,7 @@ app.use('/api/v1', apiLimiter);
 app.use('/api/v1/auth', authLimiter, authRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/buildings', buildingRoutes);
+app.use('/api/v1/floors', floorRoutes);
 
 app.get('/health', (_req, res) =>
   res.json({ success: true, message: 'OK', data: { env: process.env.NODE_ENV } })
