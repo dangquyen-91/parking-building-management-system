@@ -8,7 +8,7 @@ export const updateMeSchema = Joi.object({
   phone: Joi.string().trim().pattern(phonePattern).messages({
     'string.pattern.base': 'Phone number is invalid',
   }),
-});
+}).min(1);
 
 export const updateUserSchema = Joi.object({
   fullName: Joi.string().trim().min(2).max(100),
@@ -16,7 +16,7 @@ export const updateUserSchema = Joi.object({
   phone: Joi.string().trim().pattern(phonePattern).messages({
     'string.pattern.base': 'Phone number is invalid',
   }),
-});
+}).min(1);
 
 export const changeRoleSchema = Joi.object({
   role: Joi.string()

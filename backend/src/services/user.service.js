@@ -88,7 +88,7 @@ const updateMe = async (id, data) => {
   if (fullName !== undefined) safeData.fullName = fullName;
   if (phone !== undefined) safeData.phone = phone;
   await user.update(safeData);
-  await user.reload();
+  await user.reload({ attributes: { exclude: EXCLUDE } });
   return user;
 };
 

@@ -37,4 +37,13 @@ const logout = async (req, res, next) => {
   }
 };
 
-export { register, login, refresh, logout };
+const changePassword = async (req, res, next) => {
+  try {
+    const tokens = await authService.changePassword(req.user.id, req.body);
+    response.success(res, tokens);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export { register, login, refresh, logout, changePassword };
