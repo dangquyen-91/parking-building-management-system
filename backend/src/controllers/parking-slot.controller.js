@@ -57,4 +57,13 @@ const remove = async (req, res, next) => {
   }
 };
 
-export { getAll, getById, create, update, updateStatus, remove };
+const bulkCreate = async (req, res, next) => {
+  try {
+    const slots = await parkingSlotService.bulkCreate(req.body);
+    response.success(res, { slots, count: slots.length }, 201);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export { getAll, getById, create, bulkCreate, update, updateStatus, remove };

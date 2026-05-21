@@ -15,73 +15,44 @@ components:
       scheme: bearer
       bearerFormat: JWT
 
+  parameters:
+    pathId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        example: 1
+    queryPage:
+      name: page
+      in: query
+      schema:
+        type: integer
+        default: 1
+        minimum: 1
+    queryLimit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        default: 10
+        minimum: 1
+        maximum: 100
+    queryIsActive:
+      name: isActive
+      in: query
+      schema:
+        type: boolean
+    querySortOrder:
+      name: sortOrder
+      in: query
+      schema:
+        type: string
+        enum: [ASC, DESC]
+        default: DESC
+
   schemas:
-    User:
-      type: object
-      properties:
-        id:
-          type: integer
-          example: 1
-        fullName:
-          type: string
-          example: Nguyen Van A
-        email:
-          type: string
-          example: user@example.com
-        phone:
-          type: string
-          example: '0901234567'
-          nullable: true
-        role:
-          type: string
-          enum: [admin, manager, staff, user]
-          example: user
-        isActive:
-          type: boolean
-          example: true
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
-
-    Tokens:
-      type: object
-      properties:
-        accessToken:
-          type: string
-          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-        refreshToken:
-          type: string
-          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-
-    PaginatedUsers:
-      type: object
-      properties:
-        success:
-          type: boolean
-          example: true
-        data:
-          type: array
-          items:
-            $ref: '#/components/schemas/User'
-        pagination:
-          type: object
-          properties:
-            page:
-              type: integer
-              example: 1
-            limit:
-              type: integer
-              example: 10
-            total:
-              type: integer
-              example: 50
-            totalPages:
-              type: integer
-              example: 5
-
+    # ── COMMON ──────────────────────────────────────────
     SuccessResponse:
       type: object
       properties:
@@ -115,13 +86,569 @@ components:
                 type: string
               example: ['fullName is required', 'password must be at least 8 characters']
 
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 10
+        total:
+          type: integer
+          example: 50
+        totalPages:
+          type: integer
+          example: 5
+
+    # ── AUTH ────────────────────────────────────────────
+    Tokens:
+      type: object
+      properties:
+        accessToken:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        refreshToken:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+    # ── USER ────────────────────────────────────────────
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        fullName:
+          type: string
+          example: Nguyen Van A
+        email:
+          type: string
+          example: user@example.com
+        phone:
+          type: string
+          example: '0901234567'
+          nullable: true
+        role:
+          type: string
+          enum: [admin, manager, staff, user]
+          example: user
+        isActive:
+          type: boolean
+          example: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    PaginatedUsers:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    # ── BUILDING ────────────────────────────────────────
+    Building:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: Toa nha A
+        address:
+          type: string
+          example: 123 Nguyen Hue, Q1, TP.HCM
+        description:
+          type: string
+          nullable: true
+          example: Toa nha giu xe 5 tang
+        isActive:
+          type: boolean
+          example: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    BuildingWithFloors:
+      allOf:
+        - $ref: '#/components/schemas/Building'
+        - type: object
+          properties:
+            floors:
+              type: array
+              items:
+                $ref: '#/components/schemas/Floor'
+
+    PaginatedBuildings:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Building'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    # ── FLOOR ───────────────────────────────────────────
+    Floor:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        buildingId:
+          type: integer
+          example: 1
+        floorNumber:
+          type: integer
+          example: 1
+        vehicleType:
+          type: string
+          enum: [motorcycle, car]
+          example: motorcycle
+        totalSlots:
+          type: integer
+          example: 50
+        description:
+          type: string
+          nullable: true
+          example: Tang danh cho xe may
+        isActive:
+          type: boolean
+          example: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    FloorDetail:
+      allOf:
+        - $ref: '#/components/schemas/Floor'
+        - type: object
+          properties:
+            building:
+              type: object
+              properties:
+                id:
+                  type: integer
+                  example: 1
+                name:
+                  type: string
+                  example: Toa nha A
+                address:
+                  type: string
+                  example: 123 Nguyen Hue, Q1, TP.HCM
+            slots:
+              type: array
+              items:
+                $ref: '#/components/schemas/ParkingSlot'
+
+    PaginatedFloors:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            allOf:
+              - $ref: '#/components/schemas/Floor'
+              - type: object
+                properties:
+                  building:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                        example: 1
+                      name:
+                        type: string
+                        example: Toa nha A
+                      address:
+                        type: string
+                        example: 123 Nguyen Hue, Q1, TP.HCM
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    # ── PARKING SLOT ────────────────────────────────────
+    ParkingSlot:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        floorId:
+          type: integer
+          example: 2
+        slotCode:
+          type: string
+          example: A01
+        vehicleType:
+          type: string
+          enum: [motorcycle, car]
+          example: motorcycle
+        status:
+          type: string
+          enum: [empty, occupied, reserved, maintenance]
+          example: empty
+        note:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ParkingSlotDetail:
+      allOf:
+        - $ref: '#/components/schemas/ParkingSlot'
+        - type: object
+          properties:
+            floor:
+              type: object
+              properties:
+                id:
+                  type: integer
+                  example: 2
+                floorNumber:
+                  type: integer
+                  example: 1
+                vehicleType:
+                  type: string
+                  example: motorcycle
+                buildingId:
+                  type: integer
+                  example: 1
+                building:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 1
+                    name:
+                      type: string
+                      example: Toa nha A
+                    address:
+                      type: string
+                      example: 123 Nguyen Hue, Q1, TP.HCM
+
+    PaginatedParkingSlots:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ParkingSlotDetail'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    BulkCreateSlotItem:
+      type: object
+      required: [slotCode, vehicleType]
+      properties:
+        slotCode:
+          type: string
+          minLength: 1
+          maxLength: 20
+          example: A01
+        vehicleType:
+          type: string
+          enum: [motorcycle, car]
+          example: motorcycle
+        status:
+          type: string
+          enum: [empty, occupied, reserved, maintenance]
+          default: empty
+        note:
+          type: string
+          maxLength: 1000
+          nullable: true
+
+    BulkCreateSlotsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            slots:
+              type: array
+              items:
+                $ref: '#/components/schemas/ParkingSlot'
+            count:
+              type: integer
+              example: 3
+
+    # ── PARKING SESSION ─────────────────────────────────
+    ParkingSession:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        slotId:
+          type: integer
+          example: 5
+        licensePlate:
+          type: string
+          example: 51A-12345
+        vehicleType:
+          type: string
+          enum: [motorcycle, car]
+          example: motorcycle
+        entryTime:
+          type: string
+          format: date-time
+        exitTime:
+          type: string
+          format: date-time
+          nullable: true
+        fee:
+          type: number
+          format: float
+          example: 0
+        status:
+          type: string
+          enum: [active, completed, cancelled]
+          example: active
+        note:
+          type: string
+          nullable: true
+        staffId:
+          type: integer
+          example: 3
+        userId:
+          type: integer
+          nullable: true
+          example: 12
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ParkingSessionDetail:
+      allOf:
+        - $ref: '#/components/schemas/ParkingSession'
+        - type: object
+          properties:
+            slot:
+              type: object
+              properties:
+                id:
+                  type: integer
+                  example: 5
+                slotCode:
+                  type: string
+                  example: A01
+                floorId:
+                  type: integer
+                  example: 2
+                floor:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 2
+                    floorNumber:
+                      type: integer
+                      example: 1
+                    buildingId:
+                      type: integer
+                      example: 1
+                    building:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          example: 1
+                        name:
+                          type: string
+                          example: Toa nha A
+                        address:
+                          type: string
+                          example: 123 Nguyen Hue, Q1, TP.HCM
+            staff:
+              type: object
+              properties:
+                id:
+                  type: integer
+                  example: 3
+                fullName:
+                  type: string
+                  example: Tran Van Staff
+            user:
+              type: object
+              nullable: true
+              properties:
+                id:
+                  type: integer
+                  example: 12
+                fullName:
+                  type: string
+                  example: Nguyen Van A
+                phone:
+                  type: string
+                  nullable: true
+                  example: '0901234567'
+
+    ParkingSessionListItem:
+      allOf:
+        - $ref: '#/components/schemas/ParkingSession'
+        - type: object
+          properties:
+            slot:
+              type: object
+              properties:
+                id:
+                  type: integer
+                  example: 5
+                slotCode:
+                  type: string
+                  example: A01
+                floorId:
+                  type: integer
+                  example: 2
+                floor:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 2
+                    floorNumber:
+                      type: integer
+                      example: 1
+                    buildingId:
+                      type: integer
+                      example: 1
+                    building:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          example: 1
+                        name:
+                          type: string
+                          example: Toa nha A
+            staff:
+              type: object
+              properties:
+                id:
+                  type: integer
+                  example: 3
+                fullName:
+                  type: string
+                  example: Tran Van Staff
+
+    PaginatedParkingSessions:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ParkingSessionListItem'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    CheckInResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        licensePlate:
+          type: string
+          example: 51A-12345
+        vehicleType:
+          type: string
+          enum: [motorcycle, car]
+          example: motorcycle
+        entryTime:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [active]
+          example: active
+        note:
+          type: string
+          nullable: true
+        slot:
+          type: object
+          properties:
+            id:
+              type: integer
+              example: 5
+            slotCode:
+              type: string
+              example: A01
+            floor:
+              type: object
+              properties:
+                id:
+                  type: integer
+                  example: 2
+                floorNumber:
+                  type: integer
+                  example: 1
+                building:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 1
+                    name:
+                      type: string
+                      example: Toa nha A
+        staffId:
+          type: integer
+          example: 3
+        userId:
+          type: integer
+          nullable: true
+          example: 12
+
+# ── PATHS ──────────────────────────────────────────────────────────────────
 paths:
+
   # ── AUTH ──────────────────────────────────────────────
   /auth/register:
     post:
       tags: [Auth]
       summary: Register a new account
-      description: Creates a new account with role `user` by default. Role cannot be set on registration.
+      description: Creates a new account with role `user` by default.
       requestBody:
         required: true
         content:
@@ -204,12 +731,6 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/Tokens'
-        '400':
-          description: Validation error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '401':
           description: Invalid credentials or account inactive
           content:
@@ -250,12 +771,6 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/Tokens'
-        '400':
-          description: Validation error (missing refreshToken)
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '401':
           description: Invalid or revoked refresh token
           content:
@@ -370,7 +885,7 @@ paths:
 
     patch:
       tags: [Users]
-      summary: Update current user profile (fullName and/or phone only)
+      summary: Update own profile (fullName and/or phone only)
       security:
         - bearerAuth: []
       requestBody:
@@ -417,56 +932,30 @@ paths:
   /users:
     get:
       tags: [Users]
-      summary: Get all users (admin, manager only)
-      description: Supports pagination, search, filtering by role/status, and sorting.
+      summary: Get all users (admin, manager)
       security:
         - bearerAuth: []
       parameters:
-        - name: page
-          in: query
-          schema:
-            type: integer
-            default: 1
-            minimum: 1
-          description: Page number
-        - name: limit
-          in: query
-          schema:
-            type: integer
-            default: 10
-            minimum: 1
-            maximum: 100
-          description: Number of results per page
+        - $ref: '#/components/parameters/queryPage'
+        - $ref: '#/components/parameters/queryLimit'
         - name: search
           in: query
           schema:
             type: string
-          description: Search by full name or email (partial match)
+          description: Search by fullName or email
         - name: role
           in: query
           schema:
             type: string
             enum: [admin, manager, staff, user]
-          description: Filter by role
-        - name: isActive
-          in: query
-          schema:
-            type: boolean
-          description: Filter by active status
+        - $ref: '#/components/parameters/queryIsActive'
         - name: sortBy
           in: query
           schema:
             type: string
             enum: [fullName, email, role, createdAt]
             default: createdAt
-          description: Field to sort by
-        - name: sortOrder
-          in: query
-          schema:
-            type: string
-            enum: [ASC, DESC]
-            default: DESC
-          description: Sort direction
+        - $ref: '#/components/parameters/querySortOrder'
       responses:
         '200':
           description: Paginated list of users
@@ -474,12 +963,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PaginatedUsers'
-        '400':
-          description: Invalid query parameters
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '401':
           description: Unauthorized
           content:
@@ -492,26 +975,15 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-        '429':
-          description: Too many requests
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
 
   /users/{id}:
     get:
       tags: [Users]
-      summary: Get user by ID (admin, manager only)
+      summary: Get user by ID (admin, manager)
       security:
         - bearerAuth: []
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-          example: 1
+        - $ref: '#/components/parameters/pathId'
       responses:
         '200':
           description: User found
@@ -545,16 +1017,11 @@ paths:
 
     patch:
       tags: [Users]
-      summary: Update user info by ID (admin only — cannot change role or status here)
+      summary: Update user info by ID (admin)
       security:
         - bearerAuth: []
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-          example: 1
+        - $ref: '#/components/parameters/pathId'
       requestBody:
         required: true
         content:
@@ -619,19 +1086,14 @@ paths:
 
     delete:
       tags: [Users]
-      summary: Delete user by ID (admin only)
+      summary: Delete user by ID (admin)
       security:
         - bearerAuth: []
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-          example: 1
+        - $ref: '#/components/parameters/pathId'
       responses:
         '204':
-          description: User deleted successfully
+          description: Deleted successfully
         '401':
           description: Unauthorized
           content:
@@ -654,16 +1116,11 @@ paths:
   /users/{id}/role:
     patch:
       tags: [Users]
-      summary: Update user role (admin only)
+      summary: Update user role (admin)
       security:
         - bearerAuth: []
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-          example: 1
+        - $ref: '#/components/parameters/pathId'
       requestBody:
         required: true
         content:
@@ -715,17 +1172,12 @@ paths:
 
   /users/{id}/status:
     patch:
-      tags: [Auth]
-      summary: Toggle user active status (admin only)
+      tags: [Users]
+      summary: Toggle user active status (admin)
       security:
         - bearerAuth: []
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-          example: 1
+        - $ref: '#/components/parameters/pathId'
       requestBody:
         required: true
         content:
@@ -763,6 +1215,1199 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ── BUILDINGS ─────────────────────────────────────────
+  /buildings:
+    get:
+      tags: [Buildings]
+      summary: Get all buildings
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/queryPage'
+        - $ref: '#/components/parameters/queryLimit'
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Search by name or address
+        - $ref: '#/components/parameters/queryIsActive'
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [name, address, createdAt]
+            default: createdAt
+        - $ref: '#/components/parameters/querySortOrder'
+      responses:
+        '200':
+          description: Paginated list of buildings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedBuildings'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      tags: [Buildings]
+      summary: Create a new building (admin, manager)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, address]
+              properties:
+                name:
+                  type: string
+                  minLength: 2
+                  maxLength: 100
+                  example: Toa nha A
+                address:
+                  type: string
+                  minLength: 5
+                  maxLength: 255
+                  example: 123 Nguyen Hue, Q1, TP.HCM
+                description:
+                  type: string
+                  maxLength: 1000
+                  nullable: true
+                  example: Toa nha giu xe trung tam
+                isActive:
+                  type: boolean
+                  default: true
+      responses:
+        '201':
+          description: Building created successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Building'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Building name already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /buildings/{id}:
+    get:
+      tags: [Buildings]
+      summary: Get building by ID (includes floors list)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/pathId'
+      responses:
+        '200':
+          description: Building detail with floors
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/BuildingWithFloors'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Building not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    patch:
+      tags: [Buildings]
+      summary: Update building (admin, manager)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/pathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                name:
+                  type: string
+                  minLength: 2
+                  maxLength: 100
+                  example: Toa nha B
+                address:
+                  type: string
+                  minLength: 5
+                  maxLength: 255
+                  example: 456 Le Loi, Q1, TP.HCM
+                description:
+                  type: string
+                  maxLength: 1000
+                  nullable: true
+                isActive:
+                  type: boolean
+      responses:
+        '200':
+          description: Updated successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Building'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Building not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Building name already in use
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags: [Buildings]
+      summary: Delete building (admin) — blocked if floors exist
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/pathId'
+      responses:
+        '204':
+          description: Deleted successfully
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Building not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Cannot delete building with existing floors
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ── FLOORS ────────────────────────────────────────────
+  /floors:
+    get:
+      tags: [Floors]
+      summary: Get all floors
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/queryPage'
+        - $ref: '#/components/parameters/queryLimit'
+        - name: buildingId
+          in: query
+          schema:
+            type: integer
+          description: Filter by building
+        - name: vehicleType
+          in: query
+          schema:
+            type: string
+            enum: [motorcycle, car]
+        - $ref: '#/components/parameters/queryIsActive'
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [floorNumber, vehicleType, totalSlots, createdAt]
+            default: floorNumber
+        - name: sortOrder
+          in: query
+          schema:
+            type: string
+            enum: [ASC, DESC]
+            default: ASC
+      responses:
+        '200':
+          description: Paginated list of floors
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedFloors'
+        '400':
+          description: Invalid vehicleType filter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      tags: [Floors]
+      summary: Create a new floor (admin, manager)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [buildingId, floorNumber, vehicleType, totalSlots]
+              properties:
+                buildingId:
+                  type: integer
+                  example: 1
+                floorNumber:
+                  type: integer
+                  example: 1
+                vehicleType:
+                  type: string
+                  enum: [motorcycle, car]
+                  example: motorcycle
+                totalSlots:
+                  type: integer
+                  minimum: 1
+                  example: 50
+                description:
+                  type: string
+                  maxLength: 1000
+                  nullable: true
+                  example: Tang danh cho xe may
+                isActive:
+                  type: boolean
+                  default: true
+      responses:
+        '201':
+          description: Floor created successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Floor'
+        '400':
+          description: Validation error or building/floor inactive
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Building not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Floor number already exists in this building
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /floors/{id}:
+    get:
+      tags: [Floors]
+      summary: Get floor by ID (includes building info + slots)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/pathId'
+      responses:
+        '200':
+          description: Floor detail
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/FloorDetail'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Floor not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    patch:
+      tags: [Floors]
+      summary: Update floor (admin, manager) — buildingId cannot be changed
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/pathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                floorNumber:
+                  type: integer
+                  example: 2
+                vehicleType:
+                  type: string
+                  enum: [motorcycle, car]
+                totalSlots:
+                  type: integer
+                  minimum: 1
+                  example: 60
+                description:
+                  type: string
+                  maxLength: 1000
+                  nullable: true
+                isActive:
+                  type: boolean
+      responses:
+        '200':
+          description: Updated successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Floor'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Floor not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Floor number already exists in this building
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags: [Floors]
+      summary: Delete floor (admin) — blocked if parking slots exist
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/pathId'
+      responses:
+        '204':
+          description: Deleted successfully
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Floor not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Cannot delete floor with existing parking slots
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ── PARKING SLOTS ─────────────────────────────────────
+  /parking-slots:
+    get:
+      tags: [Parking Slots]
+      summary: Get all parking slots
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/queryPage'
+        - $ref: '#/components/parameters/queryLimit'
+        - name: floorId
+          in: query
+          schema:
+            type: integer
+          description: Filter by floor
+        - name: buildingId
+          in: query
+          schema:
+            type: integer
+          description: Filter by building (via floor join)
+        - name: vehicleType
+          in: query
+          schema:
+            type: string
+            enum: [motorcycle, car]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [empty, occupied, reserved, maintenance]
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [slotCode, vehicleType, status, createdAt]
+            default: slotCode
+        - name: sortOrder
+          in: query
+          schema:
+            type: string
+            enum: [ASC, DESC]
+            default: ASC
+      responses:
+        '200':
+          description: Paginated list of parking slots
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedParkingSlots'
+        '400':
+          description: Invalid filter value
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      tags: [Parking Slots]
+      summary: Create a new parking slot (admin, manager)
+      description: |
+        vehicleType must match the floor's vehicleType.
+        Total slots cannot exceed floor.totalSlots.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [floorId, slotCode, vehicleType]
+              properties:
+                floorId:
+                  type: integer
+                  example: 2
+                slotCode:
+                  type: string
+                  minLength: 1
+                  maxLength: 20
+                  example: A01
+                vehicleType:
+                  type: string
+                  enum: [motorcycle, car]
+                  example: motorcycle
+                status:
+                  type: string
+                  enum: [empty, occupied, reserved, maintenance]
+                  default: empty
+                note:
+                  type: string
+                  maxLength: 1000
+                  nullable: true
+      responses:
+        '201':
+          description: Slot created successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ParkingSlot'
+        '400':
+          description: Validation error, wrong vehicleType, or floor/building inactive
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Floor not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Slot code already exists on this floor, or floor at max capacity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /parking-slots/bulk:
+    post:
+      tags: [Parking Slots]
+      summary: Bulk create parking slots (admin, manager)
+      description: |
+        Hỗ trợ 2 mode: truyền `quantity` để tự sinh slotCode (A01, A02…), hoặc truyền `slots` để chỉ định tường minh.
+        Toàn bộ chạy trong một transaction — lỗi 1 slot thì rollback hết.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - title: Mode 1 — Auto-generate by quantity
+                  type: object
+                  required: [floorId, quantity]
+                  properties:
+                    floorId:
+                      type: integer
+                      example: 2
+                      description: ID của tầng cần tạo slots
+                    quantity:
+                      type: integer
+                      minimum: 1
+                      maximum: 200
+                      example: 10
+                      description: Số lượng slot cần tạo
+                    prefix:
+                      type: string
+                      maxLength: 5
+                      default: A
+                      example: A
+                      description: Tiền tố cho slotCode (mặc định "A" → A01, A02…)
+                    startFrom:
+                      type: integer
+                      minimum: 1
+                      example: 1
+                      description: Số bắt đầu (mặc định tự tính từ số slot hiện có + 1)
+                - title: Mode 2 — Explicit slots list
+                  type: object
+                  required: [floorId, slots]
+                  properties:
+                    floorId:
+                      type: integer
+                      example: 2
+                      description: ID của tầng cần tạo slots
+                    slots:
+                      type: array
+                      minItems: 1
+                      maxItems: 200
+                      items:
+                        $ref: '#/components/schemas/BulkCreateSlotItem'
+            examples:
+              autoGenerate:
+                summary: 'Mode 1: Tự sinh 10 slot (A01–A10)'
+                value:
+                  floorId: 2
+                  quantity: 10
+              autoGenerateWithPrefix:
+                summary: 'Mode 1: Tự sinh 5 slot với prefix B, bắt đầu từ 3'
+                value:
+                  floorId: 2
+                  quantity: 5
+                  prefix: B
+                  startFrom: 3
+              explicitSlots:
+                summary: 'Mode 2: Danh sách slot tường minh'
+                value:
+                  floorId: 2
+                  slots:
+                    - slotCode: A01
+                      vehicleType: motorcycle
+                    - slotCode: A02
+                      vehicleType: motorcycle
+                    - slotCode: A03
+                      vehicleType: motorcycle
+                      note: Góc tường
+      responses:
+        '201':
+          description: Tất cả slots được tạo thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkCreateSlotsResponse'
+        '400':
+          description: Validation error, vehicleType mismatch, or floor/building inactive
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                vehicleTypeMismatch:
+                  summary: '[Mode 2] vehicleType không khớp với floor'
+                  value:
+                    success: false
+                    message: 'This floor only accepts "motorcycle" slots. Slot "A01" has type "car"'
+                duplicateInRequest:
+                  summary: '[Mode 2] slotCode trùng trong request'
+                  value:
+                    success: false
+                    message: 'Duplicate slotCode in request: "A01"'
+                floorInactive:
+                  summary: Floor hoặc Building đang inactive
+                  value:
+                    success: false
+                    message: Floor is inactive
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Floor not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: slotCode đã tồn tại trên floor, hoặc vượt quá capacity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                slotCodeConflict:
+                  summary: slotCode đã tồn tại
+                  value:
+                    success: false
+                    message: 'Slot code "A01" already exists on this floor'
+                capacityExceeded:
+                  summary: Vượt quá sức chứa
+                  value:
+                    success: false
+                    message: 'Floor capacity exceeded. Current: 45, adding: 10, max: 50'
+
+  /parking-slots/{id}:
+    get:
+      tags: [Parking Slots]
+      summary: Get parking slot by ID (includes floor + building info)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/pathId'
+      responses:
+        '200':
+          description: Slot detail
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ParkingSlotDetail'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Slot not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    patch:
+      tags: [Parking Slots]
+      summary: Update slot info (admin, manager) — floorId cannot be changed
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/pathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                slotCode:
+                  type: string
+                  minLength: 1
+                  maxLength: 20
+                  example: A02
+                vehicleType:
+                  type: string
+                  enum: [motorcycle, car]
+                status:
+                  type: string
+                  enum: [empty, occupied, reserved, maintenance]
+                note:
+                  type: string
+                  maxLength: 1000
+                  nullable: true
+      responses:
+        '200':
+          description: Updated successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ParkingSlot'
+        '400':
+          description: Validation error or vehicleType mismatch
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Slot not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Slot code already exists on this floor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags: [Parking Slots]
+      summary: Delete parking slot (admin) — blocked if active session exists
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/pathId'
+      responses:
+        '204':
+          description: Deleted successfully
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Slot not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Cannot delete slot with an active parking session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /parking-slots/{id}/status:
+    patch:
+      tags: [Parking Slots]
+      summary: Update slot status (admin, manager, staff)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/pathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [empty, occupied, reserved, maintenance]
+                  example: maintenance
+                note:
+                  type: string
+                  maxLength: 1000
+                  nullable: true
+                  example: Dang sua chua
+      responses:
+        '200':
+          description: Status updated successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ParkingSlot'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Slot not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ── PARKING SESSIONS ──────────────────────────────────
+  /parking-sessions:
+    get:
+      tags: [Parking Sessions]
+      summary: Get active parking sessions (admin, manager, staff)
+      description: |
+        Trả về danh sách các session đang **active** (xe đang gửi).
+        Hỗ trợ lọc theo tầng, tòa nhà, loại xe và tìm kiếm biển số.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/queryPage'
+        - $ref: '#/components/parameters/queryLimit'
+        - name: floorId
+          in: query
+          schema:
+            type: integer
+          description: Lọc theo tầng
+        - name: buildingId
+          in: query
+          schema:
+            type: integer
+          description: Lọc theo tòa nhà
+        - name: vehicleType
+          in: query
+          schema:
+            type: string
+            enum: [motorcycle, car]
+          description: Lọc theo loại xe
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Tìm kiếm theo biển số xe (LIKE)
+          example: 51A
+      responses:
+        '200':
+          description: Danh sách session đang active
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedParkingSessions'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /parking-sessions/{id}:
+    get:
+      tags: [Parking Sessions]
+      summary: Get parking session by ID (admin, manager, staff)
+      description: |
+        Trả về chi tiết một session kèm thông tin slot, tầng, tòa nhà, staff thực hiện check-in và khách hàng (nếu có).
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/pathId'
+      responses:
+        '200':
+          description: Chi tiết session
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ParkingSessionDetail'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /parking-sessions/check-in:
+    post:
+      tags: [Parking Sessions]
+      summary: Vehicle check-in (admin, manager, staff)
+      description: |
+        Creates an active parking session and marks the slot as `occupied`.
+        Runs inside a database transaction with row-level lock to prevent race conditions.
+
+        **Validations:**
+        - Slot must exist and be `empty`
+        - Floor and building must be active
+        - `vehicleType` must match the floor's vehicleType
+        - License plate must not already have an active session
+        - `userId` (if provided) must exist
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [slotId, licensePlate, vehicleType]
+              properties:
+                slotId:
+                  type: integer
+                  example: 5
+                licensePlate:
+                  type: string
+                  minLength: 4
+                  maxLength: 20
+                  example: 51A-12345
+                  description: Letters, numbers and hyphens only — automatically uppercased
+                vehicleType:
+                  type: string
+                  enum: [motorcycle, car]
+                  example: motorcycle
+                userId:
+                  type: integer
+                  nullable: true
+                  example: 12
+                  description: Optional — link session to a registered customer
+                note:
+                  type: string
+                  maxLength: 500
+                  nullable: true
+      responses:
+        '201':
+          description: Check-in successful
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CheckInResponse'
+        '400':
+          description: Validation error, vehicleType mismatch, or inactive floor/building
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Slot or user not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Slot not available or license plate already checked in
           content:
             application/json:
               schema:

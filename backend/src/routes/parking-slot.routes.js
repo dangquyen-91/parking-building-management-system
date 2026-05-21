@@ -6,6 +6,7 @@ import {
   createParkingSlotSchema,
   updateParkingSlotSchema,
   updateSlotStatusSchema,
+  bulkCreateParkingSlotSchema,
 } from '../validations/parking-slot.validation.js';
 
 const router = Router();
@@ -21,6 +22,7 @@ router.patch('/:id/status', authorize('admin', 'manager', 'staff'), validate(upd
 
 // Admin + Manager: create and update
 router.post('/', authorize('admin', 'manager'), validate(createParkingSlotSchema), parkingSlotController.create);
+router.post('/bulk', authorize('admin', 'manager'), validate(bulkCreateParkingSlotSchema), parkingSlotController.bulkCreate);
 router.patch('/:id', authorize('admin', 'manager'), validate(updateParkingSlotSchema), parkingSlotController.update);
 
 // Admin only: delete

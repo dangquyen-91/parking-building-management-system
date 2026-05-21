@@ -138,4 +138,75 @@ const remove = async (id) => {
   await slot.destroy();
 };
 
-export { getAll, getById, create, update, updateStatus, remove };
+const bulkCreate = async ({ floorId, quantity, prefix = 'A', startFrom, slots }) => {
+  const floor = await Floor.findByPk(floorId, {
+    include: [{ model: Building, as: 'building', attributes: ['id', 'isActive'] }],
+  });
+  if (!floor) throw new AppError('Floor not found', 404);
+  if (!floor.isActive) throw new AppError('Floor is inactive', 400);
+  if (!floor.building.isActive) throw new AppError('Building is inactive', 400);
+
+  // ── Mode 1: quantity → tự sinh slotCode ─────────────────────────────
+  if (quantity !== undefined) {
+    const currentCount = await ParkingSlot.count({ where: { floorId } });
+    if (currentCount + quantity > floor.totalSlots) {
+      throw new AppError(
+        `Floor capacity exceeded. Current: ${currentCount}, adding: ${quantity}, max: ${floor.totalSlots}`,
+        409
+      );
+    }
+
+    const from = startFrom !== undefined ? startFrom : currentCount + 1;
+    const maxNum = from + quantity - 1;
+    const padLen = Math.max(String(maxNum).length, 2);
+
+    // Sinh danh sách code và kiểm tra trùng với DB
+    const generatedCodes = Array.from({ length: quantity }, (_, i) =>
+      `${prefix.toUpperCase()}${String(from + i).padStart(padLen, '0')}`
+    );
+    const existingSlots = await ParkingSlot.findAll({ where: { floorId }, attributes: ['slotCode'] });
+    const existingCodes = new Set(existingSlots.map((s) => s.slotCode));
+    const conflicting = generatedCodes.find((c) => existingCodes.has(c));
+    if (conflicting) throw new AppError(`Slot code "${conflicting}" already exists on this floor`, 409);
+
+    slots = generatedCodes.map((slotCode) => ({ slotCode, vehicleType: floor.vehicleType }));
+  } else {
+    const mismatch = slots.find((s) => s.vehicleType !== floor.vehicleType);
+    if (mismatch) {
+      throw new AppError(
+        `This floor only accepts "${floor.vehicleType}" slots. Slot "${mismatch.slotCode}" has type "${mismatch.vehicleType}"`,
+        400
+      );
+    }
+
+    const codes = slots.map((s) => s.slotCode.trim());
+    const duplicateInRequest = codes.find((c, i) => codes.indexOf(c) !== i);
+    if (duplicateInRequest) throw new AppError(`Duplicate slotCode in request: "${duplicateInRequest}"`, 400);
+
+    const currentCount = await ParkingSlot.count({ where: { floorId } });
+    if (currentCount + slots.length > floor.totalSlots) {
+      throw new AppError(
+        `Floor capacity exceeded. Current: ${currentCount}, adding: ${slots.length}, max: ${floor.totalSlots}`,
+        409
+      );
+    }
+
+    const existingSlots = await ParkingSlot.findAll({ where: { floorId }, attributes: ['slotCode'] });
+    const existingCodes = new Set(existingSlots.map((s) => s.slotCode));
+    const conflicting = codes.find((c) => existingCodes.has(c));
+    if (conflicting) throw new AppError(`Slot code "${conflicting}" already exists on this floor`, 409);
+  }
+
+  const transaction = await ParkingSlot.sequelize.transaction();
+  try {
+    const data = slots.map((s) => ({ ...s, slotCode: s.slotCode.trim(), floorId }));
+    const created = await ParkingSlot.bulkCreate(data, { transaction });
+    await transaction.commit();
+    return created;
+  } catch (err) {
+    await transaction.rollback();
+    throw err;
+  }
+};
+
+export { getAll, getById, create, bulkCreate, update, updateStatus, remove };
