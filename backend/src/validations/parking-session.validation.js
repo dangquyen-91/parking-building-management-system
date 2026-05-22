@@ -17,3 +17,16 @@ export const checkInSchema = Joi.object({
   userId: Joi.number().integer().positive().allow(null),
   note: Joi.string().trim().max(500).allow('', null),
 });
+
+export const lookupSchema = Joi.object({
+  licensePlate: Joi.string()
+    .trim()
+    .min(4)
+    .max(20)
+    .uppercase()
+    .pattern(/^[A-Z0-9\-]+$/)
+    .required()
+    .messages({
+      'string.pattern.base': 'License plate only allows letters, numbers and hyphens',
+    }),
+});

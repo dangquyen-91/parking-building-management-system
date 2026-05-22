@@ -582,6 +582,77 @@ components:
         pagination:
           $ref: '#/components/schemas/Pagination'
 
+    LookupResponse:
+      type: object
+      properties:
+        licensePlate:
+          type: string
+          example: 51A-12345
+        status:
+          type: string
+          enum: [available, already_active]
+          description: |
+            `available` — vehicle is not parked, safe to check-in.
+            `already_active` — vehicle is currently parked, check-in is blocked.
+          example: available
+        activeSession:
+          nullable: true
+          description: Populated only when `status` is `already_active`.
+          allOf:
+            - $ref: '#/components/schemas/ParkingSessionDetail'
+        hint:
+          type: object
+          description: Pre-fill hints for the check-in form derived from the most recent completed/cancelled session.
+          properties:
+            linkedResident:
+              nullable: true
+              description: Resident account linked on the last visit — use as the default `userId` on the check-in form.
+              type: object
+              properties:
+                id:
+                  type: integer
+                  example: 12
+                fullName:
+                  type: string
+                  example: Nguyen Van A
+                phone:
+                  type: string
+                  nullable: true
+                  example: '0901234567'
+                email:
+                  type: string
+                  example: user@example.com
+            lastVisit:
+              nullable: true
+              description: Summary of the most recent completed/cancelled session.
+              type: object
+              properties:
+                vehicleType:
+                  type: string
+                  enum: [motorcycle, car]
+                  example: motorcycle
+                entryTime:
+                  type: string
+                  format: date-time
+                exitTime:
+                  type: string
+                  format: date-time
+                  nullable: true
+                fee:
+                  type: number
+                  format: float
+                  example: 5000
+        availableSlots:
+          type: object
+          description: Real-time count of `empty` slots per vehicleType across all floors.
+          properties:
+            motorcycle:
+              type: integer
+              example: 24
+            car:
+              type: integer
+              example: 8
+
     CheckInResponse:
       type: object
       properties:
@@ -2270,6 +2341,141 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PaginatedParkingSessions'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /parking-sessions/lookup:
+    get:
+      tags: [Parking Sessions]
+      summary: Lookup license plate before check-in (admin, manager, staff)
+      description: |
+        **Preview endpoint** — call this before `POST /check-in` so staff can confirm:
+        - Is the vehicle already parked? (`already_active` → block the confirm button)
+        - Which resident was linked on their last visit? (`hint.linkedResident` → pre-fill the userId field)
+        - How many empty slots are available right now? (`availableSlots`)
+
+        No side effects — read-only, never cached.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: licensePlate
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 4
+            maxLength: 20
+            example: 51A-12345
+          description: Letters, numbers and hyphens only. Automatically uppercased before lookup.
+      responses:
+        '200':
+          description: Lookup result
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/LookupResponse'
+              examples:
+                available:
+                  summary: Vehicle not currently parked — safe to check in
+                  value:
+                    success: true
+                    data:
+                      licensePlate: 51A-12345
+                      status: available
+                      activeSession: null
+                      hint:
+                        linkedResident:
+                          id: 12
+                          fullName: Nguyen Van A
+                          phone: '0901234567'
+                          email: user@example.com
+                        lastVisit:
+                          vehicleType: motorcycle
+                          entryTime: '2024-05-01T08:00:00.000Z'
+                          exitTime: '2024-05-01T17:30:00.000Z'
+                          fee: 5000
+                      availableSlots:
+                        motorcycle: 24
+                        car: 8
+                alreadyActive:
+                  summary: Vehicle is currently parked — check-in blocked
+                  value:
+                    success: true
+                    data:
+                      licensePlate: 51A-12345
+                      status: already_active
+                      activeSession:
+                        id: 42
+                        licensePlate: 51A-12345
+                        vehicleType: motorcycle
+                        entryTime: '2024-05-20T07:15:00.000Z'
+                        exitTime: null
+                        fee: 0
+                        status: active
+                        note: null
+                        slotId: 5
+                        staffId: 3
+                        userId: null
+                        slot:
+                          id: 5
+                          slotCode: A01
+                          floorId: 2
+                          floor:
+                            id: 2
+                            floorNumber: 1
+                            buildingId: 1
+                            building:
+                              id: 1
+                              name: Toa nha A
+                              address: 123 Nguyen Hue, Q1, TP.HCM
+                        staff:
+                          id: 3
+                          fullName: Tran Van Staff
+                        user: null
+                      hint:
+                        linkedResident: null
+                        lastVisit: null
+                      availableSlots:
+                        motorcycle: 23
+                        car: 8
+                newVehicle:
+                  summary: First-time vehicle — no resident hint
+                  value:
+                    success: true
+                    data:
+                      licensePlate: 59B1-99999
+                      status: available
+                      activeSession: null
+                      hint:
+                        linkedResident: null
+                        lastVisit: null
+                      availableSlots:
+                        motorcycle: 24
+                        car: 8
+        '400':
+          description: Missing or invalid `licensePlate` query param
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: ['"licensePlate" is required']
         '401':
           description: Unauthorized
           content:

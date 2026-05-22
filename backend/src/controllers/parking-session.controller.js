@@ -28,4 +28,13 @@ const getOne = async (req, res, next) => {
   }
 };
 
-export { checkIn, getActiveSessions, getOne };
+const lookup = async (req, res, next) => {
+  try {
+    const result = await parkingSessionService.lookup(req.query.licensePlate);
+    response.success(res, result);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export { checkIn, getActiveSessions, getOne, lookup };

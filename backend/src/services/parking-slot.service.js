@@ -146,7 +146,6 @@ const bulkCreate = async ({ floorId, quantity, prefix = 'A', startFrom, slots })
   if (!floor.isActive) throw new AppError('Floor is inactive', 400);
   if (!floor.building.isActive) throw new AppError('Building is inactive', 400);
 
-  // ── Mode 1: quantity → tự sinh slotCode ─────────────────────────────
   if (quantity !== undefined) {
     const currentCount = await ParkingSlot.count({ where: { floorId } });
     if (currentCount + quantity > floor.totalSlots) {
@@ -160,7 +159,6 @@ const bulkCreate = async ({ floorId, quantity, prefix = 'A', startFrom, slots })
     const maxNum = from + quantity - 1;
     const padLen = Math.max(String(maxNum).length, 2);
 
-    // Sinh danh sách code và kiểm tra trùng với DB
     const generatedCodes = Array.from({ length: quantity }, (_, i) =>
       `${prefix.toUpperCase()}${String(from + i).padStart(padLen, '0')}`
     );

@@ -9,7 +9,6 @@ import AppError from '../utils/appError.js';
 
 const checkIn = async ({ slotId, licensePlate, vehicleType, userId, note }, staffId) => {
   return sequelize.transaction(async (t) => {
-    // 1. Lock slot row để tránh race condition (2 staff check-in cùng lúc)
     const slot = await ParkingSlot.findOne({
       where: { id: slotId },
       include: [
@@ -35,12 +34,10 @@ const checkIn = async ({ slotId, licensePlate, vehicleType, userId, note }, staf
     if (!slot.floor.isActive) throw new AppError('Floor is inactive', 400);
     if (!slot.floor.building.isActive) throw new AppError('Building is inactive', 400);
 
-    // 2. Kiểm tra vehicleType khớp với floor
     if (slot.floor.vehicleType !== vehicleType) {
       throw new AppError(`This slot only accepts ${slot.floor.vehicleType}`, 400);
     }
 
-    // 3. Kiểm tra biển số xe có đang trong một session active khác không
     const activeSession = await ParkingSession.findOne({
       where: { licensePlate, status: 'active' },
       transaction: t,
@@ -49,13 +46,11 @@ const checkIn = async ({ slotId, licensePlate, vehicleType, userId, note }, staf
       throw new AppError(`License plate ${licensePlate} is already checked in (session #${activeSession.id})`, 409);
     }
 
-    // 4. Validate userId nếu có
     if (userId) {
       const user = await User.findByPk(userId, { transaction: t });
       if (!user) throw new AppError('User not found', 404);
     }
 
-    // 5. Tạo session
     const session = await ParkingSession.create(
       {
         slotId,
@@ -70,10 +65,8 @@ const checkIn = async ({ slotId, licensePlate, vehicleType, userId, note }, staf
       { transaction: t }
     );
 
-    // 6. Cập nhật slot → occupied
     await slot.update({ status: 'occupied' }, { transaction: t });
 
-    // 7. Trả về session kèm thông tin slot/floor/building
     return {
       id: session.id,
       licensePlate: session.licensePlate,
@@ -173,4 +166,65 @@ const getById = async (id) => {
   return session;
 };
 
-export { checkIn, getActiveSessions, getById };
+const lookup = async (licensePlate) => {
+  const normalizedPlate = licensePlate.toUpperCase().replace(/\s/g, '');
+
+  const activeSession = await ParkingSession.findOne({
+    where: { licensePlate: normalizedPlate, status: 'active' },
+    include: [
+      {
+        model: ParkingSlot,
+        as: 'slot',
+        attributes: ['id', 'slotCode', 'floorId'],
+        include: [
+          {
+            model: Floor,
+            as: 'floor',
+            attributes: ['id', 'floorNumber', 'buildingId'],
+            include: [{ model: Building, as: 'building', attributes: ['id', 'name'] }],
+          },
+        ],
+      },
+      { model: User, as: 'staff', attributes: ['id', 'fullName'] },
+      { model: User, as: 'user', attributes: ['id', 'fullName', 'phone'] },
+    ],
+  });
+
+  const lastSession = await ParkingSession.findOne({
+    where: {
+      licensePlate: normalizedPlate,
+      status: { [Op.in]: ['completed', 'cancelled'] },
+    },
+    order: [['exitTime', 'DESC']],
+    attributes: ['id', 'vehicleType', 'entryTime', 'exitTime', 'fee', 'userId'],
+    include: [{ model: User, as: 'user', attributes: ['id', 'fullName', 'phone', 'email'] }],
+  });
+
+  const [availableMotorcycle, availableCar] = await Promise.all([
+    ParkingSlot.count({ where: { vehicleType: 'motorcycle', status: 'empty' } }),
+    ParkingSlot.count({ where: { vehicleType: 'car', status: 'empty' } }),
+  ]);
+
+  return {
+    licensePlate: normalizedPlate,
+    status: activeSession ? 'already_active' : 'available',
+    activeSession: activeSession || null,
+    hint: {
+      linkedResident: lastSession?.user || null,
+      lastVisit: lastSession
+        ? {
+            vehicleType: lastSession.vehicleType,
+            entryTime: lastSession.entryTime,
+            exitTime: lastSession.exitTime,
+            fee: lastSession.fee,
+          }
+        : null,
+    },
+    availableSlots: {
+      motorcycle: availableMotorcycle,
+      car: availableCar,
+    },
+  };
+};
+
+export { checkIn, getActiveSessions, getById, lookup };
