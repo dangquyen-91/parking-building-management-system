@@ -12,6 +12,7 @@ import userRoutes from './routes/user.routes.js';
 import buildingRoutes from './routes/building.routes.js';
 import floorRoutes from './routes/floor.routes.js';
 import parkingSlotRoutes from './routes/parking-slot.routes.js';
+import parkingRowRoutes from './routes/parking-row.routes.js';
 import parkingSessionRoutes from './routes/parking-session.routes.js';
 import errorHandler from './middlewares/error.middleware.js';
 import { apiLimiter, authLimiter } from './middlewares/rateLimiter.middleware.js';
@@ -42,6 +43,7 @@ app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/buildings', buildingRoutes);
 app.use('/api/v1/floors', floorRoutes);
 app.use('/api/v1/parking-slots', parkingSlotRoutes);
+app.use('/api/v1/parking-rows', parkingRowRoutes);
 app.use('/api/v1/parking-sessions', parkingSessionRoutes);
 
 app.get('/health', (_req, res) =>

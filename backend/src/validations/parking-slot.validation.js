@@ -1,18 +1,24 @@
 import Joi from 'joi';
 import { SLOT_STATUSES } from '../models/parking-slot.model.js';
-import { VEHICLE_TYPES } from '../models/floor.model.js';
+
+// Slots chỉ dành cho xe hơi. Xe máy dùng ParkingRow.
+const SLOT_VEHICLE_TYPE = 'car';
 
 export const createParkingSlotSchema = Joi.object({
   floorId: Joi.number().integer().positive().required(),
   slotCode: Joi.string().trim().min(1).max(20).required(),
-  vehicleType: Joi.string().valid(...VEHICLE_TYPES).required(),
+  vehicleType: Joi.string().valid(SLOT_VEHICLE_TYPE).required().messages({
+    'any.only': 'Parking slots only support car. Use parking rows for motorcycle.',
+  }),
   status: Joi.string().valid(...SLOT_STATUSES),
   note: Joi.string().trim().max(1000).allow('', null),
 });
 
 export const updateParkingSlotSchema = Joi.object({
   slotCode: Joi.string().trim().min(1).max(20),
-  vehicleType: Joi.string().valid(...VEHICLE_TYPES),
+  vehicleType: Joi.string().valid(SLOT_VEHICLE_TYPE).messages({
+    'any.only': 'Parking slots only support car. Use parking rows for motorcycle.',
+  }),
   status: Joi.string().valid(...SLOT_STATUSES),
   note: Joi.string().trim().max(1000).allow('', null),
 }).min(1);
@@ -35,7 +41,9 @@ const bulkBySlotsSchema = Joi.object({
     .items(
       Joi.object({
         slotCode: Joi.string().trim().min(1).max(20).required(),
-        vehicleType: Joi.string().valid(...VEHICLE_TYPES).required(),
+        vehicleType: Joi.string().valid(SLOT_VEHICLE_TYPE).required().messages({
+          'any.only': 'Parking slots only support car. Use parking rows for motorcycle.',
+        }),
         status: Joi.string().valid(...SLOT_STATUSES),
         note: Joi.string().trim().max(1000).allow('', null),
       })

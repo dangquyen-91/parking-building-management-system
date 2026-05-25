@@ -1,6 +1,7 @@
 import Floor from '../models/floor.model.js';
 import Building from '../models/building.model.js';
 import ParkingSlot from '../models/parking-slot.model.js';
+import ParkingRow from '../models/parking-row.model.js';
 import AppError from '../utils/appError.js';
 import { VEHICLE_TYPES } from '../models/floor.model.js';
 
@@ -47,7 +48,8 @@ const getById = async (id) => {
   const floor = await Floor.findByPk(id, {
     include: [
       { model: Building, as: 'building', attributes: ['id', 'name', 'address'] },
-      { model: ParkingSlot, as: 'slots' },
+      { model: ParkingSlot, as: 'slots' },      // car floors
+      { model: ParkingRow,  as: 'rows'  },      // motorcycle floors
     ],
   });
   if (!floor) throw new AppError('Floor not found', 404);
@@ -82,11 +84,17 @@ const update = async (id, data) => {
 
 const remove = async (id) => {
   const floor = await Floor.findByPk(id, {
-    include: [{ model: ParkingSlot, as: 'slots' }],
+    include: [
+      { model: ParkingSlot, as: 'slots' },
+      { model: ParkingRow,  as: 'rows'  },
+    ],
   });
   if (!floor) throw new AppError('Floor not found', 404);
   if (floor.slots && floor.slots.length > 0) {
     throw new AppError('Cannot delete floor with existing parking slots', 409);
+  }
+  if (floor.rows && floor.rows.length > 0) {
+    throw new AppError('Cannot delete floor with existing parking rows', 409);
   }
   await floor.destroy();
 };

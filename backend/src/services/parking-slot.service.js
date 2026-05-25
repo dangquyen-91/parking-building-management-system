@@ -80,8 +80,8 @@ const create = async (data) => {
   if (!floor.isActive) throw new AppError('Floor is inactive', 400);
   if (!floor.building.isActive) throw new AppError('Building is inactive', 400);
 
-  if (floor.vehicleType !== data.vehicleType) {
-    throw new AppError(`This floor only accepts ${floor.vehicleType} slots`, 400);
+  if (floor.vehicleType !== 'car') {
+    throw new AppError('Parking slots can only be created on car floors. Use parking rows for motorcycle floors.', 400);
   }
 
   const existing = await ParkingSlot.findOne({ where: { floorId: data.floorId, slotCode: data.slotCode.trim() } });
@@ -146,6 +146,10 @@ const bulkCreate = async ({ floorId, quantity, prefix = 'A', startFrom, slots })
   if (!floor.isActive) throw new AppError('Floor is inactive', 400);
   if (!floor.building.isActive) throw new AppError('Building is inactive', 400);
 
+  if (floor.vehicleType !== 'car') {
+    throw new AppError('Parking slots can only be created on car floors. Use parking rows for motorcycle floors.', 400);
+  }
+
   if (quantity !== undefined) {
     const currentCount = await ParkingSlot.count({ where: { floorId } });
     if (currentCount + quantity > floor.totalSlots) {
@@ -169,14 +173,6 @@ const bulkCreate = async ({ floorId, quantity, prefix = 'A', startFrom, slots })
 
     slots = generatedCodes.map((slotCode) => ({ slotCode, vehicleType: floor.vehicleType }));
   } else {
-    const mismatch = slots.find((s) => s.vehicleType !== floor.vehicleType);
-    if (mismatch) {
-      throw new AppError(
-        `This floor only accepts "${floor.vehicleType}" slots. Slot "${mismatch.slotCode}" has type "${mismatch.vehicleType}"`,
-        400
-      );
-    }
-
     const codes = slots.map((s) => s.slotCode.trim());
     const duplicateInRequest = codes.find((c, i) => codes.indexOf(c) !== i);
     if (duplicateInRequest) throw new AppError(`Duplicate slotCode in request: "${duplicateInRequest}"`, 400);
