@@ -2626,7 +2626,7 @@ paths:
       description: |
         Chi tao duoc tren tang xe may (floor.vehicleType = "motorcycle").
         Tang xe hoi dung POST /parking-slots.
-        So row khong vuot qua floor.totalSlots.
+        Tong capacity cua tat ca cac day (bao gom day moi) khong duoc vuot qua floor.totalSlots.
       security:
         - bearerAuth: []
       requestBody:
@@ -2722,11 +2722,24 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '409':
-          description: rowCode da ton tai tren tang, hoac tang da day du so day
+          description: |
+            - rowCode da ton tai tren tang nay
+            - Tong capacity cua cac day vuot qua floor.totalSlots
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                rowCodeConflict:
+                  summary: Ma day da ton tai
+                  value:
+                    success: false
+                    message: 'Row code "A" already exists on this floor'
+                capacityExceeded:
+                  summary: Tong capacity vuot qua gioi han tang
+                  value:
+                    success: false
+                    message: 'Floor capacity exceeded. Used: 80, adding: 30, max: 100'
 
   /parking-rows/{id}:
     get:
@@ -2767,6 +2780,7 @@ paths:
       description: |
         Cap nhat rowCode, capacity hoac note.
         Khong the giam capacity xuong duoi so xe dang dau (occupiedCount).
+        Khong the tang capacity neu tong capacity cua floor (cac day khac + gia tri moi) vuot qua floor.totalSlots.
       security:
         - bearerAuth: []
       parameters:
@@ -2834,11 +2848,24 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '409':
-          description: rowCode da ton tai tren tang nay
+          description: |
+            - rowCode da ton tai tren tang nay
+            - Tong capacity sau khi update vuot qua floor.totalSlots
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                rowCodeConflict:
+                  summary: Ma day da ton tai
+                  value:
+                    success: false
+                    message: 'Row code "A2" already exists on this floor'
+                capacityExceeded:
+                  summary: Tong capacity vuot qua gioi han tang sau khi update
+                  value:
+                    success: false
+                    message: 'Floor capacity exceeded. Other rows: 80, updating to: 40, max: 100'
 
     delete:
       tags: [Parking Rows]

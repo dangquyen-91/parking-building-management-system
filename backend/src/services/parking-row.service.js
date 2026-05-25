@@ -1,3 +1,4 @@
+import { Op } from 'sequelize';
 import ParkingRow from '../models/parking-row.model.js';
 import ParkingSession from '../models/parking-session.model.js';
 import Floor from '../models/floor.model.js';
@@ -92,9 +93,13 @@ const create = async ({ floorId, rowCode, capacity, note }) => {
   });
   if (existing) throw new AppError(`Row code "${rowCode}" already exists on this floor`, 409);
 
-  const currentCount = await ParkingRow.count({ where: { floorId } });
-  if (currentCount >= floor.totalSlots) {
-    throw new AppError(`Floor has reached its maximum row capacity of ${floor.totalSlots}`, 409);
+  // Kiểm tra tổng capacity của floor sau khi thêm row mới
+  const usedCapacity = (await ParkingRow.sum('capacity', { where: { floorId } })) || 0;
+  if (usedCapacity + capacity > floor.totalSlots) {
+    throw new AppError(
+      `Floor capacity exceeded. Used: ${usedCapacity}, adding: ${capacity}, max: ${floor.totalSlots}`,
+      409
+    );
   }
 
   return ParkingRow.create({
@@ -128,6 +133,20 @@ const update = async (id, { rowCode, capacity, note }) => {
         409
       );
     }
+
+    // Kiểm tra tổng capacity của floor sau khi update (loại trừ row hiện tại)
+    const floor = await Floor.findByPk(row.floorId);
+    const otherCapacity =
+      (await ParkingRow.sum('capacity', {
+        where: { floorId: row.floorId, id: { [Op.ne]: parseInt(id) } },
+      })) || 0;
+    if (otherCapacity + capacity > floor.totalSlots) {
+      throw new AppError(
+        `Floor capacity exceeded. Other rows: ${otherCapacity}, updating to: ${capacity}, max: ${floor.totalSlots}`,
+        409
+      );
+    }
+
     data.capacity = capacity;
     // Cập nhật lại status nếu cần
     if (data.capacity <= row.occupiedCount) data.status = 'full';
