@@ -3,11 +3,11 @@ import Building from '../models/building.model.js';
 import ParkingSlot from '../models/parking-slot.model.js';
 import ParkingRow from '../models/parking-row.model.js';
 import AppError from '../utils/appError.js';
-import { VEHICLE_TYPES } from '../models/floor.model.js';
+import { VEHICLE_TYPES, FLOOR_TYPES } from '../models/floor.model.js';
 
-const FLOOR_SORT_FIELDS = ['floorNumber', 'vehicleType', 'totalSlots', 'createdAt'];
+const FLOOR_SORT_FIELDS = ['floorNumber', 'vehicleType', 'floorType', 'totalSlots', 'createdAt'];
 
-const getAll = async ({ page = 1, limit = 10, buildingId, vehicleType, isActive, sortBy = 'floorNumber', sortOrder = 'ASC' } = {}) => {
+const getAll = async ({ page = 1, limit = 10, buildingId, vehicleType, floorType, isActive, sortBy = 'floorNumber', sortOrder = 'ASC' } = {}) => {
   const pageNum = Math.max(1, parseInt(page));
   const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
   const offset = (pageNum - 1) * limitNum;
@@ -17,6 +17,10 @@ const getAll = async ({ page = 1, limit = 10, buildingId, vehicleType, isActive,
   if (vehicleType) {
     if (!VEHICLE_TYPES.includes(vehicleType)) throw new AppError(`Invalid vehicleType. Must be one of: ${VEHICLE_TYPES.join(', ')}`, 400);
     where.vehicleType = vehicleType;
+  }
+  if (floorType) {
+    if (!FLOOR_TYPES.includes(floorType)) throw new AppError(`Invalid floorType. Must be one of: ${FLOOR_TYPES.join(', ')}`, 400);
+    where.floorType = floorType;
   }
   if (isActive !== undefined) {
     where.isActive = isActive === 'true' || isActive === true;

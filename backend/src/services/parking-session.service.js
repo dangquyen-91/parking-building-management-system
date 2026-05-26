@@ -67,7 +67,7 @@ const checkIn = async ({ slotId, rowId, licensePlate, vehicleType, userId, note 
           {
             model: Floor,
             as: 'floor',
-            attributes: ['id', 'floorNumber', 'vehicleType', 'isActive', 'buildingId'],
+            attributes: ['id', 'floorNumber', 'vehicleType', 'floorType', 'isActive', 'buildingId'],
             include: [{ model: Building, as: 'building', attributes: ['id', 'name', 'isActive'] }],
           },
         ],
@@ -80,6 +80,14 @@ const checkIn = async ({ slotId, rowId, licensePlate, vehicleType, userId, note 
       if (!slot.floor.isActive) throw new AppError('Floor is inactive', 400);
       if (!slot.floor.building.isActive) throw new AppError('Building is inactive', 400);
       if (slot.floor.vehicleType !== 'car') throw new AppError('This slot only accepts car', 400);
+
+      // ── Validate floorType vs userId ──
+      if (slot.floor.floorType === 'resident' && !userId) {
+        throw new AppError('This floor is for residents only. userId is required.', 403);
+      }
+      if (slot.floor.floorType === 'visitor' && userId) {
+        throw new AppError('This floor is for visitors only. Do not provide userId.', 403);
+      }
 
       const session = await ParkingSession.create(
         {
@@ -126,7 +134,7 @@ const checkIn = async ({ slotId, rowId, licensePlate, vehicleType, userId, note 
         {
           model: Floor,
           as: 'floor',
-          attributes: ['id', 'floorNumber', 'vehicleType', 'isActive', 'buildingId'],
+          attributes: ['id', 'floorNumber', 'vehicleType', 'floorType', 'isActive', 'buildingId'],
           include: [{ model: Building, as: 'building', attributes: ['id', 'name', 'isActive'] }],
         },
       ],
@@ -140,6 +148,14 @@ const checkIn = async ({ slotId, rowId, licensePlate, vehicleType, userId, note 
     if (!row.floor.isActive) throw new AppError('Floor is inactive', 400);
     if (!row.floor.building.isActive) throw new AppError('Building is inactive', 400);
     if (row.floor.vehicleType !== 'motorcycle') throw new AppError('This row only accepts motorcycle', 400);
+
+    // ── Validate floorType vs userId ──
+    if (row.floor.floorType === 'resident' && !userId) {
+      throw new AppError('This floor is for residents only. userId is required.', 403);
+    }
+    if (row.floor.floorType === 'visitor' && userId) {
+      throw new AppError('This floor is for visitors only. Do not provide userId.', 403);
+    }
 
     const session = await ParkingSession.create(
       {

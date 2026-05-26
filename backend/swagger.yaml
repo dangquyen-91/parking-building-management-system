@@ -228,6 +228,14 @@ components:
             Quyết định loại phương tiện cho toàn bộ tầng.
             - `car` → tầng dùng ParkingSlot (1 ô = 1 xe)
             - `motorcycle` → tầng dùng ParkingRow (1 dãy = N xe)
+        floorType:
+          type: string
+          enum: [resident, visitor]
+          example: resident
+          description: |
+            Phân loại tầng theo đối tượng sử dụng.
+            - `resident` → tầng dành cho cư dân (userId bắt buộc khi check-in)
+            - `visitor`  → tầng dành cho vãng lai (userId không được có khi check-in)
         totalSlots:
           type: integer
           example: 50
@@ -1835,12 +1843,19 @@ paths:
           schema:
             type: string
             enum: [motorcycle, car]
+          description: Lọc theo loại xe (car / motorcycle)
+        - name: floorType
+          in: query
+          schema:
+            type: string
+            enum: [resident, visitor]
+          description: Lọc theo loại tầng (cư dân / vãng lai)
         - $ref: '#/components/parameters/queryIsActive'
         - name: sortBy
           in: query
           schema:
             type: string
-            enum: [floorNumber, vehicleType, totalSlots, createdAt]
+            enum: [floorNumber, vehicleType, floorType, totalSlots, createdAt]
             default: floorNumber
         - name: sortOrder
           in: query
@@ -1883,7 +1898,7 @@ paths:
           application/json:
             schema:
               type: object
-              required: [buildingId, floorNumber, vehicleType, totalSlots]
+              required: [buildingId, floorNumber, vehicleType, floorType, totalSlots]
               properties:
                 buildingId:
                   type: integer
@@ -1895,19 +1910,48 @@ paths:
                   type: string
                   enum: [motorcycle, car]
                   example: motorcycle
+                  description: |
+                    Loại xe cho tầng này.
+                    - `car` → tạo ô đậu xe bằng POST /parking-slots
+                    - `motorcycle` → tạo dãy đậu xe bằng POST /parking-rows
+                floorType:
+                  type: string
+                  enum: [resident, visitor]
+                  example: resident
+                  description: |
+                    Phân loại đối tượng sử dụng tầng.
+                    - `resident` → cư dân (check-in yêu cầu userId)
+                    - `visitor`  → vãng lai (check-in không được có userId)
                 totalSlots:
                   type: integer
                   minimum: 1
                   example: 5
-                  description: So o xe toi da (car) hoac so day toi da (motorcycle)
+                  description: Số ô xe tối đa (car) hoặc tổng sức chứa tối đa (motorcycle)
                 description:
                   type: string
                   maxLength: 1000
                   nullable: true
-                  example: Tang danh cho xe may
+                  example: Tầng 1 - Xe máy cư dân
                 isActive:
                   type: boolean
                   default: true
+            examples:
+              residentMotorcycle:
+                summary: Tầng xe máy cư dân
+                value:
+                  buildingId: 1
+                  floorNumber: 1
+                  vehicleType: motorcycle
+                  floorType: resident
+                  totalSlots: 100
+              visitorCar:
+                summary: Tầng xe hơi vãng lai
+                value:
+                  buildingId: 1
+                  floorNumber: 4
+                  vehicleType: car
+                  floorType: visitor
+                  totalSlots: 50
       responses:
         '201':
           description: Floor created successfully
@@ -2009,6 +2053,10 @@ paths:
                 vehicleType:
                   type: string
                   enum: [motorcycle, car]
+                floorType:
+                  type: string
+                  enum: [resident, visitor]
+                  description: Thay đổi phân loại tầng (cư dân / vãng lai)
                 totalSlots:
                   type: integer
                   minimum: 1
@@ -3256,6 +3304,10 @@ paths:
         - `occupiedCount < capacity`
         - Tang va toa nha phai active
         - floor.vehicleType phai la "motorcycle"
+
+        **Validations floorType (cư dân / vãng lai):**
+        - Tầng `resident` → `userId` **bắt buộc** (lỗi 403 nếu không có)
+        - Tầng `visitor`  → `userId` **không được có** (lỗi 403 nếu truyền lên)
       security:
         - bearerAuth: []
       requestBody:
@@ -3316,19 +3368,32 @@ paths:
                       maxLength: 500
                       nullable: true
             examples:
-              checkInCar:
-                summary: Check-in xe hoi vao o A01
+              checkInCarResident:
+                summary: Check-in xe hơi - tầng cư dân (userId bắt buộc)
                 value:
                   vehicleType: car
                   licensePlate: 51A-12345
                   slotId: 5
                   userId: 12
-              checkInMotorcycle:
-                summary: Check-in xe may vao Day A
+              checkInCarVisitor:
+                summary: Check-in xe hơi - tầng vãng lai (không có userId)
+                value:
+                  vehicleType: car
+                  licensePlate: 51B-99999
+                  slotId: 20
+              checkInMotorcycleResident:
+                summary: Check-in xe máy - tầng cư dân (userId bắt buộc)
                 value:
                   vehicleType: motorcycle
                   licensePlate: 59B-67890
                   rowId: 3
+                  userId: 7
+              checkInMotorcycleVisitor:
+                summary: Check-in xe máy - tầng vãng lai (không có userId)
+                value:
+                  vehicleType: motorcycle
+                  licensePlate: 60C-11111
+                  rowId: 8
       responses:
         '201':
           description: Check-in thanh cong
@@ -3424,11 +3489,25 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '403':
-          description: Access denied
+          description: |
+            - Access denied (không đủ quyền)
+            - Tầng resident nhưng không có userId
+            - Tầng visitor nhưng có userId
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                residentRequiresUserId:
+                  summary: Tầng cư dân nhưng thiếu userId
+                  value:
+                    success: false
+                    message: This floor is for residents only. userId is required.
+                visitorForbidsUserId:
+                  summary: Tầng vãng lai nhưng có userId
+                  value:
+                    success: false
+                    message: This floor is for visitors only. Do not provide userId.
         '404':
           description: Slot, row hoac user khong tim thay
           content:
