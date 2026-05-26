@@ -15,73 +15,44 @@ components:
       scheme: bearer
       bearerFormat: JWT
 
+  parameters:
+    pathId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        example: 1
+    queryPage:
+      name: page
+      in: query
+      schema:
+        type: integer
+        default: 1
+        minimum: 1
+    queryLimit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        default: 10
+        minimum: 1
+        maximum: 100
+    queryIsActive:
+      name: isActive
+      in: query
+      schema:
+        type: boolean
+    querySortOrder:
+      name: sortOrder
+      in: query
+      schema:
+        type: string
+        enum: [ASC, DESC]
+        default: DESC
+
   schemas:
-    User:
-      type: object
-      properties:
-        id:
-          type: integer
-          example: 1
-        fullName:
-          type: string
-          example: Nguyen Van A
-        email:
-          type: string
-          example: user@example.com
-        phone:
-          type: string
-          example: '0901234567'
-          nullable: true
-        role:
-          type: string
-          enum: [admin, manager, staff, user]
-          example: user
-        isActive:
-          type: boolean
-          example: true
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
-
-    Tokens:
-      type: object
-      properties:
-        accessToken:
-          type: string
-          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-        refreshToken:
-          type: string
-          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-
-    PaginatedUsers:
-      type: object
-      properties:
-        success:
-          type: boolean
-          example: true
-        data:
-          type: array
-          items:
-            $ref: '#/components/schemas/User'
-        pagination:
-          type: object
-          properties:
-            page:
-              type: integer
-              example: 1
-            limit:
-              type: integer
-              example: 10
-            total:
-              type: integer
-              example: 50
-            totalPages:
-              type: integer
-              example: 5
-
+    # -- COMMON --
     SuccessResponse:
       type: object
       properties:
@@ -115,13 +86,918 @@ components:
                 type: string
               example: ['fullName is required', 'password must be at least 8 characters']
 
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 10
+        total:
+          type: integer
+          example: 50
+        totalPages:
+          type: integer
+          example: 5
+
+    # -- AUTH --
+    Tokens:
+      type: object
+      properties:
+        accessToken:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        refreshToken:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+    # -- USER --
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        fullName:
+          type: string
+          example: Nguyen Van A
+        email:
+          type: string
+          example: user@example.com
+        phone:
+          type: string
+          example: '0901234567'
+          nullable: true
+        role:
+          type: string
+          enum: [admin, manager, staff, user]
+          example: user
+        isActive:
+          type: boolean
+          example: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    PaginatedUsers:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    # -- BUILDING --
+    Building:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: Toa nha A
+        address:
+          type: string
+          example: 123 Nguyen Hue, Q1, TP.HCM
+        description:
+          type: string
+          nullable: true
+          example: Toa nha giu xe 5 tang
+        isActive:
+          type: boolean
+          example: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    BuildingWithFloors:
+      allOf:
+        - $ref: '#/components/schemas/Building'
+        - type: object
+          properties:
+            floors:
+              type: array
+              items:
+                $ref: '#/components/schemas/Floor'
+
+    PaginatedBuildings:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Building'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    # -- FLOOR --
+    Floor:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        buildingId:
+          type: integer
+          example: 1
+        floorNumber:
+          type: integer
+          example: 1
+        vehicleType:
+          type: string
+          enum: [motorcycle, car]
+          example: motorcycle
+          description: |
+            Quyết định loại phương tiện cho toàn bộ tầng.
+            - `car` → tầng dùng ParkingSlot (1 ô = 1 xe)
+            - `motorcycle` → tầng dùng ParkingRow (1 dãy = N xe)
+        totalSlots:
+          type: integer
+          example: 50
+          description: Số ô tối đa (car) hoặc số dãy tối đa (motorcycle)
+        description:
+          type: string
+          nullable: true
+          example: Tang danh cho xe may
+        isActive:
+          type: boolean
+          example: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    FloorDetail:
+      allOf:
+        - $ref: '#/components/schemas/Floor'
+        - type: object
+          properties:
+            building:
+              type: object
+              properties:
+                id:
+                  type: integer
+                  example: 1
+                name:
+                  type: string
+                  example: Toa nha A
+                address:
+                  type: string
+                  example: 123 Nguyen Hue, Q1, TP.HCM
+            slots:
+              type: array
+              description: Chỉ có dữ liệu nếu vehicleType = "car"
+              items:
+                $ref: '#/components/schemas/ParkingSlot'
+            rows:
+              type: array
+              description: Chi co du lieu neu vehicleType = "motorcycle"
+              items:
+                $ref: '#/components/schemas/ParkingRow'
+
+    PaginatedFloors:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            allOf:
+              - $ref: '#/components/schemas/Floor'
+              - type: object
+                properties:
+                  building:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                        example: 1
+                      name:
+                        type: string
+                        example: Toa nha A
+                      address:
+                        type: string
+                        example: 123 Nguyen Hue, Q1, TP.HCM
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    # -- PARKING SLOT (Car only) --
+    ParkingSlot:
+      type: object
+      description: Quan ly o do xe cho xe hoi. Xe may dung ParkingRow.
+      properties:
+        id:
+          type: integer
+          example: 1
+        floorId:
+          type: integer
+          example: 2
+        slotCode:
+          type: string
+          example: A01
+        vehicleType:
+          type: string
+          enum: [car]
+          example: car
+          description: Luon la "car". Xe may dung ParkingRow.
+        status:
+          type: string
+          enum: [empty, occupied, reserved, maintenance]
+          example: empty
+        note:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ParkingSlotDetail:
+      allOf:
+        - $ref: '#/components/schemas/ParkingSlot'
+        - type: object
+          properties:
+            floor:
+              type: object
+              properties:
+                id:
+                  type: integer
+                  example: 2
+                floorNumber:
+                  type: integer
+                  example: 1
+                vehicleType:
+                  type: string
+                  example: car
+                buildingId:
+                  type: integer
+                  example: 1
+                building:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 1
+                    name:
+                      type: string
+                      example: Toa nha A
+                    address:
+                      type: string
+                      example: 123 Nguyen Hue, Q1, TP.HCM
+
+    PaginatedParkingSlots:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ParkingSlotDetail'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    BulkCreateSlotItem:
+      type: object
+      required: [slotCode, vehicleType]
+      properties:
+        slotCode:
+          type: string
+          minLength: 1
+          maxLength: 20
+          example: A01
+        vehicleType:
+          type: string
+          enum: [car]
+          example: car
+          description: Chi chap nhan "car". Xe may dung POST /parking-rows.
+        status:
+          type: string
+          enum: [empty, occupied, reserved, maintenance]
+          default: empty
+        note:
+          type: string
+          maxLength: 1000
+          nullable: true
+
+    BulkCreateSlotsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            slots:
+              type: array
+              items:
+                $ref: '#/components/schemas/ParkingSlot'
+            count:
+              type: integer
+              example: 3
+
+    # -- PARKING ROW (Motorcycle only) --
+    ParkingRow:
+      type: object
+      description: Quan ly day do xe cho xe may. Mot day chua nhieu xe cung luc.
+      properties:
+        id:
+          type: integer
+          example: 1
+        floorId:
+          type: integer
+          example: 3
+        rowCode:
+          type: string
+          example: A
+          description: Ma day, duy nhat trong mot tang (vi du A, B, Day 1...)
+        capacity:
+          type: integer
+          example: 30
+          description: So xe may toi da co the dau trong day
+        occupiedCount:
+          type: integer
+          example: 20
+          description: So xe may dang dau hien tai (cap nhat tu dong khi check-in/out)
+        status:
+          type: string
+          enum: [available, full, maintenance]
+          example: available
+          description: |
+            - `available`: con cho, co the check-in
+            - `full`: day, khong the check-in them
+            - `maintenance`: dang sua chua, khoa check-in
+        note:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ParkingRowDetail:
+      allOf:
+        - $ref: '#/components/schemas/ParkingRow'
+        - type: object
+          properties:
+            floor:
+              type: object
+              properties:
+                id:
+                  type: integer
+                  example: 3
+                floorNumber:
+                  type: integer
+                  example: 2
+                vehicleType:
+                  type: string
+                  example: motorcycle
+                buildingId:
+                  type: integer
+                  example: 1
+                totalSlots:
+                  type: integer
+                  example: 5
+                building:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 1
+                    name:
+                      type: string
+                      example: Toa nha A
+                    address:
+                      type: string
+                      example: 123 Nguyen Hue, Q1, TP.HCM
+
+    PaginatedParkingRows:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ParkingRowDetail'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    # -- PARKING SESSION --
+    ParkingSession:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        slotId:
+          type: integer
+          nullable: true
+          example: 5
+          description: Co gia tri neu vehicleType = "car", null neu xe may
+        rowId:
+          type: integer
+          nullable: true
+          example: null
+          description: Co gia tri neu vehicleType = "motorcycle", null neu xe hoi
+        licensePlate:
+          type: string
+          example: 51A-12345
+        vehicleType:
+          type: string
+          enum: [motorcycle, car]
+          example: car
+        entryTime:
+          type: string
+          format: date-time
+        exitTime:
+          type: string
+          format: date-time
+          nullable: true
+        fee:
+          type: number
+          format: float
+          example: 0
+        status:
+          type: string
+          enum: [active, completed, cancelled]
+          example: active
+        note:
+          type: string
+          nullable: true
+        staffId:
+          type: integer
+          example: 3
+        userId:
+          type: integer
+          nullable: true
+          example: 12
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ParkingSessionDetail:
+      allOf:
+        - $ref: '#/components/schemas/ParkingSession'
+        - type: object
+          properties:
+            slot:
+              nullable: true
+              description: Co gia tri neu vehicleType = "car"
+              type: object
+              properties:
+                id:
+                  type: integer
+                  example: 5
+                slotCode:
+                  type: string
+                  example: A01
+                floorId:
+                  type: integer
+                  example: 2
+                floor:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 2
+                    floorNumber:
+                      type: integer
+                      example: 1
+                    buildingId:
+                      type: integer
+                      example: 1
+                    building:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          example: 1
+                        name:
+                          type: string
+                          example: Toa nha A
+                        address:
+                          type: string
+                          example: 123 Nguyen Hue, Q1, TP.HCM
+            row:
+              nullable: true
+              description: Co gia tri neu vehicleType = "motorcycle"
+              type: object
+              properties:
+                id:
+                  type: integer
+                  example: 3
+                rowCode:
+                  type: string
+                  example: A
+                floorId:
+                  type: integer
+                  example: 3
+                capacity:
+                  type: integer
+                  example: 30
+                occupiedCount:
+                  type: integer
+                  example: 20
+                floor:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 3
+                    floorNumber:
+                      type: integer
+                      example: 2
+                    buildingId:
+                      type: integer
+                      example: 1
+                    building:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          example: 1
+                        name:
+                          type: string
+                          example: Toa nha A
+                        address:
+                          type: string
+                          example: 123 Nguyen Hue, Q1, TP.HCM
+            staff:
+              type: object
+              properties:
+                id:
+                  type: integer
+                  example: 3
+                fullName:
+                  type: string
+                  example: Tran Van Staff
+            user:
+              type: object
+              nullable: true
+              properties:
+                id:
+                  type: integer
+                  example: 12
+                fullName:
+                  type: string
+                  example: Nguyen Van A
+                phone:
+                  type: string
+                  nullable: true
+                  example: '0901234567'
+
+    ParkingSessionListItem:
+      allOf:
+        - $ref: '#/components/schemas/ParkingSession'
+        - type: object
+          properties:
+            slot:
+              nullable: true
+              description: Co gia tri neu vehicleType = "car"
+              type: object
+              properties:
+                id:
+                  type: integer
+                  example: 5
+                slotCode:
+                  type: string
+                  example: A01
+                floorId:
+                  type: integer
+                  example: 2
+                floor:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 2
+                    floorNumber:
+                      type: integer
+                      example: 1
+                    buildingId:
+                      type: integer
+                      example: 1
+                    building:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          example: 1
+                        name:
+                          type: string
+                          example: Toa nha A
+            row:
+              nullable: true
+              description: Co gia tri neu vehicleType = "motorcycle"
+              type: object
+              properties:
+                id:
+                  type: integer
+                  example: 3
+                rowCode:
+                  type: string
+                  example: A
+                floorId:
+                  type: integer
+                  example: 3
+                capacity:
+                  type: integer
+                  example: 30
+                occupiedCount:
+                  type: integer
+                  example: 20
+                floor:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 3
+                    floorNumber:
+                      type: integer
+                      example: 2
+                    buildingId:
+                      type: integer
+                      example: 1
+                    building:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          example: 1
+                        name:
+                          type: string
+                          example: Toa nha A
+            staff:
+              type: object
+              properties:
+                id:
+                  type: integer
+                  example: 3
+                fullName:
+                  type: string
+                  example: Tran Van Staff
+
+    PaginatedParkingSessions:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ParkingSessionListItem'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    LookupResponse:
+      type: object
+      properties:
+        licensePlate:
+          type: string
+          example: 51A-12345
+        status:
+          type: string
+          enum: [available, already_active]
+          description: |
+            `available` — vehicle is not parked, safe to check-in.
+            `already_active` — vehicle is currently parked, check-in is blocked.
+          example: available
+        activeSession:
+          nullable: true
+          description: Populated only when `status` is `already_active`.
+          allOf:
+            - $ref: '#/components/schemas/ParkingSessionDetail'
+        hint:
+          type: object
+          description: Pre-fill hints for the check-in form derived from the most recent completed/cancelled session.
+          properties:
+            linkedResident:
+              nullable: true
+              description: Resident account linked on the last visit.
+              type: object
+              properties:
+                id:
+                  type: integer
+                  example: 12
+                fullName:
+                  type: string
+                  example: Nguyen Van A
+                phone:
+                  type: string
+                  nullable: true
+                  example: '0901234567'
+                email:
+                  type: string
+                  example: user@example.com
+            lastVisit:
+              nullable: true
+              description: Summary of the most recent completed/cancelled session.
+              type: object
+              properties:
+                vehicleType:
+                  type: string
+                  enum: [motorcycle, car]
+                  example: motorcycle
+                entryTime:
+                  type: string
+                  format: date-time
+                exitTime:
+                  type: string
+                  format: date-time
+                  nullable: true
+                fee:
+                  type: number
+                  format: float
+                  example: 5000
+        availableSlots:
+          type: object
+          description: |
+            So cho trong theo loai xe.
+            - car: so o trong (ParkingSlot status=empty)
+            - motorcycle: tong so cho trong trong tat ca cac day (sum capacity - occupiedCount)
+          properties:
+            motorcycle:
+              type: integer
+              example: 47
+            car:
+              type: integer
+              example: 8
+
+    CheckInCarResponse:
+      type: object
+      description: Response khi check-in xe hoi
+      properties:
+        id:
+          type: integer
+          example: 1
+        licensePlate:
+          type: string
+          example: 51A-12345
+        vehicleType:
+          type: string
+          enum: [car]
+          example: car
+        entryTime:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [active]
+          example: active
+        note:
+          type: string
+          nullable: true
+        slot:
+          type: object
+          properties:
+            id:
+              type: integer
+              example: 5
+            slotCode:
+              type: string
+              example: A01
+            floor:
+              type: object
+              properties:
+                id:
+                  type: integer
+                  example: 2
+                floorNumber:
+                  type: integer
+                  example: 1
+                building:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 1
+                    name:
+                      type: string
+                      example: Toa nha A
+        row:
+          type: object
+          nullable: true
+          example: null
+        staffId:
+          type: integer
+          example: 3
+        userId:
+          type: integer
+          nullable: true
+          example: 12
+
+    CheckInMotorcycleResponse:
+      type: object
+      description: Response khi check-in xe may
+      properties:
+        id:
+          type: integer
+          example: 2
+        licensePlate:
+          type: string
+          example: 59B-67890
+        vehicleType:
+          type: string
+          enum: [motorcycle]
+          example: motorcycle
+        entryTime:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [active]
+          example: active
+        note:
+          type: string
+          nullable: true
+        slot:
+          type: object
+          nullable: true
+          example: null
+        row:
+          type: object
+          properties:
+            id:
+              type: integer
+              example: 3
+            rowCode:
+              type: string
+              example: A
+            capacity:
+              type: integer
+              example: 30
+            occupiedCount:
+              type: integer
+              example: 21
+              description: So xe sau khi check-in (da tang 1)
+            floor:
+              type: object
+              properties:
+                id:
+                  type: integer
+                  example: 3
+                floorNumber:
+                  type: integer
+                  example: 2
+                building:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 1
+                    name:
+                      type: string
+                      example: Toa nha A
+        staffId:
+          type: integer
+          example: 3
+        userId:
+          type: integer
+          nullable: true
+          example: null
+
+# -- PATHS --
 paths:
-  # ── AUTH ──────────────────────────────────────────────
+
+  # -- AUTH --
   /auth/register:
     post:
       tags: [Auth]
       summary: Register a new account
-      description: Creates a new account with role `user` by default. Role cannot be set on registration.
+      description: Creates a new account with role `user` by default.
       requestBody:
         required: true
         content:
@@ -204,12 +1080,6 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/Tokens'
-        '400':
-          description: Validation error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '401':
           description: Invalid credentials or account inactive
           content:
@@ -250,12 +1120,6 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/Tokens'
-        '400':
-          description: Validation error (missing refreshToken)
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '401':
           description: Invalid or revoked refresh token
           content:
@@ -283,7 +1147,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
-  # ── AUTH ─────────────────────────────────────────────
   /auth/change-password:
     post:
       tags: [Auth]
@@ -342,7 +1205,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
-  # ── USERS ─────────────────────────────────────────────
+  # -- USERS --
   /users/me:
     get:
       tags: [Users]
@@ -370,7 +1233,7 @@ paths:
 
     patch:
       tags: [Users]
-      summary: Update current user profile (fullName and/or phone only)
+      summary: Update own profile (fullName and/or phone only)
       security:
         - bearerAuth: []
       requestBody:
@@ -417,56 +1280,30 @@ paths:
   /users:
     get:
       tags: [Users]
-      summary: Get all users (admin, manager only)
-      description: Supports pagination, search, filtering by role/status, and sorting.
+      summary: Get all users (admin, manager)
       security:
         - bearerAuth: []
       parameters:
-        - name: page
-          in: query
-          schema:
-            type: integer
-            default: 1
-            minimum: 1
-          description: Page number
-        - name: limit
-          in: query
-          schema:
-            type: integer
-            default: 10
-            minimum: 1
-            maximum: 100
-          description: Number of results per page
+        - $ref: '#/components/parameters/queryPage'
+        - $ref: '#/components/parameters/queryLimit'
         - name: search
           in: query
           schema:
             type: string
-          description: Search by full name or email (partial match)
+          description: Search by fullName or email
         - name: role
           in: query
           schema:
             type: string
             enum: [admin, manager, staff, user]
-          description: Filter by role
-        - name: isActive
-          in: query
-          schema:
-            type: boolean
-          description: Filter by active status
+        - $ref: '#/components/parameters/queryIsActive'
         - name: sortBy
           in: query
           schema:
             type: string
             enum: [fullName, email, role, createdAt]
             default: createdAt
-          description: Field to sort by
-        - name: sortOrder
-          in: query
-          schema:
-            type: string
-            enum: [ASC, DESC]
-            default: DESC
-          description: Sort direction
+        - $ref: '#/components/parameters/querySortOrder'
       responses:
         '200':
           description: Paginated list of users
@@ -474,12 +1311,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PaginatedUsers'
-        '400':
-          description: Invalid query parameters
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '401':
           description: Unauthorized
           content:
@@ -492,26 +1323,15 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-        '429':
-          description: Too many requests
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
 
   /users/{id}:
     get:
       tags: [Users]
-      summary: Get user by ID (admin, manager only)
+      summary: Get user by ID (admin, manager)
       security:
         - bearerAuth: []
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-          example: 1
+        - $ref: '#/components/parameters/pathId'
       responses:
         '200':
           description: User found
@@ -545,16 +1365,11 @@ paths:
 
     patch:
       tags: [Users]
-      summary: Update user info by ID (admin only — cannot change role or status here)
+      summary: Update user info by ID (admin)
       security:
         - bearerAuth: []
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-          example: 1
+        - $ref: '#/components/parameters/pathId'
       requestBody:
         required: true
         content:
@@ -619,19 +1434,14 @@ paths:
 
     delete:
       tags: [Users]
-      summary: Delete user by ID (admin only)
+      summary: Delete user by ID (admin)
       security:
         - bearerAuth: []
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-          example: 1
+        - $ref: '#/components/parameters/pathId'
       responses:
         '204':
-          description: User deleted successfully
+          description: Deleted successfully
         '401':
           description: Unauthorized
           content:
@@ -654,16 +1464,11 @@ paths:
   /users/{id}/role:
     patch:
       tags: [Users]
-      summary: Update user role (admin only)
+      summary: Update user role (admin)
       security:
         - bearerAuth: []
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-          example: 1
+        - $ref: '#/components/parameters/pathId'
       requestBody:
         required: true
         content:
@@ -715,17 +1520,12 @@ paths:
 
   /users/{id}/status:
     patch:
-      tags: [Auth]
-      summary: Toggle user active status (admin only)
+      tags: [Users]
+      summary: Toggle user active status (admin)
       security:
         - bearerAuth: []
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-          example: 1
+        - $ref: '#/components/parameters/pathId'
       requestBody:
         required: true
         content:
@@ -767,3 +1567,1896 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+
+  # -- BUILDINGS --
+  /buildings:
+    get:
+      tags: [Buildings]
+      summary: Get all buildings
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/queryPage'
+        - $ref: '#/components/parameters/queryLimit'
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Search by name or address
+        - $ref: '#/components/parameters/queryIsActive'
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [name, address, createdAt]
+            default: createdAt
+        - $ref: '#/components/parameters/querySortOrder'
+      responses:
+        '200':
+          description: Paginated list of buildings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedBuildings'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      tags: [Buildings]
+      summary: Create a new building (admin, manager)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, address]
+              properties:
+                name:
+                  type: string
+                  minLength: 2
+                  maxLength: 100
+                  example: Toa nha A
+                address:
+                  type: string
+                  minLength: 5
+                  maxLength: 255
+                  example: 123 Nguyen Hue, Q1, TP.HCM
+                description:
+                  type: string
+                  maxLength: 1000
+                  nullable: true
+                  example: Toa nha giu xe trung tam
+                isActive:
+                  type: boolean
+                  default: true
+      responses:
+        '201':
+          description: Building created successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Building'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Building name already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /buildings/{id}:
+    get:
+      tags: [Buildings]
+      summary: Get building by ID (includes floors list)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/pathId'
+      responses:
+        '200':
+          description: Building detail with floors
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/BuildingWithFloors'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Building not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    patch:
+      tags: [Buildings]
+      summary: Update building (admin, manager)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/pathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                name:
+                  type: string
+                  minLength: 2
+                  maxLength: 100
+                  example: Toa nha B
+                address:
+                  type: string
+                  minLength: 5
+                  maxLength: 255
+                  example: 456 Le Loi, Q1, TP.HCM
+                description:
+                  type: string
+                  maxLength: 1000
+                  nullable: true
+                isActive:
+                  type: boolean
+      responses:
+        '200':
+          description: Updated successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Building'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Building not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Building name already in use
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags: [Buildings]
+      summary: Delete building (admin) — blocked if floors exist
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/pathId'
+      responses:
+        '204':
+          description: Deleted successfully
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Building not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Cannot delete building with existing floors
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # -- FLOORS --
+  /floors:
+    get:
+      tags: [Floors]
+      summary: Get all floors
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/queryPage'
+        - $ref: '#/components/parameters/queryLimit'
+        - name: buildingId
+          in: query
+          schema:
+            type: integer
+          description: Filter by building
+        - name: vehicleType
+          in: query
+          schema:
+            type: string
+            enum: [motorcycle, car]
+        - $ref: '#/components/parameters/queryIsActive'
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [floorNumber, vehicleType, totalSlots, createdAt]
+            default: floorNumber
+        - name: sortOrder
+          in: query
+          schema:
+            type: string
+            enum: [ASC, DESC]
+            default: ASC
+      responses:
+        '200':
+          description: Paginated list of floors
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedFloors'
+        '400':
+          description: Invalid vehicleType filter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      tags: [Floors]
+      summary: Create a new floor (admin, manager)
+      description: |
+        `vehicleType` quyet dinh loai don vi quan ly cho tang:
+        - `car` → dung POST /parking-slots de tao o do xe
+        - `motorcycle` → dung POST /parking-rows de tao day do xe
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [buildingId, floorNumber, vehicleType, totalSlots]
+              properties:
+                buildingId:
+                  type: integer
+                  example: 1
+                floorNumber:
+                  type: integer
+                  example: 1
+                vehicleType:
+                  type: string
+                  enum: [motorcycle, car]
+                  example: motorcycle
+                totalSlots:
+                  type: integer
+                  minimum: 1
+                  example: 5
+                  description: So o xe toi da (car) hoac so day toi da (motorcycle)
+                description:
+                  type: string
+                  maxLength: 1000
+                  nullable: true
+                  example: Tang danh cho xe may
+                isActive:
+                  type: boolean
+                  default: true
+      responses:
+        '201':
+          description: Floor created successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Floor'
+        '400':
+          description: Validation error or building inactive
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Building not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Floor number already exists in this building
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /floors/{id}:
+    get:
+      tags: [Floors]
+      summary: Get floor by ID
+      description: |
+        Tra ve thong tin tang kem:
+        - `slots`: danh sach o xe (neu vehicleType = "car")
+        - `rows`: danh sach day xe (neu vehicleType = "motorcycle")
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/pathId'
+      responses:
+        '200':
+          description: Floor detail
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/FloorDetail'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Floor not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    patch:
+      tags: [Floors]
+      summary: Update floor (admin, manager)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/pathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                floorNumber:
+                  type: integer
+                  example: 2
+                vehicleType:
+                  type: string
+                  enum: [motorcycle, car]
+                totalSlots:
+                  type: integer
+                  minimum: 1
+                  example: 60
+                description:
+                  type: string
+                  maxLength: 1000
+                  nullable: true
+                isActive:
+                  type: boolean
+      responses:
+        '200':
+          description: Updated successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Floor'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Floor not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Floor number already exists in this building
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags: [Floors]
+      summary: Delete floor (admin) — blocked if slots or rows exist
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/pathId'
+      responses:
+        '204':
+          description: Deleted successfully
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Floor not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Cannot delete floor with existing parking slots or rows
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # -- PARKING SLOTS (Car floors only) --
+  /parking-slots:
+    get:
+      tags: [Parking Slots]
+      summary: Get all parking slots
+      description: Chi tra ve slots cua xe hoi. Xe may dung GET /parking-rows.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/queryPage'
+        - $ref: '#/components/parameters/queryLimit'
+        - name: floorId
+          in: query
+          schema:
+            type: integer
+          description: Filter by floor
+        - name: buildingId
+          in: query
+          schema:
+            type: integer
+          description: Filter by building (via floor join)
+        - name: vehicleType
+          in: query
+          schema:
+            type: string
+            enum: [car]
+          description: Luon la "car"
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [empty, occupied, reserved, maintenance]
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [slotCode, vehicleType, status, createdAt]
+            default: slotCode
+        - name: sortOrder
+          in: query
+          schema:
+            type: string
+            enum: [ASC, DESC]
+            default: ASC
+      responses:
+        '200':
+          description: Paginated list of parking slots
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedParkingSlots'
+        '400':
+          description: Invalid filter value
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      tags: [Parking Slots]
+      summary: Create a new parking slot (admin, manager) — car floors only
+      description: |
+        Chi tao duoc tren tang xe hoi (floor.vehicleType = "car").
+        Tang xe may dung POST /parking-rows.
+        vehicleType phai la "car".
+        Tong so slot khong vuot qua floor.totalSlots.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [floorId, slotCode, vehicleType]
+              properties:
+                floorId:
+                  type: integer
+                  example: 2
+                slotCode:
+                  type: string
+                  minLength: 1
+                  maxLength: 20
+                  example: A01
+                vehicleType:
+                  type: string
+                  enum: [car]
+                  example: car
+                status:
+                  type: string
+                  enum: [empty, occupied, reserved, maintenance]
+                  default: empty
+                note:
+                  type: string
+                  maxLength: 1000
+                  nullable: true
+      responses:
+        '201':
+          description: Slot created successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ParkingSlot'
+        '400':
+          description: Validation error, floor is motorcycle type, or floor/building inactive
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: Parking slots can only be created on car floors. Use parking rows for motorcycle floors.
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Floor not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Slot code already exists on this floor, or floor at max capacity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /parking-slots/bulk:
+    post:
+      tags: [Parking Slots]
+      summary: Bulk create parking slots (admin, manager) — car floors only
+      description: |
+        Chi tao duoc tren tang xe hoi (floor.vehicleType = "car").
+        Ho tro 2 mode: truyen `quantity` de tu sinh slotCode (A01, A02...), hoac truyen `slots` de chi dinh tuong minh.
+        Toan bo chay trong mot transaction — loi 1 slot thi rollback het.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - title: Mode 1 — Auto-generate by quantity
+                  type: object
+                  required: [floorId, quantity]
+                  properties:
+                    floorId:
+                      type: integer
+                      example: 2
+                    quantity:
+                      type: integer
+                      minimum: 1
+                      maximum: 200
+                      example: 10
+                    prefix:
+                      type: string
+                      maxLength: 5
+                      default: A
+                      example: A
+                    startFrom:
+                      type: integer
+                      minimum: 1
+                      example: 1
+                - title: Mode 2 — Explicit slots list
+                  type: object
+                  required: [floorId, slots]
+                  properties:
+                    floorId:
+                      type: integer
+                      example: 2
+                    slots:
+                      type: array
+                      minItems: 1
+                      maxItems: 200
+                      items:
+                        $ref: '#/components/schemas/BulkCreateSlotItem'
+            examples:
+              autoGenerate:
+                summary: 'Mode 1: Tu sinh 10 slot (A01-A10)'
+                value:
+                  floorId: 2
+                  quantity: 10
+              autoGenerateWithPrefix:
+                summary: 'Mode 1: Tu sinh 5 slot prefix B, bat dau tu 3'
+                value:
+                  floorId: 2
+                  quantity: 5
+                  prefix: B
+                  startFrom: 3
+              explicitSlots:
+                summary: 'Mode 2: Danh sach slot tuong minh'
+                value:
+                  floorId: 2
+                  slots:
+                    - slotCode: A01
+                      vehicleType: car
+                    - slotCode: A02
+                      vehicleType: car
+                    - slotCode: A03
+                      vehicleType: car
+                      note: Goc tuong
+      responses:
+        '201':
+          description: Tat ca slots duoc tao thanh cong
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkCreateSlotsResponse'
+        '400':
+          description: Validation error, floor is motorcycle type, or floor/building inactive
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Floor not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: slotCode da ton tai tren floor, hoac vuot qua capacity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /parking-slots/{id}:
+    get:
+      tags: [Parking Slots]
+      summary: Get parking slot by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/pathId'
+      responses:
+        '200':
+          description: Slot detail
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ParkingSlotDetail'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Slot not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    patch:
+      tags: [Parking Slots]
+      summary: Update slot info (admin, manager)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/pathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                slotCode:
+                  type: string
+                  minLength: 1
+                  maxLength: 20
+                  example: A02
+                vehicleType:
+                  type: string
+                  enum: [car]
+                status:
+                  type: string
+                  enum: [empty, occupied, reserved, maintenance]
+                note:
+                  type: string
+                  maxLength: 1000
+                  nullable: true
+      responses:
+        '200':
+          description: Updated successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ParkingSlot'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Slot not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Slot code already exists on this floor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags: [Parking Slots]
+      summary: Delete parking slot (admin) — blocked if active session exists
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/pathId'
+      responses:
+        '204':
+          description: Deleted successfully
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Slot not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Cannot delete slot with an active parking session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /parking-slots/{id}/status:
+    patch:
+      tags: [Parking Slots]
+      summary: Update slot status (admin, manager, staff)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/pathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [empty, occupied, reserved, maintenance]
+                  example: maintenance
+                note:
+                  type: string
+                  maxLength: 1000
+                  nullable: true
+                  example: Dang sua chua
+      responses:
+        '200':
+          description: Status updated successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ParkingSlot'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Slot not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # -- PARKING ROWS (Motorcycle floors only) --
+  /parking-rows:
+    get:
+      tags: [Parking Rows]
+      summary: Get all parking rows
+      description: Danh sach cac day do xe may. Tuong duong GET /parking-slots nhung danh cho xe may.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/queryPage'
+        - $ref: '#/components/parameters/queryLimit'
+        - name: floorId
+          in: query
+          schema:
+            type: integer
+          description: Filter theo tang
+        - name: buildingId
+          in: query
+          schema:
+            type: integer
+          description: Filter theo toa nha (via floor join)
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [available, full, maintenance]
+          description: Filter theo trang thai day
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [rowCode, capacity, occupiedCount, status, createdAt]
+            default: rowCode
+        - name: sortOrder
+          in: query
+          schema:
+            type: string
+            enum: [ASC, DESC]
+            default: ASC
+      responses:
+        '200':
+          description: Paginated list of parking rows
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedParkingRows'
+        '400':
+          description: Invalid filter value
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      tags: [Parking Rows]
+      summary: Create a new parking row (admin, manager) — motorcycle floors only
+      description: |
+        Chi tao duoc tren tang xe may (floor.vehicleType = "motorcycle").
+        Tang xe hoi dung POST /parking-slots.
+        Tong capacity cua tat ca cac day (bao gom day moi) khong duoc vuot qua floor.totalSlots.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [floorId, rowCode, capacity]
+              properties:
+                floorId:
+                  type: integer
+                  example: 3
+                  description: ID tang xe may
+                rowCode:
+                  type: string
+                  minLength: 1
+                  maxLength: 20
+                  example: A
+                  description: Ma day, duy nhat trong tang (A, B, Day 1...)
+                capacity:
+                  type: integer
+                  minimum: 1
+                  maximum: 500
+                  example: 30
+                  description: So xe may toi da trong day
+                note:
+                  type: string
+                  maxLength: 1000
+                  nullable: true
+            examples:
+              createRowA:
+                summary: Tao day A suc chua 30 xe
+                value:
+                  floorId: 3
+                  rowCode: A
+                  capacity: 30
+              createRowB:
+                summary: Tao day B suc chua 25 xe
+                value:
+                  floorId: 3
+                  rowCode: B
+                  capacity: 25
+                  note: Gan loi ra
+      responses:
+        '201':
+          description: Row created successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ParkingRow'
+        '400':
+          description: |
+            - Validation error
+            - floor.vehicleType != "motorcycle"
+            - Floor or building inactive
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                wrongFloorType:
+                  summary: Tang la xe hoi, khong phai xe may
+                  value:
+                    success: false
+                    message: Parking rows can only be created on motorcycle floors
+                floorInactive:
+                  summary: Tang dang inactive
+                  value:
+                    success: false
+                    message: Floor is inactive
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Floor not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: |
+            - rowCode da ton tai tren tang nay
+            - Tong capacity cua cac day vuot qua floor.totalSlots
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                rowCodeConflict:
+                  summary: Ma day da ton tai
+                  value:
+                    success: false
+                    message: 'Row code "A" already exists on this floor'
+                capacityExceeded:
+                  summary: Tong capacity vuot qua gioi han tang
+                  value:
+                    success: false
+                    message: 'Floor capacity exceeded. Used: 80, adding: 30, max: 100'
+
+  /parking-rows/{id}:
+    get:
+      tags: [Parking Rows]
+      summary: Get parking row by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/pathId'
+      responses:
+        '200':
+          description: Row detail
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ParkingRowDetail'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Row not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    patch:
+      tags: [Parking Rows]
+      summary: Update row info (admin, manager)
+      description: |
+        Cap nhat rowCode, capacity hoac note.
+        Khong the giam capacity xuong duoi so xe dang dau (occupiedCount).
+        Khong the tang capacity neu tong capacity cua floor (cac day khac + gia tri moi) vuot qua floor.totalSlots.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/pathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                rowCode:
+                  type: string
+                  minLength: 1
+                  maxLength: 20
+                  example: A2
+                capacity:
+                  type: integer
+                  minimum: 1
+                  maximum: 500
+                  example: 40
+                  description: Khong the nho hon occupiedCount hien tai
+                note:
+                  type: string
+                  maxLength: 1000
+                  nullable: true
+      responses:
+        '200':
+          description: Updated successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ParkingRow'
+        '400':
+          description: Validation error or capacity < occupiedCount
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: 'Cannot reduce capacity to 5: 20 motorcycles currently parked'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Row not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: |
+            - rowCode da ton tai tren tang nay
+            - Tong capacity sau khi update vuot qua floor.totalSlots
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                rowCodeConflict:
+                  summary: Ma day da ton tai
+                  value:
+                    success: false
+                    message: 'Row code "A2" already exists on this floor'
+                capacityExceeded:
+                  summary: Tong capacity vuot qua gioi han tang sau khi update
+                  value:
+                    success: false
+                    message: 'Floor capacity exceeded. Other rows: 80, updating to: 40, max: 100'
+
+    delete:
+      tags: [Parking Rows]
+      summary: Delete parking row (admin) — blocked if active session exists
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/pathId'
+      responses:
+        '204':
+          description: Deleted successfully
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Row not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Cannot delete row with an active parking session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /parking-rows/{id}/status:
+    patch:
+      tags: [Parking Rows]
+      summary: Update row status (admin, manager, staff)
+      description: |
+        Cap nhat trang thai day xe may thu cong.
+        - `maintenance`: khoa check-in vao day nay
+        - `available`: mo lai (du co xe dang dau)
+        - `full`: thuong tu dong set boi he thong, co the override
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/pathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [available, full, maintenance]
+                  example: maintenance
+                note:
+                  type: string
+                  maxLength: 1000
+                  nullable: true
+                  example: Dang son lai day
+            examples:
+              setMaintenance:
+                summary: Chuyen sang bao tri
+                value:
+                  status: maintenance
+                  note: Dang son lai nen khoa
+              reopen:
+                summary: Mo lai sau bao tri
+                value:
+                  status: available
+      responses:
+        '200':
+          description: Status updated successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ParkingRow'
+        '400':
+          description: Invalid status value
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Row not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # -- PARKING SESSIONS --
+  /parking-sessions:
+    get:
+      tags: [Parking Sessions]
+      summary: Get active parking sessions (admin, manager, staff)
+      description: |
+        Tra ve danh sach cac session dang **active** (xe dang gui).
+        Moi session co the co `slot` (xe hoi) hoac `row` (xe may), cai con lai la null.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/queryPage'
+        - $ref: '#/components/parameters/queryLimit'
+        - name: floorId
+          in: query
+          schema:
+            type: integer
+          description: Loc theo tang
+        - name: buildingId
+          in: query
+          schema:
+            type: integer
+          description: Loc theo toa nha
+        - name: vehicleType
+          in: query
+          schema:
+            type: string
+            enum: [motorcycle, car]
+          description: Loc theo loai xe
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Tim kiem theo bien so xe (LIKE)
+          example: 51A
+      responses:
+        '200':
+          description: Danh sach session dang active
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedParkingSessions'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /parking-sessions/lookup:
+    get:
+      tags: [Parking Sessions]
+      summary: Lookup license plate before check-in (admin, manager, staff)
+      description: |
+        **Preview endpoint** — goi truoc POST /check-in de staff xac nhan:
+        - Xe co dang trong bai khong? (`already_active` → khoa nut check-in)
+        - Cu dan nao da lien ket lan truoc? (`hint.linkedResident`)
+        - Con bao nhieu cho trong? (`availableSlots.car`, `availableSlots.motorcycle`)
+
+        Doc-only, khong co side effect.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: licensePlate
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 4
+            maxLength: 20
+            example: 51A-12345
+          description: Chi chu cai, chu so va go ngang. Tu dong uppercase truoc khi lookup.
+      responses:
+        '200':
+          description: Lookup result
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/LookupResponse'
+              examples:
+                available:
+                  summary: Xe chua trong bai, safe to check-in
+                  value:
+                    success: true
+                    data:
+                      licensePlate: 51A-12345
+                      status: available
+                      activeSession: null
+                      hint:
+                        linkedResident:
+                          id: 12
+                          fullName: Nguyen Van A
+                          phone: '0901234567'
+                          email: user@example.com
+                        lastVisit:
+                          vehicleType: motorcycle
+                          entryTime: '2024-05-01T08:00:00.000Z'
+                          exitTime: '2024-05-01T17:30:00.000Z'
+                          fee: 5000
+                      availableSlots:
+                        motorcycle: 47
+                        car: 8
+                alreadyActiveCar:
+                  summary: Xe hoi dang trong bai (co slot)
+                  value:
+                    success: true
+                    data:
+                      licensePlate: 51A-12345
+                      status: already_active
+                      activeSession:
+                        id: 42
+                        slotId: 5
+                        rowId: null
+                        licensePlate: 51A-12345
+                        vehicleType: car
+                        entryTime: '2024-05-20T07:15:00.000Z'
+                        exitTime: null
+                        fee: 0
+                        status: active
+                        slot:
+                          id: 5
+                          slotCode: A01
+                          floor:
+                            id: 2
+                            floorNumber: 1
+                            buildingId: 1
+                            building:
+                              id: 1
+                              name: Toa nha A
+                        row: null
+                        staff:
+                          id: 3
+                          fullName: Tran Van Staff
+                        user: null
+                      hint:
+                        linkedResident: null
+                        lastVisit: null
+                      availableSlots:
+                        motorcycle: 47
+                        car: 7
+                alreadyActiveMotorcycle:
+                  summary: Xe may dang trong bai (co row)
+                  value:
+                    success: true
+                    data:
+                      licensePlate: 59B-67890
+                      status: already_active
+                      activeSession:
+                        id: 55
+                        slotId: null
+                        rowId: 3
+                        licensePlate: 59B-67890
+                        vehicleType: motorcycle
+                        entryTime: '2024-05-20T08:00:00.000Z'
+                        exitTime: null
+                        fee: 0
+                        status: active
+                        slot: null
+                        row:
+                          id: 3
+                          rowCode: A
+                          capacity: 30
+                          occupiedCount: 21
+                          floor:
+                            id: 3
+                            floorNumber: 2
+                            buildingId: 1
+                            building:
+                              id: 1
+                              name: Toa nha A
+                        staff:
+                          id: 3
+                          fullName: Tran Van Staff
+                        user: null
+                      hint:
+                        linkedResident: null
+                        lastVisit: null
+                      availableSlots:
+                        motorcycle: 46
+                        car: 8
+        '400':
+          description: Missing or invalid licensePlate query param
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /parking-sessions/{id}:
+    get:
+      tags: [Parking Sessions]
+      summary: Get parking session by ID (admin, manager, staff)
+      description: |
+        Tra ve chi tiet session. Truong `slot` hoac `row` se co gia tri tuy vehicleType, cai con lai la null.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/pathId'
+      responses:
+        '200':
+          description: Chi tiet session
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ParkingSessionDetail'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /parking-sessions/check-in:
+    post:
+      tags: [Parking Sessions]
+      summary: Vehicle check-in (admin, manager, staff)
+      description: |
+        Tao parking session va cap nhat trang thai o/day.
+        Chay trong database transaction voi row-level lock (tranh race condition).
+
+        **Phan nhanh theo vehicleType:**
+        - `car` → phai co `slotId`, `rowId` bi cam (forbidden)
+        - `motorcycle` → phai co `rowId`, `slotId` bi cam (forbidden)
+
+        **Validations chung:**
+        - Bien so chua co active session
+        - userId (neu co) phai ton tai
+
+        **Validations xe hoi:**
+        - Slot phai ton tai va `status = "empty"`
+        - Tang va toa nha phai active
+        - floor.vehicleType phai la "car"
+
+        **Validations xe may:**
+        - Row phai ton tai va `status != "maintenance"`
+        - `occupiedCount < capacity`
+        - Tang va toa nha phai active
+        - floor.vehicleType phai la "motorcycle"
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - title: Check-in xe hoi
+                  type: object
+                  required: [vehicleType, licensePlate, slotId]
+                  properties:
+                    vehicleType:
+                      type: string
+                      enum: [car]
+                      example: car
+                    licensePlate:
+                      type: string
+                      minLength: 4
+                      maxLength: 20
+                      example: 51A-12345
+                      description: Chi chu cai, chu so va go ngang. Tu dong uppercase.
+                    slotId:
+                      type: integer
+                      example: 5
+                      description: ID o do xe (phai status = empty)
+                    userId:
+                      type: integer
+                      nullable: true
+                      example: 12
+                    note:
+                      type: string
+                      maxLength: 500
+                      nullable: true
+                - title: Check-in xe may
+                  type: object
+                  required: [vehicleType, licensePlate, rowId]
+                  properties:
+                    vehicleType:
+                      type: string
+                      enum: [motorcycle]
+                      example: motorcycle
+                    licensePlate:
+                      type: string
+                      minLength: 4
+                      maxLength: 20
+                      example: 59B-67890
+                    rowId:
+                      type: integer
+                      example: 3
+                      description: ID day do xe (phai status != maintenance va chua day)
+                    userId:
+                      type: integer
+                      nullable: true
+                      example: null
+                    note:
+                      type: string
+                      maxLength: 500
+                      nullable: true
+            examples:
+              checkInCar:
+                summary: Check-in xe hoi vao o A01
+                value:
+                  vehicleType: car
+                  licensePlate: 51A-12345
+                  slotId: 5
+                  userId: 12
+              checkInMotorcycle:
+                summary: Check-in xe may vao Day A
+                value:
+                  vehicleType: motorcycle
+                  licensePlate: 59B-67890
+                  rowId: 3
+      responses:
+        '201':
+          description: Check-in thanh cong
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        oneOf:
+                          - $ref: '#/components/schemas/CheckInCarResponse'
+                          - $ref: '#/components/schemas/CheckInMotorcycleResponse'
+              examples:
+                carCheckIn:
+                  summary: Response xe hoi (co slot, row = null)
+                  value:
+                    success: true
+                    data:
+                      id: 1
+                      licensePlate: 51A-12345
+                      vehicleType: car
+                      entryTime: '2024-05-20T07:15:00.000Z'
+                      status: active
+                      note: null
+                      slot:
+                        id: 5
+                        slotCode: A01
+                        floor:
+                          id: 2
+                          floorNumber: 1
+                          building:
+                            id: 1
+                            name: Toa nha A
+                      row: null
+                      staffId: 3
+                      userId: 12
+                motorcycleCheckIn:
+                  summary: Response xe may (slot = null, co row)
+                  value:
+                    success: true
+                    data:
+                      id: 2
+                      licensePlate: 59B-67890
+                      vehicleType: motorcycle
+                      entryTime: '2024-05-20T08:00:00.000Z'
+                      status: active
+                      note: null
+                      slot: null
+                      row:
+                        id: 3
+                        rowCode: A
+                        capacity: 30
+                        occupiedCount: 21
+                        floor:
+                          id: 3
+                          floorNumber: 2
+                          building:
+                            id: 1
+                            name: Toa nha A
+                      staffId: 3
+                      userId: null
+        '400':
+          description: |
+            - Validation error (slotId/rowId khong khop vehicleType)
+            - vehicleType mismatch voi floor
+            - Floor hoac building inactive
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                slotIdForbidden:
+                  summary: Gui slotId cho xe may
+                  value:
+                    success: false
+                    message: ['"slotId" is not allowed']
+                rowIdForbidden:
+                  summary: Gui rowId cho xe hoi
+                  value:
+                    success: false
+                    message: ['"rowId" is not allowed']
+                floorTypeMismatch:
+                  summary: Check-in car vao motorcycle floor
+                  value:
+                    success: false
+                    message: This slot only accepts car
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Slot, row hoac user khong tim thay
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: |
+            - Slot dang occupied/reserved/maintenance
+            - Row dang full hoac maintenance
+            - Bien so da co active session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                slotNotEmpty:
+                  summary: O xe khong trong
+                  value:
+                    success: false
+                    message: 'Slot is not available (current status: occupied)'
+                rowFull:
+                  summary: Day xe may da day
+                  value:
+                    success: false
+                    message: 'Row is full (30/30)'
+                alreadyCheckedIn:
+                  summary: Bien so da check-in
+                  value:
+                    success: false
+                    message: 'License plate 51A-12345 is already checked in (session #42)'
