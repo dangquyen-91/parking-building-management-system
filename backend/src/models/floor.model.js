@@ -2,6 +2,7 @@ import { DataTypes } from 'sequelize';
 import { sequelize } from '../config/database.js';
 
 export const VEHICLE_TYPES = ['motorcycle', 'car'];
+export const FLOOR_TYPES   = ['resident', 'visitor'];
 
 const Floor = sequelize.define(
   'Floor',
@@ -10,6 +11,7 @@ const Floor = sequelize.define(
     buildingId: { type: DataTypes.INTEGER, allowNull: false },
     floorNumber: { type: DataTypes.INTEGER, allowNull: false },
     vehicleType: { type: DataTypes.ENUM(...VEHICLE_TYPES), allowNull: false },
+    floorType:   { type: DataTypes.ENUM(...FLOOR_TYPES),   allowNull: false },
     totalSlots: { type: DataTypes.INTEGER, allowNull: false },
     description: { type: DataTypes.TEXT, allowNull: true },
     isActive: { type: DataTypes.BOOLEAN, defaultValue: true },
