@@ -3278,6 +3278,85 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /parking-sessions/{id}/checkout-preview:
+    get:
+      tags: [Parking Sessions]
+      summary: Preview check-out fee (admin, manager, staff)
+      description: |
+        Bao gia phi truoc khi check-out — KHONG dong session. Staff dung de bao
+        khach so tien, thu tien mat, roi moi xac nhan POST /check-out.
+        - Cu dan co goi active (tang resident) → fee 0 (`paymentMethod: package`)
+        - Vang lai → phi flat theo loai xe (`paymentMethod: cash`)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/pathId'
+      responses:
+        '200':
+          description: Fee quote
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          sessionId: { type: integer }
+                          licensePlate: { type: string }
+                          vehicleType: { type: string, enum: [motorcycle, car] }
+                          entryTime: { type: string, format: date-time }
+                          now: { type: string, format: date-time }
+                          durationMinutes: { type: integer }
+                          floorType: { type: string, enum: [resident, visitor], nullable: true }
+                          covered: { type: boolean }
+                          coveredBy: { type: string, nullable: true, example: subscription }
+                          fee: { type: integer, example: 5000 }
+                          paymentMethod: { type: string, enum: [cash, package] }
+        '404': { description: Session not found }
+        '409': { description: Session is not active }
+
+  /parking-sessions/{id}/check-out:
+    post:
+      tags: [Parking Sessions]
+      summary: Vehicle check-out (admin, manager, staff)
+      description: |
+        Hoan tat xe ra: dong session (completed), set exitTime + fee, va giai phong cho:
+        - O to vang lai → slot ve `empty`; o to cu dan (slot dat truoc con han) → ve `reserved`
+        - Xe may → row.occupiedCount giam 1
+        Phi: cu dan co goi = 0; vang lai = phi flat (xe may 5.000, o to 20.000) thu tien mat.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/pathId'
+      responses:
+        '200':
+          description: Check-out thanh cong (bien lai)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          sessionId: { type: integer }
+                          licensePlate: { type: string }
+                          vehicleType: { type: string }
+                          entryTime: { type: string, format: date-time }
+                          exitTime: { type: string, format: date-time }
+                          durationMinutes: { type: integer }
+                          fee: { type: integer }
+                          covered: { type: boolean }
+                          coveredBy: { type: string, nullable: true }
+                          paymentMethod: { type: string, enum: [cash, package] }
+        '404': { description: Session not found }
+        '409': { description: Session is not active (already checked out?) }
+
   /parking-sessions/check-in:
     post:
       tags: [Parking Sessions]

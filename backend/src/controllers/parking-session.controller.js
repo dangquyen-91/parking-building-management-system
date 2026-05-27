@@ -37,4 +37,22 @@ const lookup = async (req, res, next) => {
   }
 };
 
-export { checkIn, getActiveSessions, getOne, lookup };
+const previewCheckout = async (req, res, next) => {
+  try {
+    const result = await parkingSessionService.previewCheckout(req.params.id);
+    response.success(res, result);
+  } catch (err) {
+    next(err);
+  }
+};
+
+const checkOut = async (req, res, next) => {
+  try {
+    const result = await parkingSessionService.checkOut(req.params.id);
+    response.success(res, result);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export { checkIn, getActiveSessions, getOne, lookup, previewCheckout, checkOut };

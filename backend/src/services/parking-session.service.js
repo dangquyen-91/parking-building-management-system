@@ -6,7 +6,9 @@ import ParkingRow from '../models/parking-row.model.js';
 import Floor from '../models/floor.model.js';
 import Building from '../models/building.model.js';
 import User from '../models/user.model.js';
+import ResidentSubscription from '../models/resident-subscription.model.js';
 import AppError from '../utils/appError.js';
+import { getVisitorFlatFee } from '../constants/pricing.js';
 
 const slotInclude = (slotWhere, floorWhere) => ({
   model: ParkingSlot,
@@ -76,7 +78,21 @@ const checkIn = async ({ slotId, rowId, licensePlate, vehicleType, userId, note 
       });
 
       if (!slot) throw new AppError('Parking slot not found', 404);
-      if (slot.status !== 'empty') throw new AppError(`Slot is not available (current status: ${slot.status})`, 409);
+      if (slot.status !== 'empty') {
+        // A car resident may check into a slot reserved by THEIR own active
+        // package (matched by license plate). Any other non-empty slot is blocked.
+        const ownReservation =
+          slot.status === 'reserved'
+            ? await ResidentSubscription.findOne({
+                where: { slotId, licensePlate, status: 'active', endDate: { [Op.gt]: new Date() } },
+                transaction: t,
+              })
+            : null;
+        if (!ownReservation) {
+          throw new AppError(`Slot is not available (current status: ${slot.status})`, 409);
+        }
+        // else: resident entering their own reserved slot — allowed
+      }
       if (!slot.floor.isActive) throw new AppError('Floor is inactive', 400);
       if (!slot.floor.building.isActive) throw new AppError('Building is inactive', 400);
       if (slot.floor.vehicleType !== 'car') throw new AppError('This slot only accepts car', 400);
@@ -366,4 +382,132 @@ const lookup = async (licensePlate) => {
   };
 };
 
-export { checkIn, getActiveSessions, getById, lookup };
+// ── CHECK-OUT ──────────────────────────────────────────
+
+const findActiveSubByPlate = (licensePlate, t) =>
+  ResidentSubscription.findOne({
+    where: { licensePlate, status: 'active', endDate: { [Op.gt]: new Date() } },
+    order: [['endDate', 'DESC']],
+    transaction: t,
+  });
+
+/**
+ * Determine the fee for a session. Residents on a resident floor with an active
+ * subscription are covered (fee 0); everyone else pays the flat visitor fee.
+ */
+const resolveFee = async (session, floorType, t) => {
+  if (floorType === 'resident') {
+    const activeSub = await findActiveSubByPlate(session.licensePlate, t);
+    if (activeSub) {
+      return { fee: 0, covered: true, coveredBy: 'subscription', subscriptionId: activeSub.id };
+    }
+    // On a resident floor but no valid package → charge as visitor.
+    return { fee: getVisitorFlatFee(session.vehicleType), covered: false, coveredBy: null, note: 'no active resident package' };
+  }
+  return { fee: getVisitorFlatFee(session.vehicleType), covered: false, coveredBy: null };
+};
+
+const loadFloorType = async (session, t) => {
+  if (session.slotId) {
+    const slot = await ParkingSlot.findByPk(session.slotId, {
+      include: [{ model: Floor, as: 'floor', attributes: ['id', 'floorType'] }],
+      transaction: t,
+    });
+    return slot?.floor?.floorType || null;
+  }
+  if (session.rowId) {
+    const row = await ParkingRow.findByPk(session.rowId, {
+      include: [{ model: Floor, as: 'floor', attributes: ['id', 'floorType'] }],
+      transaction: t,
+    });
+    return row?.floor?.floorType || null;
+  }
+  return null;
+};
+
+/**
+ * Preview the fee for an active session without completing check-out.
+ * Lets staff quote the amount, collect cash, then confirm.
+ */
+const previewCheckout = async (id) => {
+  const session = await ParkingSession.findByPk(id);
+  if (!session) throw new AppError('Session not found', 404);
+  if (session.status !== 'active') throw new AppError(`Session is not active (current: ${session.status})`, 409);
+
+  const floorType = await loadFloorType(session);
+  const { fee, covered, coveredBy } = await resolveFee(session, floorType);
+
+  const now = new Date();
+  const durationMinutes = Math.max(0, Math.round((now - new Date(session.entryTime)) / 60000));
+
+  return {
+    sessionId: session.id,
+    licensePlate: session.licensePlate,
+    vehicleType: session.vehicleType,
+    entryTime: session.entryTime,
+    now,
+    durationMinutes,
+    floorType,
+    covered,
+    coveredBy,
+    fee,
+    paymentMethod: covered ? 'package' : 'cash',
+  };
+};
+
+/**
+ * Complete check-out: mark the session completed, set exit time + fee, and
+ * release the spot. A reserved resident slot returns to 'reserved' (still
+ * theirs); a visitor slot returns to 'empty'. Motorcycle rows decrement.
+ */
+const checkOut = async (id) => {
+  return sequelize.transaction(async (t) => {
+    const session = await ParkingSession.findByPk(id, { transaction: t, lock: t.LOCK.UPDATE });
+    if (!session) throw new AppError('Session not found', 404);
+    if (session.status !== 'active') {
+      throw new AppError(`Session is not active (current: ${session.status})`, 409);
+    }
+
+    const floorType = await loadFloorType(session, t);
+    const { fee, covered, coveredBy } = await resolveFee(session, floorType, t);
+
+    const exitTime = new Date();
+    await session.update({ status: 'completed', exitTime, fee }, { transaction: t });
+
+    // Release the spot
+    if (session.slotId) {
+      const stillReserved = await ResidentSubscription.findOne({
+        where: { slotId: session.slotId, status: 'active', endDate: { [Op.gt]: exitTime } },
+        transaction: t,
+      });
+      await ParkingSlot.update(
+        { status: stillReserved ? 'reserved' : 'empty' },
+        { where: { id: session.slotId }, transaction: t }
+      );
+    } else if (session.rowId) {
+      const row = await ParkingRow.findByPk(session.rowId, { transaction: t, lock: t.LOCK.UPDATE });
+      if (row) {
+        const newCount = Math.max(0, row.occupiedCount - 1);
+        const newStatus = row.status === 'maintenance' ? 'maintenance' : newCount >= row.capacity ? 'full' : 'available';
+        await row.update({ occupiedCount: newCount, status: newStatus }, { transaction: t });
+      }
+    }
+
+    const durationMinutes = Math.max(0, Math.round((exitTime - new Date(session.entryTime)) / 60000));
+
+    return {
+      sessionId: session.id,
+      licensePlate: session.licensePlate,
+      vehicleType: session.vehicleType,
+      entryTime: session.entryTime,
+      exitTime,
+      durationMinutes,
+      fee,
+      covered,
+      coveredBy,
+      paymentMethod: covered ? 'package' : 'cash',
+    };
+  });
+};
+
+export { checkIn, getActiveSessions, getById, lookup, previewCheckout, checkOut };
