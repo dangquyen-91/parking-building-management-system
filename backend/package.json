@@ -6,7 +6,8 @@
   "main": "src/app.js",
   "scripts": {
     "start": "node src/app.js",
-    "dev": "nodemon src/app.js"
+    "dev": "nodemon src/app.js",
+    "seed:packages": "node src/seeds/package.seed.js"
   },
   "keywords": [
     "parking",
@@ -31,6 +32,7 @@
     "jsonwebtoken": "^9.0.3",
     "morgan": "^1.10.1",
     "mysql2": "^3.22.3",
+    "qs": "^6.15.2",
     "sequelize": "^6.37.8",
     "swagger-ui-express": "^5.0.1",
     "yaml": "^2.9.0"
