@@ -14,10 +14,16 @@ import floorRoutes from './routes/floor.routes.js';
 import parkingSlotRoutes from './routes/parking-slot.routes.js';
 import parkingRowRoutes from './routes/parking-row.routes.js';
 import parkingSessionRoutes from './routes/parking-session.routes.js';
+import packageRoutes from './routes/package.routes.js';
+import subscriptionRoutes from './routes/subscription.routes.js';
+import paymentRoutes from './routes/payment.routes.js';
 import errorHandler from './middlewares/error.middleware.js';
 import { apiLimiter, authLimiter } from './middlewares/rateLimiter.middleware.js';
 
 const app = express();
+
+// Trust the first proxy (Railway/nginx) so rate limiting reads the real client IP
+app.set('trust proxy', 1);
 
 connectDB().catch((err) => {
   console.error('Failed to connect to database', err.message);
@@ -45,6 +51,9 @@ app.use('/api/v1/floors', floorRoutes);
 app.use('/api/v1/parking-slots', parkingSlotRoutes);
 app.use('/api/v1/parking-rows', parkingRowRoutes);
 app.use('/api/v1/parking-sessions', parkingSessionRoutes);
+app.use('/api/v1/packages', packageRoutes);
+app.use('/api/v1/subscriptions', subscriptionRoutes);
+app.use('/api/v1/payments', paymentRoutes);
 
 app.get('/health', (_req, res) =>
   res.json({ success: true, message: 'OK', data: { env: process.env.NODE_ENV } })

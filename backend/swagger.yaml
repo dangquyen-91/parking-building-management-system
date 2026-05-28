@@ -3539,3 +3539,339 @@ paths:
                   value:
                     success: false
                     message: 'License plate 51A-12345 is already checked in (session #42)'
+
+  # ── PACKAGES (resident parking plans) ─────────────────
+  /packages:
+    get:
+      tags: [Packages]
+      summary: List parking packages
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: vehicleType
+          in: query
+          schema: { type: string, enum: [motorcycle, car] }
+        - name: isActive
+          in: query
+          schema: { type: boolean }
+      responses:
+        '200':
+          description: List of packages
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+    post:
+      tags: [Packages]
+      summary: Create a package (admin, manager)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, vehicleType, durationDays, price]
+              properties:
+                name: { type: string, example: Xe máy hàng tháng }
+                vehicleType: { type: string, enum: [motorcycle, car], example: motorcycle }
+                durationDays: { type: integer, example: 30 }
+                price: { type: integer, example: 150000 }
+                description: { type: string, example: Gửi xe máy 1 tháng }
+                isActive: { type: boolean, default: true }
+      responses:
+        '201':
+          description: Package created
+
+  /packages/{id}:
+    get:
+      tags: [Packages]
+      summary: Get a package by id
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200': { description: Package found }
+        '404': { description: Package not found }
+    patch:
+      tags: [Packages]
+      summary: Update a package (admin, manager)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                vehicleType: { type: string, enum: [motorcycle, car] }
+                durationDays: { type: integer }
+                price: { type: integer }
+                description: { type: string }
+                isActive: { type: boolean }
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Packages]
+      summary: Disable a package (admin, manager) — soft delete
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200': { description: Package disabled }
+
+  # ── SUBSCRIPTIONS (resident buys a package) ───────────
+  /subscriptions:
+    get:
+      tags: [Subscriptions]
+      summary: List all subscriptions (admin, manager, staff)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [pending, active, expired, cancelled] }
+        - name: licensePlate
+          in: query
+          schema: { type: string }
+      responses:
+        '200': { description: List of subscriptions }
+    post:
+      tags: [Subscriptions]
+      summary: Buy a package for a license plate (returns VNPay URL)
+      description: |
+        Creates a pending subscription + pending payment, returns a VNPay URL.
+        The subscription is activated only after the VNPay IPN confirms success.
+        Residents buy for themselves; staff/manager/admin may pass `userId` to buy on behalf.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [packageId, licensePlate]
+              properties:
+                packageId: { type: integer, example: 1 }
+                licensePlate: { type: string, example: 51A-12345 }
+                slotId:
+                  type: integer
+                  description: 'Required for CAR packages (fixed reserved slot on a resident floor). Ignored for motorcycle.'
+                  example: 5
+                userId: { type: integer, description: 'Privileged roles only — buy on behalf of a resident' }
+      responses:
+        '201':
+          description: Subscription created, payment pending
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          paymentUrl: { type: string }
+                          orderId: { type: string }
+                          subscriptionId: { type: integer }
+                          slotId: { type: integer, nullable: true }
+                          amount: { type: integer }
+        '400': { description: 'slotId required for car / slot not a car slot / not a resident floor' }
+        '404': { description: Package not found or inactive / slot not found }
+        '409': { description: Pending purchase already exists, or slot is not available }
+
+  /subscriptions/expire:
+    post:
+      tags: [Subscriptions]
+      summary: Sweep expired/stale subscriptions, free reserved slots (admin, manager)
+      description: |
+        Cancels pending subscriptions older than 15 minutes and marks active
+        subscriptions past their endDate as expired, releasing reserved car slots.
+        Intended to be run on a schedule (no cron wired yet).
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Sweep result
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          pendingCancelled: { type: integer }
+                          activeExpired: { type: integer }
+
+  /subscriptions/me:
+    get:
+      tags: [Subscriptions]
+      summary: List my subscriptions
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [pending, active, expired, cancelled] }
+      responses:
+        '200': { description: My subscriptions }
+
+  /subscriptions/active:
+    get:
+      tags: [Subscriptions]
+      summary: Check active subscription for a license plate (admin, manager, staff)
+      description: Used by the check-out flow to decide whether a resident vehicle is covered.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: licensePlate
+          in: query
+          required: true
+          schema: { type: string, example: 51A-12345 }
+      responses:
+        '200':
+          description: Active subscription or null
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          active: { type: boolean }
+                          subscription: { type: object, nullable: true }
+
+  /subscriptions/{id}:
+    get:
+      tags: [Subscriptions]
+      summary: Get a subscription by id (owner or privileged)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200': { description: Subscription found }
+        '403': { description: Access denied }
+        '404': { description: Subscription not found }
+
+  # ── PAYMENTS (VNPay callbacks) ────────────────────────
+  /payments/vnpay/return:
+    get:
+      tags: [Payments]
+      summary: VNPay browser return URL (public)
+      description: |
+        VNPay redirects browser here after checkout. Verifies signature then
+        302-redirects to FRONTEND_PAYMENT_RETURN_URL with status query params.
+        Does NOT mutate business state (rely on IPN).
+      responses:
+        '302':
+          description: Redirect to frontend with `?status=success|failed&code=<code>&orderId=<id>`
+
+  /payments/vnpay/ipn:
+    get:
+      tags: [Payments]
+      summary: VNPay server-to-server IPN (public)
+      description: |
+        Called by VNPay backend. Authoritative source for marking payment success/failure.
+        Returns VNPay-standard RspCode JSON (NOT the API envelope).
+      responses:
+        '200':
+          description: IPN processed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  RspCode:
+                    type: string
+                    enum: ['00', '01', '02', '04', '97']
+                  Message:
+                    type: string
+
+  /payments/{orderId}/query:
+    get:
+      tags: [Payments]
+      summary: Reconcile a payment via VNPay queryDr (staff, manager, admin)
+      description: |
+        Actively asks VNPay for the true status of this order (queryDr) and
+        updates the payment + subscription if VNPay reports success while our
+        record is still pending. Works WITHOUT IPN/ngrok — use it on localhost
+        or for manual reconciliation when an IPN was missed.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Reconciliation result
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          orderId: { type: string }
+                          paid: { type: boolean }
+                          queryResponseCode: { type: string }
+                          transactionStatus: { type: string, nullable: true }
+                          message: { type: string }
+                          paymentStatus: { type: string, example: success }
+                          subscriptionStatus: { type: string, nullable: true, example: active }
+                          amount: { type: integer }
+        '400': { description: Original transaction date not recorded for this order }
+        '404': { description: Payment not found }
+
+  /payments/{orderId}:
+    get:
+      tags: [Payments]
+      summary: Get payment status by orderId
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Payment found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '404':
+          description: Payment not found
