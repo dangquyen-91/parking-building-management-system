@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useFormik } from 'formik';
-import { motion } from 'framer-motion';
-import { User, Mail, Lock, Phone, Car, ArrowRight, AlertTriangle } from 'lucide-react';
+import { motion, type Variants } from 'framer-motion';
+import { User, Mail, Lock, ArrowRight, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { registerSchema } from '../../validation/authSchema';
 import { AuthLayout } from '../../components/auth/AuthLayout';
 import { Input } from '../../components/ui/Input';
-import { cn } from '../../lib/utils';
 
 export const Register: React.FC = () => {
   const { register } = useAuth();
@@ -42,7 +41,7 @@ export const Register: React.FC = () => {
   });
 
   // Framer motion variants for staggering inputs
-  const containerVariants = {
+  const containerVariants: Variants = {
     hidden: { opacity: 0 },
     show: {
       opacity: 1,
@@ -52,7 +51,7 @@ export const Register: React.FC = () => {
     },
   };
 
-  const itemVariants = {
+  const itemVariants: Variants = {
     hidden: { opacity: 0, y: 15 },
     show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 100 } },
   };

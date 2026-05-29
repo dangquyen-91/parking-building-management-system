@@ -1,4 +1,3 @@
-import { motion } from 'framer-motion';
 import { Check, HelpCircle, ArrowRight } from 'lucide-react';
 import PackageSection from '../components/sections/PackageSection';
 

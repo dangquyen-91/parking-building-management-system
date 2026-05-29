@@ -1,8 +1,8 @@
-import { motion } from 'framer-motion';
+import { motion, type Variants } from 'framer-motion';
 import { UserCheck, Shield, Car, Key, Cpu, Sparkles, CheckCircle2 } from 'lucide-react';
 
 export default function Features() {
-  const containerVariants = {
+  const containerVariants: Variants = {
     hidden: {},
     visible: {
       transition: {
@@ -11,7 +11,7 @@ export default function Features() {
     },
   };
 
-  const itemVariants = {
+  const itemVariants: Variants = {
     hidden: { opacity: 0, y: 30 },
     visible: {
       opacity: 1,

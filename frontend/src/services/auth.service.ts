@@ -45,7 +45,7 @@ export const authService = {
   /**
    * Registers a new user.
    */
-  async register(userData: { fullName: string; email: string; password; phone?: string }): Promise<any> {
+  async register(userData: { fullName: string; email: string; password: string; phone?: string }): Promise<any> {
     const response = await fetch(`${API_BASE_URL}/auth/register`, {
       method: 'POST',
       headers: {
@@ -59,7 +59,7 @@ export const authService = {
   /**
    * Logs in a user and returns tokens.
    */
-  async login(credentials: { email: string; password }): Promise<AuthTokens> {
+  async login(credentials: { email: string; password: string }): Promise<AuthTokens> {
     const response = await fetch(`${API_BASE_URL}/auth/login`, {
       method: 'POST',
       headers: {

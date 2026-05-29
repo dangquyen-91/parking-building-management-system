@@ -1,13 +1,13 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { authService } from '../services/auth.service';
-import type { UserProfile, AuthTokens } from '../services/auth.service';
+import type { UserProfile } from '../services/auth.service';
 
 
 interface AuthContextType {
   user: UserProfile | null;
   loading: boolean;
-  login: (credentials: { email: string; password }) => Promise<void>;
-  register: (userData: { fullName: string; email: string; password; phone?: string }) => Promise<void>;
+  login: (credentials: { email: string; password: string }) => Promise<UserProfile>;
+  register: (userData: { fullName: string; email: string; password: string; phone?: string }) => Promise<void>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
 }
@@ -56,7 +56,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     initializeAuth();
   }, []);
 
-  const login = async (credentials: { email: string; password }) => {
+  const login = async (credentials: { email: string; password: string }) => {
     setLoading(true);
     try {
       const tokens = await authService.login(credentials);
@@ -65,6 +65,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const profile = await authService.getProfile(tokens.accessToken);
       setUser(profile);
+      return profile;
     } catch (err) {
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
@@ -75,7 +76,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const register = async (userData: { fullName: string; email: string; password; phone?: string }) => {
+  const register = async (userData: { fullName: string; email: string; password: string; phone?: string }) => {
     setLoading(true);
     try {
       await authService.register(userData);

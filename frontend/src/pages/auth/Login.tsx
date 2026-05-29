@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useFormik } from 'formik';
-import { motion } from 'framer-motion';
+import { motion, type Variants } from 'framer-motion';
 import { Mail, Lock, LogIn, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { loginSchema } from '../../validation/authSchema';
@@ -29,7 +29,7 @@ export const Login: React.FC = () => {
       setApiError(null);
       setIsSuccess(false);
       try {
-        await login({
+        const profile = await login({
           email: values.email,
           password: values.password,
         });
@@ -44,7 +44,7 @@ export const Login: React.FC = () => {
         setIsSuccess(true);
         // Delay slightly for transition animation
         setTimeout(() => {
-          navigate('/');
+          navigate(profile.role === 'admin' ? '/admin/dashboard' : '/');
         }, 800);
       } catch (err: any) {
         setApiError(err.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.');
@@ -63,7 +63,7 @@ export const Login: React.FC = () => {
   }, []);
 
   // Framer motion variants for staggering inputs
-  const containerVariants = {
+  const containerVariants: Variants = {
     hidden: { opacity: 0 },
     show: {
       opacity: 1,
@@ -73,7 +73,7 @@ export const Login: React.FC = () => {
     },
   };
 
-  const itemVariants = {
+  const itemVariants: Variants = {
     hidden: { opacity: 0, y: 15 },
     show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 100 } },
   };
