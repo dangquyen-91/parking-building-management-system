@@ -26,6 +26,8 @@ export default function Navbar() {
     { name: 'Trang Chủ', href: '/' },
     { name: 'Tính Năng', href: '/features' },
     { name: 'Gói Dịch Vụ', href: '/membership' },
+    { name: 'Dat Cho', href: '/booking' },
+    { name: 'My Booking', href: '/my-bookings' },
     { name: 'Về Chúng Tôi', href: '/about' },
     { name: 'Liên Hệ', href: '/contact' },
   ];

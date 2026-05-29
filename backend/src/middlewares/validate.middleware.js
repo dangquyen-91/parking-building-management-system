@@ -7,7 +7,8 @@ const validate = (schema, source = 'body') => {
       return res.status(400).json({ success: false, message: messages });
     }
     if (source === 'query') {
-      req.query = value;
+      Object.keys(target).forEach((key) => delete target[key]);
+      Object.assign(target, value);
     } else {
       req.body = value;
     }

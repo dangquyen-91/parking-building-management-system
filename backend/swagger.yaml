@@ -790,6 +790,223 @@ components:
         pagination:
           $ref: '#/components/schemas/Pagination'
 
+    # -- PARKING BOOKING (Visitor car booking) --
+    ParkingBooking:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        floorId:
+          type: integer
+          example: 2
+        slotId:
+          type: integer
+          nullable: true
+          example: null
+          description: Null while pending; set when staff confirms/checks in the booking.
+        userId:
+          type: integer
+          nullable: true
+          example: null
+          description: Optional linked user account. Admin, manager and staff accounts cannot create visitor bookings.
+        customerName:
+          type: string
+          example: Nguyen Van A
+        customerPhone:
+          type: string
+          example: '0901234567'
+        licensePlate:
+          type: string
+          example: 30F-30002
+        vehicleType:
+          type: string
+          enum: [car]
+          example: car
+        startTime:
+          type: string
+          format: date-time
+          nullable: true
+        endTime:
+          type: string
+          format: date-time
+          nullable: true
+        status:
+          type: string
+          enum: [pending, confirmed, cancelled, rejected]
+          example: pending
+        note:
+          type: string
+          nullable: true
+          example: Khach den cong B
+        staffNote:
+          type: string
+          nullable: true
+          example: Da xac nhan tai cong vao
+        handledBy:
+          type: integer
+          nullable: true
+          example: 3
+        handledAt:
+          type: string
+          format: date-time
+          nullable: true
+        sessionId:
+          type: integer
+          nullable: true
+          example: null
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ParkingBookingDetail:
+      allOf:
+        - $ref: '#/components/schemas/ParkingBooking'
+        - type: object
+          properties:
+            floor:
+              type: object
+              nullable: true
+              properties:
+                id: { type: integer, example: 2 }
+                floorNumber: { type: integer, example: 1 }
+                floorType: { type: string, enum: [visitor], example: visitor }
+                vehicleType: { type: string, enum: [car], example: car }
+                building:
+                  type: object
+                  properties:
+                    id: { type: integer, example: 1 }
+                    name: { type: string, example: Toa nha A }
+            slot:
+              type: object
+              nullable: true
+              properties:
+                id: { type: integer, example: 5 }
+                slotCode: { type: string, example: A01 }
+                floorId: { type: integer, example: 2 }
+                status: { type: string, enum: [empty, occupied, reserved, maintenance], example: occupied }
+            user:
+              type: object
+              nullable: true
+              properties:
+                id: { type: integer, example: 12 }
+                fullName: { type: string, example: Nguyen Van A }
+                email: { type: string, example: user@example.com }
+            staff:
+              type: object
+              nullable: true
+              properties:
+                id: { type: integer, example: 3 }
+                fullName: { type: string, example: Tran Van Staff }
+            session:
+              type: object
+              nullable: true
+              properties:
+                id: { type: integer, example: 42 }
+                entryTime: { type: string, format: date-time }
+                status: { type: string, enum: [active, completed, cancelled], example: active }
+
+    PublicParkingBooking:
+      type: object
+      properties:
+        id: { type: integer, example: 1 }
+        customerName: { type: string, example: Nguyen Van A }
+        customerPhone: { type: string, example: '0901234567' }
+        licensePlate: { type: string, example: 30F-30002 }
+        vehicleType: { type: string, enum: [car], example: car }
+        status: { type: string, enum: [pending, confirmed, cancelled, rejected], example: pending }
+        note: { type: string, nullable: true, example: Khach den cong B }
+        startTime: { type: string, format: date-time, nullable: true }
+        endTime: { type: string, format: date-time, nullable: true }
+        availableSlotsRemaining:
+          type: integer
+          example: 8
+          description: Returned after creating a booking; counts empty visitor car slots minus pending bookings.
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    VisitorAvailability:
+      type: object
+      properties:
+        floorId: { type: integer, example: 2 }
+        floorNumber: { type: integer, example: 1 }
+        vehicleType: { type: string, enum: [car], example: car }
+        building:
+          type: object
+          properties:
+            id: { type: integer, example: 1 }
+            name: { type: string, example: Toa nha A }
+        availableSlots:
+          type: integer
+          example: 8
+          description: Empty visitor car slots minus pending bookings. Pending bookings hold capacity until staff confirms, rejects, or cancels them.
+
+    CreateVisitorBookingRequest:
+      type: object
+      required: [floorId, vehicleType, customerName, customerPhone, licensePlate]
+      properties:
+        floorId: { type: integer, example: 2 }
+        vehicleType: { type: string, enum: [car], example: car }
+        customerName: { type: string, minLength: 2, maxLength: 100, example: Nguyen Van A }
+        customerPhone:
+          type: string
+          pattern: '^[0-9+\-\s]{8,20}$'
+          example: '0901234567'
+        licensePlate:
+          type: string
+          minLength: 4
+          maxLength: 20
+          pattern: '^[A-Z0-9\-]+$'
+          example: 30F-30002
+        startTime:
+          type: string
+          format: date-time
+          example: '2026-05-29T04:00:00.000Z'
+          description: Must not be in the past.
+        endTime:
+          type: string
+          format: date-time
+          description: Must be after startTime.
+        durationHours:
+          type: number
+          minimum: 0
+          maximum: 24
+          example: 2
+          description: Used to calculate endTime when endTime is omitted.
+        note:
+          type: string
+          maxLength: 500
+          nullable: true
+
+    StaffBookingActionRequest:
+      type: object
+      properties:
+        slotId:
+          type: integer
+          example: 5
+          description: Optional. If omitted, the backend assigns the first empty visitor car slot on the booking floor.
+        staffNote:
+          type: string
+          maxLength: 500
+          nullable: true
+          example: Khach da den cong vao
+
+    PaginatedParkingBookings:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ParkingBookingDetail'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
     LookupResponse:
       type: object
       properties:
@@ -3620,6 +3837,343 @@ paths:
                     message: 'License plate 51A-12345 is already checked in (session #42)'
 
   # ── PACKAGES (resident parking plans) ─────────────────
+  # -- PARKING BOOKINGS --
+  /parking-bookings/availability:
+    get:
+      tags: [Parking Bookings]
+      summary: Get public visitor booking availability
+      description: |
+        Public endpoint for visitor car booking. Availability is calculated as:
+        `empty visitor car slots - pending bookings`.
+
+        A pending booking holds one available slot until staff confirms/checks in,
+        rejects, or cancels the booking.
+      parameters:
+        - name: vehicleType
+          in: query
+          schema:
+            type: string
+            enum: [car]
+            default: car
+          description: Visitor booking currently supports car only.
+      responses:
+        '200':
+          description: Visitor car availability by floor
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/VisitorAvailability'
+        '400':
+          description: Invalid vehicleType
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /parking-bookings/my:
+    get:
+      tags: [Parking Bookings]
+      summary: Public lookup for visitor bookings
+      description: |
+        Public lookup by phone number, optionally filtered by license plate.
+        Returns the latest 20 matching visitor bookings.
+      parameters:
+        - name: customerPhone
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: '^[0-9+\-\s]{8,20}$'
+            example: '0901234567'
+        - name: licensePlate
+          in: query
+          schema:
+            type: string
+            minLength: 4
+            maxLength: 20
+            pattern: '^[A-Z0-9\-]+$'
+            example: 30F-30002
+      responses:
+        '200':
+          description: Matching visitor bookings
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ParkingBookingDetail'
+        '400':
+          description: Invalid query
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /parking-bookings:
+    post:
+      tags: [Parking Bookings]
+      summary: Create a visitor booking
+      description: |
+        Public visitor booking flow for car visitor floors.
+
+        Auth is optional:
+        - No token: allowed, creates an anonymous visitor booking.
+        - `user` token: allowed, links the booking to that user.
+        - `admin`, `manager`, `staff` token: blocked with 403. Internal accounts may view the page but cannot create visitor bookings.
+
+        The booking starts as `pending`. It does not create a parking session and does not occupy a physical slot yet.
+        It only reduces public availability because pending bookings hold capacity.
+      security:
+        - {}
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateVisitorBookingRequest'
+            example:
+              floorId: 2
+              vehicleType: car
+              customerName: Nguyen Van A
+              customerPhone: '0901234567'
+              licensePlate: 30F-30002
+              startTime: '2026-05-29T04:00:00.000Z'
+              durationHours: 2
+              note: Khach den cong B
+      responses:
+        '201':
+          description: Booking created as pending
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PublicParkingBooking'
+        '400':
+          description: Validation error, inactive floor/building, non-visitor floor, wrong vehicle type, or past startTime
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Admin, manager and staff accounts cannot create visitor bookings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: Admin, manager and staff accounts cannot create visitor bookings
+        '404':
+          description: Floor not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: No visitor slot available, active resident package exists, duplicate pending booking, or plate already checked in
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    get:
+      tags: [Parking Bookings]
+      summary: List visitor bookings (admin, manager, staff)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/queryPage'
+        - $ref: '#/components/parameters/queryLimit'
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, confirmed, cancelled, rejected]
+          description: Defaults to pending in the backend when omitted.
+        - name: vehicleType
+          in: query
+          schema:
+            type: string
+            enum: [car]
+        - name: search
+          in: query
+          schema:
+            type: string
+            maxLength: 50
+          description: Search by license plate, customer name, or phone.
+      responses:
+        '200':
+          description: Paginated booking list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedParkingBookings'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /parking-bookings/{id}:
+    get:
+      tags: [Parking Bookings]
+      summary: Get visitor booking by ID (admin, manager, staff)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/pathId'
+      responses:
+        '200':
+          description: Booking detail
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ParkingBookingDetail'
+        '401': { description: Unauthorized }
+        '403': { description: Access denied }
+        '404': { description: Booking not found }
+
+  /parking-bookings/{id}/confirm:
+    post:
+      tags: [Parking Bookings]
+      summary: Confirm booking and check vehicle in (admin, manager, staff)
+      description: |
+        Staff action that converts a `pending` visitor booking into a real parking session.
+
+        Side effects in one transaction:
+        - Finds or uses an empty visitor car slot.
+        - Creates an active `parking_session`.
+        - Updates slot status to `occupied`.
+        - Updates booking status to `confirmed`, sets `slotId`, `sessionId`, `handledBy`, and `handledAt`.
+
+        This is the recommended check-in path when a visitor arrives with a pending booking.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/pathId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StaffBookingActionRequest'
+            example:
+              slotId: 5
+              staffNote: Khach da den cong vao
+      responses:
+        '200':
+          description: Booking confirmed and parking session created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ParkingBookingDetail'
+        '400': { description: Inactive floor, wrong slot floor/type, or invalid request }
+        '401': { description: Unauthorized }
+        '403': { description: Access denied }
+        '404': { description: Booking not found }
+        '409': { description: Booking is not pending, no slot available, active session exists, or active resident package exists }
+
+  /parking-bookings/{id}/reject:
+    post:
+      tags: [Parking Bookings]
+      summary: Reject a pending booking (admin, manager, staff)
+      description: Rejects a pending booking. Once rejected, it no longer holds availability.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/pathId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StaffBookingActionRequest'
+            example:
+              staffNote: Thong tin khong hop le
+      responses:
+        '200':
+          description: Booking rejected
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ParkingBookingDetail'
+        '401': { description: Unauthorized }
+        '403': { description: Access denied }
+        '404': { description: Booking not found }
+        '409': { description: Booking is not pending }
+
+  /parking-bookings/{id}/cancel:
+    post:
+      tags: [Parking Bookings]
+      summary: Cancel a pending booking (admin, manager, staff)
+      description: Cancels a pending booking. Once cancelled, it no longer holds availability.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/pathId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StaffBookingActionRequest'
+            example:
+              staffNote: Khach khong den
+      responses:
+        '200':
+          description: Booking cancelled
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ParkingBookingDetail'
+        '401': { description: Unauthorized }
+        '403': { description: Access denied }
+        '404': { description: Booking not found }
+        '409': { description: Booking is not pending }
+
   /packages:
     get:
       tags: [Packages]

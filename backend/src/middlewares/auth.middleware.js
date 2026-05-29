@@ -15,6 +15,18 @@ const authenticate = (req, res, next) => {
   }
 };
 
+const authenticateOptional = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    try {
+      req.user = verifyAccess(authHeader.split(' ')[1]);
+    } catch (err) {
+      // Ignore token errors for optional auth
+    }
+  }
+  next();
+};
+
 const authorize = (...roles) => {
   return (req, res, next) => {
     if (!roles.includes(req.user.role)) {
@@ -24,4 +36,4 @@ const authorize = (...roles) => {
   };
 };
 
-export { authenticate, authorize };
+export { authenticate, authenticateOptional, authorize };
