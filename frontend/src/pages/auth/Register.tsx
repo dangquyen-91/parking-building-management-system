@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useFormik } from 'formik';
-import { motion } from 'framer-motion';
-import { User, Mail, Lock, Phone, Car, ArrowRight, AlertTriangle } from 'lucide-react';
+import { motion, type Variants } from 'framer-motion';
+import { User, Mail, Lock, ArrowRight, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { registerSchema } from '../../validation/authSchema';
 import { AuthLayout } from '../../components/auth/AuthLayout';
 import { Input } from '../../components/ui/Input';
-import { cn } from '../../lib/utils';
 
 export const Register: React.FC = () => {
   const { register } = useAuth();
@@ -32,7 +31,6 @@ export const Register: React.FC = () => {
           password: values.password,
         });
 
-        // Redirect to login with registerSuccess state
         navigate('/login', { state: { registerSuccess: true } });
       } catch (err: any) {
         setApiError(err.message || 'Đăng ký thất bại. Vui lòng kiểm tra lại thông tin.');
@@ -41,8 +39,7 @@ export const Register: React.FC = () => {
     },
   });
 
-  // Framer motion variants for staggering inputs
-  const containerVariants = {
+  const containerVariants: Variants = {
     hidden: { opacity: 0 },
     show: {
       opacity: 1,
@@ -52,7 +49,7 @@ export const Register: React.FC = () => {
     },
   };
 
-  const itemVariants = {
+  const itemVariants: Variants = {
     hidden: { opacity: 0, y: 15 },
     show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 100 } },
   };
@@ -62,7 +59,6 @@ export const Register: React.FC = () => {
       title="Tạo tài khoản mới" 
       subtitle="Đăng ký tài khoản ParkEase để quản lý bãi xe thông minh."
     >
-      {/* Alert banner for error */}
       {apiError && (
         <motion.div 
           initial={{ opacity: 0, height: 0 }}
@@ -81,7 +77,6 @@ export const Register: React.FC = () => {
           animate="show"
           className="flex flex-col gap-4"
         >
-          {/* Full Name input */}
           <motion.div variants={itemVariants}>
             <Input
               label="Họ và tên"
@@ -96,8 +91,6 @@ export const Register: React.FC = () => {
               disabled={formik.isSubmitting}
             />
           </motion.div>
-
-          {/* Email input */}
           <motion.div variants={itemVariants}>
             <Input
               label="Email"
@@ -113,10 +106,6 @@ export const Register: React.FC = () => {
               disabled={formik.isSubmitting}
             />
           </motion.div>
-
-
-
-          {/* Grid for Password & Confirm Password */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <motion.div variants={itemVariants}>
               <Input
@@ -150,10 +139,6 @@ export const Register: React.FC = () => {
               />
             </motion.div>
           </div>
-
-
-
-          {/* Terms checkbox */}
           <motion.div variants={itemVariants} className="mt-1">
             <label className="flex items-start gap-2.5 cursor-pointer text-slate-400 hover:text-slate-300 select-none text-xs sm:text-sm">
               <input
@@ -183,8 +168,6 @@ export const Register: React.FC = () => {
               </div>
             )}
           </motion.div>
-
-          {/* Register button */}
           <motion.div variants={itemVariants} className="mt-2">
             <motion.button
               whileHover={{ scale: 1.01 }}
@@ -203,8 +186,6 @@ export const Register: React.FC = () => {
               )}
             </motion.button>
           </motion.div>
-
-          {/* Redirect to Login link */}
           <motion.div variants={itemVariants} className="text-center mt-3">
             <span className="text-slate-400 text-sm">Đã có tài khoản? </span>
             <Link to="/login" className="text-blue-400 hover:text-blue-300 font-semibold text-sm transition-colors">

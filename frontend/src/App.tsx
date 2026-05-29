@@ -8,16 +8,17 @@ import { AuthProvider } from './hooks/useAuth';
 function AppContent() {
   const location = useLocation();
   const isAuthPage = ['/login', '/register', '/signin', '/signup'].includes(location.pathname);
+  const isAdminPage = location.pathname.startsWith('/admin');
 
   return (
     <div className="bg-white min-h-screen text-slate-900 font-sans selection:bg-blue-200 selection:text-blue-900 overflow-x-hidden relative">
-      {!isAuthPage && <Navbar />}
+      {!isAuthPage && !isAdminPage && <Navbar />}
       
       <main>
         <AppRoutes />
       </main>
 
-      {!isAuthPage && <Footer />}
+      {!isAuthPage && !isAdminPage && <Footer />}
     </div>
   );
 }

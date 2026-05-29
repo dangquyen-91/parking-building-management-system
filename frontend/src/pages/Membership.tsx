@@ -1,4 +1,3 @@
-import { motion } from 'framer-motion';
 import { Check, HelpCircle, ArrowRight } from 'lucide-react';
 import PackageSection from '../components/sections/PackageSection';
 
@@ -36,15 +35,10 @@ export default function Membership() {
 
   return (
     <div className="pt-32 pb-24 bg-white min-h-screen">
-      {/* Background neon light reflection */}
       <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-blue-100/30 rounded-full blur-[130px] pointer-events-none -z-10" />
 
       <div className="container mx-auto px-6 md:px-12">
-        
-        {/* Render the basic cards in non-preview mode */}
         <PackageSection isPreview={false} />
-
-        {/* Pricing Comparison Table (Stripe inspired) */}
         <div className="mt-28 max-w-5xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-3xl font-bold text-slate-900 tracking-tight mb-4">Bảng So Sánh Quyền Lợi Chi Tiết</h2>
@@ -92,8 +86,6 @@ export default function Membership() {
             </table>
           </div>
         </div>
-
-        {/* FAQs */}
         <div className="mt-28 max-w-4xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-3xl font-bold text-slate-900 tracking-tight mb-4">Các Câu Hỏi Thường Gặp</h2>
@@ -114,8 +106,6 @@ export default function Membership() {
             ))}
           </div>
         </div>
-
-        {/* Inner CTA */}
         <div className="mt-28 bg-slate-950 text-white rounded-[40px] p-8 md:p-16 border border-white/10 relative overflow-hidden text-center max-w-5xl mx-auto">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.1),transparent_70%)] pointer-events-none" />
           <h3 className="text-3xl md:text-4xl font-bold mb-4 tracking-tight">Sẵn sàng trải nghiệm dịch vụ Premium?</h3>

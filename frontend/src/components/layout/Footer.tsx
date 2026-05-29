@@ -4,12 +4,10 @@ import { Car, ArrowRight } from 'lucide-react';
 export default function Footer() {
   return (
     <footer id="footer" className="bg-slate-950 pt-20 pb-10 border-t border-white/5 relative overflow-hidden">
-      {/* Glow effect */}
       <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1/2 h-[200px] bg-blue-600/10 blur-[100px] rounded-full pointer-events-none"></div>
 
       <div className="container mx-auto px-6 md:px-12 relative z-10">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-16">
-          {/* Brand */}
           <div className="lg:col-span-1">
             <div className="flex items-center gap-2 mb-6">
               <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-500">
@@ -23,8 +21,6 @@ export default function Footer() {
               Giải pháp quản lý bãi đỗ xe thông minh hàng đầu, mang lại trải nghiệm tiện lợi và an toàn cho thành phố hiện đại.
             </p>
           </div>
-
-          {/* Links */}
           <div>
             <h4 className="text-white font-semibold mb-6">Sản Phẩm</h4>
             <ul className="space-y-4">
@@ -44,8 +40,6 @@ export default function Footer() {
               <li><Link to="/contact" className="text-slate-400 hover:text-white transition-colors text-sm">Liên hệ</Link></li>
             </ul>
           </div>
-
-          {/* Newsletter */}
           <div>
             <h4 className="text-white font-semibold mb-6">Đăng Ký Nhận Tin</h4>
             <p className="text-slate-400 text-sm mb-4">Nhận thông tin cập nhật mới nhất về các tính năng và ưu đãi.</p>

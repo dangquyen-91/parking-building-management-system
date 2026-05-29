@@ -1,13 +1,13 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { authService } from '../services/auth.service';
-import type { UserProfile, AuthTokens } from '../services/auth.service';
+import type { UserProfile } from '../services/auth.service';
 
 
 interface AuthContextType {
   user: UserProfile | null;
   loading: boolean;
-  login: (credentials: { email: string; password }) => Promise<void>;
-  register: (userData: { fullName: string; email: string; password; phone?: string }) => Promise<void>;
+  login: (credentials: { email: string; password: string }) => Promise<UserProfile>;
+  register: (userData: { fullName: string; email: string; password: string; phone?: string }) => Promise<void>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
 }
@@ -18,7 +18,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
-  // Initialize and check for existing tokens
   useEffect(() => {
     const initializeAuth = async () => {
       const accessToken = localStorage.getItem('accessToken');
@@ -30,11 +29,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       try {
-        // Try getting profile using current access token
         const profile = await authService.getProfile(accessToken);
         setUser(profile);
       } catch (err) {
-        // Access token might be expired, try refreshing
         try {
           const newTokens = await authService.refresh(refreshToken);
           localStorage.setItem('accessToken', newTokens.accessToken);
@@ -43,7 +40,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const profile = await authService.getProfile(newTokens.accessToken);
           setUser(profile);
         } catch (refreshErr) {
-          // Both expired/invalid, clear them
           localStorage.removeItem('accessToken');
           localStorage.removeItem('refreshToken');
           setUser(null);
@@ -56,7 +52,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     initializeAuth();
   }, []);
 
-  const login = async (credentials: { email: string; password }) => {
+  const login = async (credentials: { email: string; password: string }) => {
     setLoading(true);
     try {
       const tokens = await authService.login(credentials);
@@ -65,6 +61,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const profile = await authService.getProfile(tokens.accessToken);
       setUser(profile);
+      return profile;
     } catch (err) {
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
@@ -75,7 +72,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const register = async (userData: { fullName: string; email: string; password; phone?: string }) => {
+  const register = async (userData: { fullName: string; email: string; password: string; phone?: string }) => {
     setLoading(true);
     try {
       await authService.register(userData);

@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { Cpu, ShieldCheck, Zap, Server, ShieldAlert } from 'lucide-react';
+import { Cpu, Zap, Server, ShieldAlert } from 'lucide-react';
 
 export default function AboutSection() {
   const cards = [

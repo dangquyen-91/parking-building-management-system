@@ -4,7 +4,6 @@ import { ArrowRight, MessageSquare } from 'lucide-react';
 export default function CTASection() {
   return (
     <section className="relative py-28 bg-slate-950 text-white overflow-hidden">
-      {/* Background patterns */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom,rgba(30,58,138,0.3),transparent_70%)]"></div>
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[300px] bg-blue-600/15 blur-[120px] rounded-full pointer-events-none"></div>
 

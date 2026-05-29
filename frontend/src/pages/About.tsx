@@ -27,12 +27,9 @@ export default function About() {
 
   return (
     <div className="pt-32 pb-24 bg-white min-h-screen">
-      {/* Background gradients */}
       <div className="absolute top-0 left-1/3 w-[500px] h-[500px] bg-blue-100/30 rounded-full blur-[140px] pointer-events-none -z-10" />
 
       <div className="container mx-auto px-6 md:px-12">
-        
-        {/* Intro Section */}
         <div className="max-w-4xl mx-auto text-center mb-24">
           <motion.h1 
             initial={{ opacity: 0, y: 30 }}
@@ -53,8 +50,6 @@ export default function About() {
             ParkEase bắt đầu với ý tưởng đơn giản: Gửi xe phải là một trải nghiệm không chạm, không gây căng thẳng. Chúng tôi phát triển các công nghệ tích hợp giúp đô thị hóa hiện đại trở nên thông minh và dễ thở hơn.
           </motion.p>
         </div>
-
-        {/* Cinematic Vision Banner */}
         <motion.div 
           initial={{ opacity: 0, y: 40 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -83,8 +78,6 @@ export default function About() {
             </div>
           </div>
         </motion.div>
-
-        {/* Core Values / Concept */}
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-3xl font-bold text-slate-900 tracking-tight mb-4">Các Giá Trị Cốt Lõi</h2>
