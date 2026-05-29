@@ -38,7 +38,6 @@ export default function FeaturesSection() {
 
   return (
     <section id="features" className="py-24 bg-slate-50 relative overflow-hidden">
-      {/* Background neon blurs */}
       <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-100/50 rounded-full blur-[100px] -translate-y-1/3 translate-x-1/3"></div>
       <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-cyan-100/40 rounded-full blur-[100px] translate-y-1/3 -translate-x-1/3"></div>
 

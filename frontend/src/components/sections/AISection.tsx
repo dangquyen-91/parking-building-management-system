@@ -32,17 +32,12 @@ export default function AISection() {
 
   return (
     <section className="py-24 bg-slate-950 text-white relative overflow-hidden">
-      {/* Blueprint background lines & neon grids */}
       <div className="absolute inset-0 opacity-[0.03] bg-[linear-gradient(to_right,#808080_1px,transparent_1px),linear-gradient(to_bottom,#808080_1px,transparent_1px)] bg-[size:30px_30px] z-0"></div>
-      
-      {/* Huge cyan neon glow overlay */}
       <div className="absolute top-1/2 left-1/3 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-blue-600/20 blur-[130px] rounded-full pointer-events-none z-0"></div>
       <div className="absolute bottom-0 right-10 w-[300px] h-[300px] bg-cyan-500/10 blur-[100px] rounded-full pointer-events-none z-0"></div>
 
       <div className="container mx-auto px-6 md:px-12 relative z-10">
         <div className="flex flex-col lg:flex-row gap-16 items-center">
-          
-          {/* Left Graphic - Futuristic System Preview */}
           <div className="w-full lg:w-1/2 relative flex items-center justify-center">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95 }}
@@ -51,39 +46,28 @@ export default function AISection() {
               transition={{ duration: 0.8 }}
               className="relative w-full max-w-[500px] aspect-square rounded-3xl border border-white/10 bg-slate-900/60 p-8 glass-panel-dark"
             >
-              {/* Radar scanner simulation */}
               <div className="absolute inset-4 rounded-full border border-cyan-500/10 flex items-center justify-center">
                 <div className="absolute w-3/4 h-3/4 rounded-full border border-cyan-500/20 flex items-center justify-center animate-ping opacity-40"></div>
                 <div className="absolute w-1/2 h-1/2 rounded-full border border-blue-500/30"></div>
               </div>
-
-              {/* AI Core Box */}
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-28 h-28 rounded-3xl bg-slate-950 border border-cyan-500/50 flex flex-col items-center justify-center shadow-[0_0_40px_rgba(6,182,212,0.3)] z-10">
                 <Cpu className="w-10 h-10 text-cyan-400 animate-pulse" />
                 <span className="text-[10px] text-cyan-400 font-mono tracking-widest mt-2">AI CORE</span>
               </div>
-
-              {/* Floating Node A */}
               <div className="absolute top-12 left-12 glass-panel-dark px-3 py-1.5 rounded-xl border border-white/10 text-xs font-mono flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
                 SLOT ACCESSIBILITY
               </div>
-
-              {/* Floating Node B */}
               <div className="absolute bottom-16 right-8 glass-panel-dark px-3 py-1.5 rounded-xl border border-white/10 text-xs font-mono flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
                 TRAFFIC FLUIDITY: 98%
               </div>
-
-              {/* Floating Node C */}
               <div className="absolute top-1/3 right-12 glass-panel-dark px-3 py-1.5 rounded-xl border border-white/10 text-xs font-mono flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-amber-400"></span>
                 PEAK LOAD CONTROL
               </div>
             </motion.div>
           </div>
-
-          {/* Right Text Content */}
           <div className="w-full lg:w-1/2 flex flex-col items-start gap-8">
             <div>
               <h2 className="text-cyan-400 font-semibold tracking-wider uppercase text-sm mb-3">Tự Động Hóa Trí Tuệ Nhân Tạo</h2>

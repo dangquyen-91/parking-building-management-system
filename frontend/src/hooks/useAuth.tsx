@@ -18,7 +18,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
-  // Initialize and check for existing tokens
   useEffect(() => {
     const initializeAuth = async () => {
       const accessToken = localStorage.getItem('accessToken');
@@ -30,11 +29,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       try {
-        // Try getting profile using current access token
         const profile = await authService.getProfile(accessToken);
         setUser(profile);
       } catch (err) {
-        // Access token might be expired, try refreshing
         try {
           const newTokens = await authService.refresh(refreshToken);
           localStorage.setItem('accessToken', newTokens.accessToken);
@@ -43,7 +40,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const profile = await authService.getProfile(newTokens.accessToken);
           setUser(profile);
         } catch (refreshErr) {
-          // Both expired/invalid, clear them
           localStorage.removeItem('accessToken');
           localStorage.removeItem('refreshToken');
           setUser(null);

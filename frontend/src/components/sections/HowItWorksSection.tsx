@@ -32,7 +32,6 @@ export default function HowItWorksSection() {
         </div>
 
         <div className="grid md:grid-cols-3 gap-12 max-w-5xl mx-auto relative">
-          {/* Connector Line (Desktop) */}
           <div className="hidden md:block absolute top-12 left-[15%] right-[15%] h-0.5 bg-gradient-to-r from-blue-100 via-blue-400 to-blue-100 opacity-60 z-0"></div>
 
           {steps.map((step, idx) => (

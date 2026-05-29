@@ -18,7 +18,6 @@ export default function Navbar() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Reset mobile menu on page transition
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [location]);
@@ -40,7 +39,6 @@ export default function Navbar() {
       }`}
     >
       <div className="container mx-auto px-6 md:px-12 flex items-center justify-between">
-        {/* Logo */}
         <Link to="/" className="flex items-center gap-2">
           <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-500">
             <Car size={24} className="stroke-[2.5]" />
@@ -49,8 +47,6 @@ export default function Navbar() {
             ParkEase<span className="text-blue-500">.</span>
           </span>
         </Link>
-
-        {/* Desktop Nav */}
         <div className="hidden md:flex items-center gap-8">
           {navLinks.map((link, idx) => (
             <NavLink
@@ -81,8 +77,6 @@ export default function Navbar() {
             </NavLink>
           ))}
         </div>
-
-        {/* CTA */}
         <div className="hidden md:flex items-center gap-4">
           {isAuthenticated && user ? (
             <>
@@ -124,8 +118,6 @@ export default function Navbar() {
             Đặt Chỗ Ngay
           </Link>
         </div>
-
-        {/* Mobile Toggle */}
         <button 
           className={`md:hidden p-2 rounded-lg ${scrolled || !isHome ? 'text-slate-900' : 'text-white'}`}
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -133,8 +125,6 @@ export default function Navbar() {
           {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
       </div>
-
-      {/* Mobile Menu */}
       <AnimatePresence>
         {mobileMenuOpen && (
           <motion.div 

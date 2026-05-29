@@ -25,11 +25,9 @@ export default function Features() {
 
   return (
     <div className="pt-32 pb-24 bg-white min-h-screen">
-      {/* Decorative gradients */}
       <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-blue-100/40 rounded-full blur-[120px] pointer-events-none -z-10" />
 
       <div className="container mx-auto px-6 md:px-12">
-        {/* Header */}
         <div className="max-w-3xl mx-auto text-center mb-24">
           <motion.div 
             initial={{ opacity: 0, scale: 0.95 }}
@@ -60,15 +58,12 @@ export default function Features() {
             Khám phá chiều sâu công nghệ và hệ thống tính năng chuyên biệt dành riêng cho từng phân vai sử dụng tại bãi đỗ xe thông minh ParkEase.
           </motion.p>
         </div>
-
-        {/* Detailed Sections List */}
         <motion.div 
           variants={containerVariants}
           initial="hidden"
           animate="visible"
           className="space-y-24 max-w-6xl mx-auto"
         >
-          {/* 1. Parking Manager */}
           <motion.div variants={itemVariants} className="grid lg:grid-cols-2 gap-12 items-center">
             <div className="order-2 lg:order-1">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-blue-50 text-blue-600 text-xs font-semibold mb-4 border border-blue-100">
@@ -106,8 +101,6 @@ export default function Features() {
               </div>
             </div>
           </motion.div>
-
-          {/* 2. Parking Staff */}
           <motion.div variants={itemVariants} className="grid lg:grid-cols-2 gap-12 items-center">
             <div className="bg-slate-50 border border-slate-100 rounded-3xl p-8 aspect-video flex items-center justify-center relative overflow-hidden shadow-sm hover:shadow-md transition-shadow">
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(6,182,212,0.08),transparent_70%)]" />
@@ -145,8 +138,6 @@ export default function Features() {
               </div>
             </div>
           </motion.div>
-
-          {/* 3. Parking User */}
           <motion.div variants={itemVariants} className="grid lg:grid-cols-2 gap-12 items-center">
             <div className="order-2 lg:order-1">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-indigo-50 text-indigo-600 text-xs font-semibold mb-4 border border-indigo-100">
@@ -184,8 +175,6 @@ export default function Features() {
               </div>
             </div>
           </motion.div>
-
-          {/* 4. System Administrator */}
           <motion.div variants={itemVariants} className="grid lg:grid-cols-2 gap-12 items-center">
             <div className="bg-slate-50 border border-slate-100 rounded-3xl p-8 aspect-video flex items-center justify-center relative overflow-hidden shadow-sm hover:shadow-md transition-shadow">
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(168,85,247,0.08),transparent_70%)]" />
@@ -223,8 +212,6 @@ export default function Features() {
               </div>
             </div>
           </motion.div>
-
-          {/* 5. AI Smart Parking */}
           <motion.div variants={itemVariants} className="grid lg:grid-cols-2 gap-12 items-center bg-slate-950 text-white rounded-[40px] p-8 md:p-16 border border-white/10 relative overflow-hidden">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(6,182,212,0.12),transparent_70%)]" />
             <div className="relative z-10">

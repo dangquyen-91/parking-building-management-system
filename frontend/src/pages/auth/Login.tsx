@@ -15,7 +15,6 @@ export const Login: React.FC = () => {
   const [apiError, setApiError] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState<boolean>(false);
 
-  // Check if we came from register success
   const registerSuccess = location.state?.registerSuccess;
 
   const formik = useFormik({
@@ -34,7 +33,6 @@ export const Login: React.FC = () => {
           password: values.password,
         });
         
-        // Remember me logic
         if (values.rememberMe) {
           localStorage.setItem('rememberedEmail', values.email);
         } else {
@@ -42,7 +40,6 @@ export const Login: React.FC = () => {
         }
 
         setIsSuccess(true);
-        // Delay slightly for transition animation
         setTimeout(() => {
           navigate(profile.role === 'admin' ? '/admin/dashboard' : '/');
         }, 800);
@@ -53,7 +50,6 @@ export const Login: React.FC = () => {
     },
   });
 
-  // Load remembered email if present
   React.useEffect(() => {
     const savedEmail = localStorage.getItem('rememberedEmail');
     if (savedEmail) {
@@ -62,7 +58,6 @@ export const Login: React.FC = () => {
     }
   }, []);
 
-  // Framer motion variants for staggering inputs
   const containerVariants: Variants = {
     hidden: { opacity: 0 },
     show: {
@@ -83,7 +78,6 @@ export const Login: React.FC = () => {
       title="Chào mừng trở lại!" 
       subtitle="Nhập thông tin tài khoản của bạn để truy cập hệ thống ParkEase."
     >
-      {/* Alert banner for register success */}
       {registerSuccess && !apiError && !isSuccess && (
         <motion.div 
           initial={{ opacity: 0, height: 0 }}
@@ -97,8 +91,6 @@ export const Login: React.FC = () => {
           </div>
         </motion.div>
       )}
-
-      {/* Alert banner for error */}
       {apiError && (
         <motion.div 
           initial={{ opacity: 0, height: 0 }}
@@ -109,8 +101,6 @@ export const Login: React.FC = () => {
           <span className="font-medium">{apiError}</span>
         </motion.div>
       )}
-
-      {/* Success state */}
       {isSuccess && (
         <motion.div 
           initial={{ opacity: 0, scale: 0.95 }}
@@ -134,7 +124,6 @@ export const Login: React.FC = () => {
           animate="show"
           className="flex flex-col gap-5"
         >
-          {/* Email input */}
           <motion.div variants={itemVariants}>
             <Input
               label="Email"
@@ -150,8 +139,6 @@ export const Login: React.FC = () => {
               disabled={formik.isSubmitting || isSuccess}
             />
           </motion.div>
-
-          {/* Password input */}
           <motion.div variants={itemVariants}>
             <Input
               label="Mật khẩu"
@@ -167,8 +154,6 @@ export const Login: React.FC = () => {
               disabled={formik.isSubmitting || isSuccess}
             />
           </motion.div>
-
-          {/* Remember me & Forgot password */}
           <motion.div variants={itemVariants} className="flex items-center justify-between mt-1 text-sm">
             <label className="flex items-center gap-2 cursor-pointer text-slate-400 hover:text-slate-300 select-none">
               <input
@@ -189,8 +174,6 @@ export const Login: React.FC = () => {
               Quên mật khẩu?
             </Link>
           </motion.div>
-
-          {/* Login button */}
           <motion.div variants={itemVariants} className="mt-2">
             <motion.button
               whileHover={{ scale: 1.01 }}
@@ -209,8 +192,6 @@ export const Login: React.FC = () => {
               )}
             </motion.button>
           </motion.div>
-
-          {/* Redirect to Register link */}
           <motion.div variants={itemVariants} className="text-center mt-4">
             <span className="text-slate-400 text-sm">Chưa có tài khoản? </span>
             <Link to="/register" className="text-blue-400 hover:text-blue-300 font-semibold text-sm transition-colors">

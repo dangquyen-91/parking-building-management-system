@@ -20,15 +20,12 @@ export default function Contact() {
 
   return (
     <div className="pt-32 pb-24 bg-white min-h-screen">
-      {/* Background decoration */}
       <div className="absolute top-0 right-1/4 w-[400px] h-[400px] bg-blue-100/30 rounded-full blur-[120px] pointer-events-none -z-10" />
 
       <div className="container mx-auto px-6 md:px-12">
         <div className="max-w-6xl mx-auto">
           
           <div className="grid lg:grid-cols-12 gap-16 items-start">
-            
-            {/* Contact details */}
             <div className="lg:col-span-5 flex flex-col gap-8">
               <div>
                 <h1 className="text-4xl md:text-5xl font-bold text-slate-900 tracking-tight mb-4">Kết Nối Với Chúng Tôi</h1>
@@ -68,8 +65,6 @@ export default function Contact() {
                   </div>
                 </div>
               </div>
-
-              {/* FAQ preview inside contact */}
               <div className="border-t border-slate-150 pt-8 mt-4">
                 <h4 className="font-bold text-slate-900 mb-6 flex items-center gap-2">
                   <HelpCircle size={18} className="text-blue-500" />
@@ -85,8 +80,6 @@ export default function Contact() {
                 </div>
               </div>
             </div>
-
-            {/* Glassmorphism Contact Form */}
             <div className="lg:col-span-7">
               <motion.div 
                 initial={{ opacity: 0, y: 30 }}
