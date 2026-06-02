@@ -24,11 +24,11 @@ export function OccupancyChart({ data }: OccupancyChartProps) {
     >
       <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-sm font-medium text-slate-400">Parking Occupancy</p>
-          <h2 className="mt-1 text-xl font-bold tracking-tight text-white">Ty le lap day theo gio</h2>
+          <p className="text-sm font-medium text-slate-400">Công suất bãi đỗ xe</p>
+          <h2 className="mt-1 text-xl font-bold tracking-tight text-white">Tỷ lệ lấp đầy theo giờ</h2>
         </div>
         <div className="rounded-full border border-blue-400/20 bg-blue-400/10 px-3 py-1 text-xs font-semibold text-blue-300">
-          Live simulation
+          Dữ liệu mô phỏng
         </div>
       </div>
 
@@ -62,7 +62,7 @@ export function OccupancyChart({ data }: OccupancyChartProps) {
                 color: '#FFFFFF',
                 boxShadow: '0 20px 60px rgba(0,0,0,0.32)',
               }}
-              formatter={(value) => [`${value}%`, 'Occupancy']}
+              formatter={(value) => [`${value}%`, 'Tỷ lệ lấp đầy']}
               labelStyle={{ color: '#94A3B8' }}
             />
             <Area

@@ -61,7 +61,7 @@ export default function BuildingsPage() {
       setBuildings(result.buildings);
       setPagination(result.pagination);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Khong tai duoc danh sach buildings');
+      setError(err instanceof Error ? err.message : 'Không tải được danh sách tòa nhà');
     } finally {
       setLoading(false);
     }
@@ -104,33 +104,33 @@ export default function BuildingsPage() {
 
       if (editingBuilding) {
         await buildingService.updateBuilding(editingBuilding.id, payload);
-        setSuccess(`Da cap nhat building ${payload.name}`);
+        setSuccess(`Đã cập nhật tòa nhà ${payload.name}`);
       } else {
         await buildingService.createBuilding(payload);
-        setSuccess(`Da tao building ${payload.name}`);
+        setSuccess(`Đã tạo tòa nhà ${payload.name}`);
       }
 
       setModalOpen(false);
       await loadBuildings(editingBuilding ? pagination.page : 1);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Luu building that bai');
+      setError(err instanceof Error ? err.message : 'Lưu tòa nhà thất bại');
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async (building: Building) => {
-    if (!window.confirm(`Delete building "${building.name}"?`)) return;
+    if (!window.confirm(`Xóa tòa nhà "${building.name}"?`)) return;
 
     setDeletingId(building.id);
     setError(null);
     setSuccess(null);
     try {
       await buildingService.deleteBuilding(building.id);
-      setSuccess(`Da xoa building ${building.name}`);
+      setSuccess(`Đã xóa tòa nhà ${building.name}`);
       await loadBuildings(buildings.length === 1 && pagination.page > 1 ? pagination.page - 1 : pagination.page);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Xoa building that bai');
+      setError(err instanceof Error ? err.message : 'Xóa tòa nhà thất bại');
     } finally {
       setDeletingId(null);
     }
@@ -138,16 +138,16 @@ export default function BuildingsPage() {
 
   return (
     <AdminLayout
-      eyebrow="Infrastructure"
-      title="Buildings Management"
-      subtitle="Quan ly danh sach toa nha trong he thong Smart Parking."
+      eyebrow="Hạ tầng"
+      title="Quản lý tòa nhà"
+      subtitle="Quản lý danh sách tòa nhà trong hệ thống Smart Parking."
       meta={
         <button
           onClick={openCreateModal}
           className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-3 text-sm font-semibold text-white shadow-[0_0_24px_rgba(59,130,246,0.24)] transition hover:from-blue-500 hover:to-purple-500"
         >
           <Plus className="h-4 w-4" />
-          Add Building
+          Thêm tòa nhà
         </button>
       }
     >
@@ -157,9 +157,9 @@ export default function BuildingsPage() {
           className="grid gap-4 md:grid-cols-3"
         >
           {[
-            { label: 'Total Buildings', value: stats.total, icon: Building2, tone: 'text-blue-300' },
-            { label: 'Active This Page', value: stats.active, icon: CheckCircle2, tone: 'text-emerald-300' },
-            { label: 'Inactive This Page', value: stats.inactive, icon: CircleParking, tone: 'text-amber-300' },
+            { label: 'Tổng tòa nhà', value: stats.total, icon: Building2, tone: 'text-blue-300' },
+            { label: 'Hoạt động trang này', value: stats.active, icon: CheckCircle2, tone: 'text-emerald-300' },
+            { label: 'Ngừng hoạt động trang này', value: stats.inactive, icon: CircleParking, tone: 'text-amber-300' },
           ].map((item, index) => (
             <motion.article
               key={item.label}
@@ -183,8 +183,8 @@ export default function BuildingsPage() {
         >
           <div className="mb-5 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-400">Building Directory</p>
-              <h2 className="mt-1 text-xl font-bold tracking-tight text-white">Danh sach toa nha</h2>
+              <p className="text-sm font-medium text-slate-400">Danh mục tòa nhà</p>
+              <h2 className="mt-1 text-xl font-bold tracking-tight text-white">Danh sách tòa nhà</h2>
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row">
@@ -196,7 +196,7 @@ export default function BuildingsPage() {
                   onKeyDown={(event) => {
                     if (event.key === 'Enter') loadBuildings(1);
                   }}
-                  placeholder="Search name or address"
+                  placeholder="Tìm theo tên hoặc địa chỉ"
                   className="h-11 w-full rounded-2xl border border-white/10 bg-white/[0.04] pl-10 pr-4 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-blue-400/60 sm:w-72"
                 />
               </div>
@@ -206,9 +206,9 @@ export default function BuildingsPage() {
                 onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)}
                 className="h-11 rounded-2xl border border-white/10 bg-[#111827] px-4 text-sm font-medium text-white outline-none transition focus:border-blue-400/60"
               >
-                <option value="all">All status</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
+                <option value="all">Tất cả trạng thái</option>
+                <option value="active">Hoạt động</option>
+                <option value="inactive">Ngừng hoạt động</option>
               </select>
 
               <button
@@ -217,7 +217,7 @@ export default function BuildingsPage() {
                 className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-blue-400/25 bg-blue-400/10 px-5 text-sm font-semibold text-blue-200 transition hover:border-blue-300/50 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {loading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-                Search
+                Tìm kiếm
               </button>
             </div>
           </div>
@@ -252,24 +252,24 @@ export default function BuildingsPage() {
             <table className="w-full min-w-[880px] text-left">
               <thead>
                 <tr className="border-b border-white/10 text-xs uppercase tracking-[0.16em] text-slate-500">
-                  <th className="pb-3 font-semibold">Building</th>
-                  <th className="pb-3 font-semibold">Address</th>
-                  <th className="pb-3 font-semibold">Description</th>
-                  <th className="pb-3 font-semibold">Status</th>
-                  <th className="pb-3 text-right font-semibold">Actions</th>
+                  <th className="pb-3 font-semibold">Tòa nhà</th>
+                  <th className="pb-3 font-semibold">Địa chỉ</th>
+                  <th className="pb-3 font-semibold">Mô tả</th>
+                  <th className="pb-3 font-semibold">Trạng thái</th>
+                  <th className="pb-3 text-right font-semibold">Thao tác</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/[0.06]">
                 {loading ? (
                   <tr>
                     <td colSpan={5} className="py-12 text-center text-sm text-slate-400">
-                      Loading buildings...
+                      Đang tải tòa nhà...
                     </td>
                   </tr>
                 ) : buildings.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="py-12 text-center text-sm text-slate-400">
-                      Khong co building phu hop.
+                      Không có tòa nhà phù hợp.
                     </td>
                   </tr>
                 ) : (
@@ -303,7 +303,7 @@ export default function BuildingsPage() {
                               : 'border-red-400/20 bg-red-400/10 text-red-300',
                           )}
                         >
-                          {building.isActive ? 'Active' : 'Inactive'}
+                          {building.isActive ? 'Hoạt động' : 'Ngừng hoạt động'}
                         </span>
                       </td>
                       <td className="py-4 text-right">
@@ -311,7 +311,7 @@ export default function BuildingsPage() {
                           <button
                             onClick={() => openEditModal(building)}
                             className="flex h-9 w-9 items-center justify-center rounded-xl border border-blue-400/20 bg-blue-400/10 text-blue-200 transition hover:border-blue-300/50 hover:bg-blue-400/20"
-                            title="Edit building"
+                            title="Sửa tòa nhà"
                           >
                             <Edit3 className="h-4 w-4" />
                           </button>
@@ -319,7 +319,7 @@ export default function BuildingsPage() {
                             onClick={() => handleDelete(building)}
                             disabled={deletingId === building.id}
                             className="flex h-9 w-9 items-center justify-center rounded-xl border border-red-400/20 bg-red-400/10 text-red-200 transition hover:border-red-300/50 hover:bg-red-400/20 disabled:cursor-not-allowed disabled:opacity-50"
-                            title="Delete building"
+                            title="Xóa tòa nhà"
                           >
                             {deletingId === building.id ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                           </button>
@@ -334,8 +334,8 @@ export default function BuildingsPage() {
 
           <div className="mt-5 flex flex-col gap-3 border-t border-white/10 pt-5 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-slate-400">
-              Showing page <span className="font-semibold text-white">{pagination.page}</span> of{' '}
-              <span className="font-semibold text-white">{pagination.totalPages || 1}</span>, 5 buildings per page
+              Đang hiển thị trang <span className="font-semibold text-white">{pagination.page}</span> /{' '}
+              <span className="font-semibold text-white">{pagination.totalPages || 1}</span>, 5 tòa nhà mỗi trang
             </p>
             <div className="flex items-center gap-2">
               <button
@@ -344,14 +344,14 @@ export default function BuildingsPage() {
                 className="inline-flex h-10 items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-4 text-sm font-semibold text-slate-200 transition hover:border-blue-400/40 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <ChevronLeft className="h-4 w-4" />
-                Prev
+                Trước
               </button>
               <button
                 onClick={() => loadBuildings(Math.min(pagination.totalPages || 1, pagination.page + 1))}
                 disabled={loading || pagination.page >= (pagination.totalPages || 1)}
                 className="inline-flex h-10 items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-4 text-sm font-semibold text-slate-200 transition hover:border-blue-400/40 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                Next
+                Sau
                 <ChevronRight className="h-4 w-4" />
               </button>
             </div>
@@ -375,13 +375,13 @@ export default function BuildingsPage() {
             >
               <div className="mb-5 flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-sm font-medium text-blue-300">{editingBuilding ? 'Edit Building' : 'New Building'}</p>
-                  <h2 className="mt-1 text-2xl font-bold text-white">{editingBuilding ? 'Cap nhat toa nha' : 'Them toa nha moi'}</h2>
+                  <p className="text-sm font-medium text-blue-300">{editingBuilding ? 'Sửa tòa nhà' : 'Tòa nhà mới'}</p>
+                  <h2 className="mt-1 text-2xl font-bold text-white">{editingBuilding ? 'Cập nhật tòa nhà' : 'Thêm tòa nhà mới'}</h2>
                 </div>
                 <button
                   onClick={() => setModalOpen(false)}
                   className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-slate-300 transition hover:bg-white/[0.08] hover:text-white"
-                  title="Close"
+                  title="Đóng"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -389,20 +389,20 @@ export default function BuildingsPage() {
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-slate-300">Building name</span>
+                  <span className="mb-2 block text-sm font-medium text-slate-300">Tên tòa nhà</span>
                   <input
                     value={form.name}
                     onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
                     required
                     minLength={2}
                     maxLength={100}
-                    placeholder="Smart Parking Tower"
+                    placeholder="Tòa nhà Smart Parking"
                     className="h-12 w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-blue-400/60"
                   />
                 </label>
 
                 <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-slate-300">Address</span>
+                  <span className="mb-2 block text-sm font-medium text-slate-300">Địa chỉ</span>
                   <div className="relative">
                     <MapPin className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                     <input
@@ -411,20 +411,20 @@ export default function BuildingsPage() {
                       required
                       minLength={5}
                       maxLength={255}
-                      placeholder="123 Nguyen Hue, District 1"
+                      placeholder="123 Nguyễn Huệ, Quận 1"
                       className="h-12 w-full rounded-2xl border border-white/10 bg-white/[0.04] pl-10 pr-4 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-blue-400/60"
                     />
                   </div>
                 </label>
 
                 <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-slate-300">Description</span>
+                  <span className="mb-2 block text-sm font-medium text-slate-300">Mô tả</span>
                   <textarea
                     value={form.description ?? ''}
                     onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
                     maxLength={1000}
                     rows={4}
-                    placeholder="Building description"
+                    placeholder="Mô tả tòa nhà"
                     className="w-full resize-none rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-blue-400/60"
                   />
                 </label>
@@ -436,7 +436,7 @@ export default function BuildingsPage() {
                     type="checkbox"
                     className="h-4 w-4 accent-blue-500"
                   />
-                  <span className="text-sm font-medium text-slate-300">Building is active</span>
+                  <span className="text-sm font-medium text-slate-300">Tòa nhà đang hoạt động</span>
                 </label>
 
                 <button
@@ -445,7 +445,7 @@ export default function BuildingsPage() {
                   className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-purple-600 px-5 text-sm font-semibold text-white shadow-[0_0_24px_rgba(59,130,246,0.24)] transition hover:from-blue-500 hover:to-purple-500 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {saving ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                  {editingBuilding ? 'Save Changes' : 'Create Building'}
+                  {editingBuilding ? 'Lưu thay đổi' : 'Tạo tòa nhà'}
                 </button>
               </form>
             </motion.div>

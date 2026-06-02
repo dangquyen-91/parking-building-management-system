@@ -30,6 +30,13 @@ const roleClasses: Record<UserRole, string> = {
   user: 'border-slate-400/30 bg-slate-400/10 text-slate-200',
 };
 
+const roleLabels: Record<UserRole, string> = {
+  admin: 'Quản trị viên',
+  manager: 'Quản lý',
+  staff: 'Nhân viên',
+  user: 'Người dùng',
+};
+
 export default function UsersPage() {
   const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<UserProfile[]>([]);
@@ -65,7 +72,7 @@ export default function UsersPage() {
       setPagination(result.pagination);
       setSelectedRoles(Object.fromEntries(result.users.map((item) => [item.id, item.role])));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Khong tai duoc danh sach users');
+      setError(err instanceof Error ? err.message : 'Không tải được danh sách người dùng');
     } finally {
       setLoading(false);
     }
@@ -79,7 +86,7 @@ export default function UsersPage() {
     const nextRole = selectedRoles[targetUser.id];
     if (!nextRole || nextRole === targetUser.role) return;
     if (!isAssignableRole(nextRole)) {
-      setError('Admin chi duoc gan role user, staff hoac manager');
+      setError('Admin chỉ được gán vai trò người dùng, nhân viên hoặc quản lý');
       return;
     }
 
@@ -91,9 +98,9 @@ export default function UsersPage() {
       const updated = await userService.updateRole(targetUser.id, nextRole);
       setUsers((items) => items.map((item) => (item.id === updated.id ? updated : item)));
       setSelectedRoles((items) => ({ ...items, [updated.id]: updated.role }));
-      setSuccess(`Da cap nhat role cua ${updated.fullName} thanh ${updated.role}`);
+      setSuccess(`Đã cập nhật vai trò của ${updated.fullName} thành ${roleLabels[updated.role]}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Cap nhat role that bai');
+      setError(err instanceof Error ? err.message : 'Cập nhật vai trò thất bại');
     } finally {
       setSavingId(null);
     }
@@ -101,8 +108,8 @@ export default function UsersPage() {
 
   return (
     <AdminLayout
-      eyebrow="Access Control"
-      title="User Role Management"
+      eyebrow="Kiểm soát truy cập"
+      title="Quản lý vai trò người dùng"
       subtitle=""
       meta={
         <button
@@ -111,7 +118,7 @@ export default function UsersPage() {
           className="inline-flex items-center justify-center gap-2 rounded-2xl border border-blue-400/25 bg-blue-400/10 px-4 py-3 text-sm font-semibold text-blue-200 transition hover:border-blue-300/50 hover:bg-blue-400/15 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
-          Refresh
+          Làm mới
         </button>
       }
     >
@@ -121,10 +128,10 @@ export default function UsersPage() {
           className="grid gap-4 md:grid-cols-2 xl:grid-cols-4"
         >
           {[
-            { label: 'Total Users', value: stats.total, icon: UsersRound, tone: 'text-blue-300' },
-            { label: 'Admins This Page', value: stats.admins, icon: ShieldCheck, tone: 'text-purple-300' },
-            { label: 'Staff This Page', value: stats.staff, icon: UserCog, tone: 'text-emerald-300' },
-            { label: 'Active This Page', value: stats.active, icon: CheckCircle2, tone: 'text-cyan-300' },
+            { label: 'Tổng người dùng', value: stats.total, icon: UsersRound, tone: 'text-blue-300' },
+            { label: 'Quản trị viên trang này', value: stats.admins, icon: ShieldCheck, tone: 'text-purple-300' },
+            { label: 'Nhân viên trang này', value: stats.staff, icon: UserCog, tone: 'text-emerald-300' },
+            { label: 'Đang hoạt động trang này', value: stats.active, icon: CheckCircle2, tone: 'text-cyan-300' },
           ].map((item, index) => (
             <motion.article
               key={item.label}
@@ -148,8 +155,8 @@ export default function UsersPage() {
         >
           <div className="mb-5 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-400">Admin Function</p>
-              <h2 className="mt-1 text-xl font-bold tracking-tight text-white">Cap nhat staff va manager</h2>
+              <p className="text-sm font-medium text-slate-400">Chức năng quản trị</p>
+              <h2 className="mt-1 text-xl font-bold tracking-tight text-white">Cập nhật vai trò người dùng</h2>
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row">
@@ -161,7 +168,7 @@ export default function UsersPage() {
                   onKeyDown={(event) => {
                     if (event.key === 'Enter') loadUsers(1);
                   }}
-                  placeholder="Search name or email"
+                  placeholder="Tìm theo tên hoặc email"
                   className="h-11 w-full rounded-2xl border border-white/10 bg-white/[0.04] pl-10 pr-4 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-blue-400/60 sm:w-72"
                 />
               </div>
@@ -171,10 +178,10 @@ export default function UsersPage() {
                 onChange={(event) => setRoleFilter(event.target.value as UserRole | '')}
                 className="h-11 rounded-2xl border border-white/10 bg-[#111827] px-4 text-sm font-medium text-white outline-none transition focus:border-blue-400/60"
               >
-                <option value="">All roles</option>
+                <option value="">Tất cả vai trò</option>
                 {filterRoles.map((role) => (
                   <option key={role} value={role}>
-                    {role}
+                    {roleLabels[role]}
                   </option>
                 ))}
               </select>
@@ -185,7 +192,7 @@ export default function UsersPage() {
                 className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-purple-600 px-5 text-sm font-semibold text-white shadow-[0_0_24px_rgba(59,130,246,0.24)] transition hover:from-blue-500 hover:to-purple-500 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Search className="h-4 w-4" />
-                Search
+                Tìm kiếm
               </button>
             </div>
           </div>
@@ -220,25 +227,25 @@ export default function UsersPage() {
             <table className="w-full min-w-[920px] text-left">
               <thead>
                 <tr className="border-b border-white/10 text-xs uppercase tracking-[0.16em] text-slate-500">
-                  <th className="pb-3 font-semibold">User</th>
+                  <th className="pb-3 font-semibold">Người dùng</th>
                   <th className="pb-3 font-semibold">Email</th>
-                  <th className="pb-3 font-semibold">Current Role</th>
-                  <th className="pb-3 font-semibold">New Role</th>
-                  <th className="pb-3 font-semibold">Status</th>
-                  <th className="pb-3 text-right font-semibold">Action</th>
+                  <th className="pb-3 font-semibold">Vai trò hiện tại</th>
+                  <th className="pb-3 font-semibold">Vai trò mới</th>
+                  <th className="pb-3 font-semibold">Trạng thái</th>
+                  <th className="pb-3 text-right font-semibold">Thao tác</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/[0.06]">
                 {loading ? (
                   <tr>
                     <td colSpan={6} className="py-12 text-center text-sm text-slate-400">
-                      Loading users...
+                      Đang tải người dùng...
                     </td>
                   </tr>
                 ) : users.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="py-12 text-center text-sm text-slate-400">
-                      Khong co user phu hop.
+                      Không có người dùng phù hợp.
                     </td>
                   </tr>
                 ) : (
@@ -271,7 +278,7 @@ export default function UsersPage() {
                         <td className="py-4 text-sm text-slate-300">{item.email}</td>
                         <td className="py-4">
                           <span className={cn('inline-flex rounded-full border px-3 py-1 text-xs font-semibold capitalize', roleClasses[item.role])}>
-                            {item.role}
+                            {roleLabels[item.role]}
                           </span>
                         </td>
                         <td className="py-4">
@@ -283,10 +290,10 @@ export default function UsersPage() {
                             disabled={savingId === item.id || locked}
                             className="h-10 rounded-2xl border border-white/10 bg-[#111827] px-3 text-sm font-medium text-white outline-none transition focus:border-blue-400/60 disabled:cursor-not-allowed disabled:opacity-45"
                           >
-                            <option value="">{isAdminAccount ? 'Admin locked' : 'Choose role'}</option>
+                            <option value="">{isAdminAccount ? 'Quản trị viên bị khóa' : 'Chọn vai trò'}</option>
                             {assignableRoles.map((role) => (
                               <option key={role} value={role}>
-                                {role}
+                                {roleLabels[role]}
                               </option>
                             ))}
                           </select>
@@ -300,7 +307,7 @@ export default function UsersPage() {
                                 : 'border-red-400/20 bg-red-400/10 text-red-300',
                             )}
                           >
-                            {item.isActive ? 'Active' : 'Inactive'}
+                            {item.isActive ? 'Hoạt động' : 'Ngừng hoạt động'}
                           </span>
                         </td>
                         <td className="py-4 text-right">
@@ -314,7 +321,7 @@ export default function UsersPage() {
                             ) : (
                               <Save className="h-4 w-4" />
                             )}
-                            Save
+                            Lưu
                           </button>
                         </td>
                       </motion.tr>
@@ -327,8 +334,8 @@ export default function UsersPage() {
 
           <div className="mt-5 flex flex-col gap-3 border-t border-white/10 pt-5 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-slate-400">
-              Showing page <span className="font-semibold text-white">{pagination.page}</span> of{' '}
-              <span className="font-semibold text-white">{pagination.totalPages || 1}</span>, 5 users per page
+              Đang hiển thị trang <span className="font-semibold text-white">{pagination.page}</span> /{' '}
+              <span className="font-semibold text-white">{pagination.totalPages || 1}</span>, 5 người dùng mỗi trang
             </p>
 
             <div className="flex items-center gap-2">
@@ -338,14 +345,14 @@ export default function UsersPage() {
                 className="inline-flex h-10 items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-4 text-sm font-semibold text-slate-200 transition hover:border-blue-400/40 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <ChevronLeft className="h-4 w-4" />
-                Prev
+                Trước
               </button>
               <button
                 onClick={() => loadUsers(Math.min(pagination.totalPages || 1, pagination.page + 1))}
                 disabled={loading || pagination.page >= (pagination.totalPages || 1)}
                 className="inline-flex h-10 items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-4 text-sm font-semibold text-slate-200 transition hover:border-blue-400/40 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                Next
+                Sau
                 <ChevronRight className="h-4 w-4" />
               </button>
             </div>

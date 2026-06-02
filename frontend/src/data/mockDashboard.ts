@@ -9,16 +9,16 @@ import type { DashboardMockData } from '../types/dashboard';
 
 export const dashboardData: DashboardMockData = {
   meta: {
-    eyebrow: 'Admin Dashboard',
-    title: 'Smart Parking Operations',
+    eyebrow: 'Bảng điều khiển quản trị',
+    title: 'Vận hành bãi đỗ xe thông minh',
     subtitle:
-      'Monitor revenue, occupancy, sessions, bookings, and building utilization from a unified enterprise console.',
-    lastUpdated: '29 May 2026, 15:40',
+      'Theo dõi doanh thu, công suất, phiên gửi xe, đặt chỗ và mức sử dụng tòa nhà trên một giao diện quản trị thống nhất.',
+    lastUpdated: '29/05/2026, 15:40',
   },
   kpis: [
     {
       id: 'revenue',
-      title: 'Tong doanh thu',
+      title: 'Tổng doanh thu',
       value: '124.8M VND',
       change: '+18.2%',
       trend: 'up',
@@ -27,7 +27,7 @@ export const dashboardData: DashboardMockData = {
     },
     {
       id: 'vehicles-today',
-      title: 'Xe hom nay',
+      title: 'Xe hôm nay',
       value: '1,284',
       change: '+9.6%',
       trend: 'up',
@@ -36,7 +36,7 @@ export const dashboardData: DashboardMockData = {
     },
     {
       id: 'available-slots',
-      title: 'Slot trong',
+      title: 'Vị trí trống',
       value: '342',
       change: '-4.1%',
       trend: 'down',
@@ -45,7 +45,7 @@ export const dashboardData: DashboardMockData = {
     },
     {
       id: 'occupied-slots',
-      title: 'Slot dang su dung',
+      title: 'Vị trí đang sử dụng',
       value: '918',
       change: '+12.4%',
       trend: 'up',
@@ -54,7 +54,7 @@ export const dashboardData: DashboardMockData = {
     },
     {
       id: 'bookings-today',
-      title: 'Booking hom nay',
+      title: 'Đặt chỗ hôm nay',
       value: '276',
       change: '+6.8%',
       trend: 'up',
@@ -74,17 +74,17 @@ export const dashboardData: DashboardMockData = {
     { time: '22:00', occupancy: 48 },
   ],
   zones: [
-    { name: 'Tang 1', value: 88, color: '#3B82F6' },
-    { name: 'Tang 2', value: 74, color: '#8B5CF6' },
-    { name: 'Tang 3', value: 63, color: '#22C55E' },
-    { name: 'Tang 4', value: 57, color: '#F59E0B' },
-    { name: 'Tang 5', value: 41, color: '#EF4444' },
+    { name: 'Tầng 1', value: 88, color: '#3B82F6' },
+    { name: 'Tầng 2', value: 74, color: '#8B5CF6' },
+    { name: 'Tầng 3', value: 63, color: '#22C55E' },
+    { name: 'Tầng 4', value: 57, color: '#F59E0B' },
+    { name: 'Tầng 5', value: 41, color: '#EF4444' },
   ],
   sessions: [
     {
       id: 'SES-1001',
       plateNumber: '51F-928.31',
-      customerName: 'Nguyen Minh Anh',
+      customerName: 'Nguyễn Minh Anh',
       checkIn: '07:42',
       checkOut: '--',
       fee: '42,000 VND',
@@ -93,7 +93,7 @@ export const dashboardData: DashboardMockData = {
     {
       id: 'SES-1002',
       plateNumber: '30H-882.19',
-      customerName: 'Tran Quoc Bao',
+      customerName: 'Trần Quốc Bảo',
       checkIn: '08:15',
       checkOut: '11:45',
       fee: '68,000 VND',
@@ -102,7 +102,7 @@ export const dashboardData: DashboardMockData = {
     {
       id: 'SES-1003',
       plateNumber: '59A-441.20',
-      customerName: 'Le Hoang Nam',
+      customerName: 'Lê Hoàng Nam',
       checkIn: '09:03',
       checkOut: '--',
       fee: '96,000 VND',
@@ -111,7 +111,7 @@ export const dashboardData: DashboardMockData = {
     {
       id: 'SES-1004',
       plateNumber: '51G-204.77',
-      customerName: 'Pham Thanh Ha',
+      customerName: 'Phạm Thanh Hà',
       checkIn: '10:26',
       checkOut: '--',
       fee: '28,000 VND',
@@ -120,7 +120,7 @@ export const dashboardData: DashboardMockData = {
     {
       id: 'SES-1005',
       plateNumber: '43C-719.05',
-      customerName: 'Do Tuan Kiet',
+      customerName: 'Đỗ Tuấn Kiệt',
       checkIn: '12:10',
       checkOut: '13:50',
       fee: '36,000 VND',

@@ -21,21 +21,21 @@ import { NavLink } from 'react-router-dom';
 import { cn } from '../../lib/utils';
 
 const menuItems = [
-  { label: 'Dashboard', icon: LayoutDashboard, to: '/admin/dashboard' },
-  { label: 'Buildings', icon: Building2, to: '/admin/buildings' },
-  { label: 'Floors', icon: Layers3, to: '/admin/floors' },
-  { label: 'Zones', icon: MapPinned, to: '/admin/zones' },
-  { label: 'Slots', icon: SquareParking, to: '/admin/slots' },
-  { label: 'Vehicles', icon: Car, to: '/admin/vehicles' },
-  { label: 'Bookings', icon: CalendarCheck, to: '/admin/bookings' },
-  { label: 'Parking Sessions', icon: Clock3, to: '/admin/parking-sessions' },
-  { label: 'Payments', icon: CreditCard, to: '/admin/payments' },
-  { label: 'Packages', icon: Boxes, to: '/admin/packages' },
-  { label: 'Users', icon: UsersRound, to: '/admin/users' },
-  { label: 'Staff', icon: ShieldCheck, to: '/admin/staff' },
-  { label: 'Reports', icon: BarChart3, to: '/admin/reports' },
-  { label: 'Settings', icon: Settings, to: '/admin/settings' },
-  { label: 'System Logs', icon: ScrollText, to: '/admin/system-logs' },
+  { label: 'Tổng quan', icon: LayoutDashboard, to: '/admin/dashboard' },
+  { label: 'Tòa nhà', icon: Building2, to: '/admin/buildings' },
+  { label: 'Tầng', icon: Layers3, to: '/admin/floors' },
+  { label: 'Khu vực', icon: MapPinned, to: '/admin/zones' },
+  { label: 'Vị trí đỗ xe', icon: SquareParking, to: '/admin/slots' },
+  { label: 'Phương tiện', icon: Car, to: '/admin/vehicles' },
+  { label: 'Đặt chỗ', icon: CalendarCheck, to: '/admin/bookings' },
+  { label: 'Phiên gửi xe', icon: Clock3, to: '/admin/parking-sessions' },
+  { label: 'Thanh toán', icon: CreditCard, to: '/admin/payments' },
+  { label: 'Gói gửi xe', icon: Boxes, to: '/admin/packages' },
+  { label: 'Người dùng', icon: UsersRound, to: '/admin/users' },
+  { label: 'Nhân viên', icon: ShieldCheck, to: '/admin/staff' },
+  { label: 'Báo cáo', icon: BarChart3, to: '/admin/reports' },
+  { label: 'Cài đặt', icon: Settings, to: '/admin/settings' },
+  { label: 'Nhật ký hệ thống', icon: ScrollText, to: '/admin/system-logs' },
 ];
 
 export function Sidebar() {
@@ -49,7 +49,7 @@ export function Sidebar() {
           </div>
           <div>
             <p className="text-lg font-bold tracking-tight text-white">Smart Parking</p>
-            <p className="text-xs font-medium uppercase tracking-[0.22em] text-slate-500">Admin Console</p>
+            <p className="text-xs font-medium uppercase tracking-[0.22em] text-slate-500">Quản trị hệ thống</p>
           </div>
         </div>
 
