@@ -107,20 +107,49 @@ const checkIn = async ({ slotId, rowId, licensePlate, vehicleType, userId, note 
         throw new AppError('This floor is for visitors only. Do not provide userId.', 403);
       }
 
-      const session = await ParkingSession.create(
-        {
-          slotId,
-          rowId: null,
-          licensePlate,
-          vehicleType,
-          entryTime: new Date(),
-          staffId,
-          userId: userId || null,
-          status: 'active',
-          note: note || null,
-        },
-        { transaction: t }
-      );
+      // ── Detect confirmed booking for this plate (cars only) ──
+      // Dynamic import to break the parking-session ↔ booking ↔ payment cycle.
+      // Booking customer prepaid for X hours; we copy that into the session so
+      // check-out can compute the excess (or zero) correctly.
+      let activeBooking = null;
+      if (slot.floor.floorType === 'visitor') {
+        const { findActiveBookingByPlate } = await import('./booking.service.js');
+        const found = await findActiveBookingByPlate(licensePlate, t);
+        if (found) {
+          // Lock the booking row to prevent two concurrent check-ins consuming it.
+          const Booking = (await import('../models/booking.model.js')).default;
+          activeBooking = await Booking.findByPk(found.id, {
+            transaction: t,
+            lock: t.LOCK.UPDATE,
+          });
+          // Double-check after lock — another tx may have linked it first.
+          if (!activeBooking || activeBooking.sessionId) activeBooking = null;
+        }
+      }
+
+      const sessionPayload = {
+        slotId,
+        rowId: null,
+        licensePlate,
+        vehicleType,
+        entryTime: new Date(),
+        staffId,
+        userId: activeBooking?.userId || userId || null,
+        status: 'active',
+        note: note || null,
+      };
+      if (activeBooking) {
+        sessionPayload.bookingId = activeBooking.id;
+        sessionPayload.prepaidHours = activeBooking.prepaidHours;
+        sessionPayload.prepaidAmount = activeBooking.amount;
+        sessionPayload.paymentStatus = 'paid';
+      }
+
+      const session = await ParkingSession.create(sessionPayload, { transaction: t });
+
+      if (activeBooking) {
+        await activeBooking.update({ sessionId: session.id }, { transaction: t });
+      }
 
       await slot.update({ status: 'occupied' }, { transaction: t });
 
@@ -143,6 +172,10 @@ const checkIn = async ({ slotId, rowId, licensePlate, vehicleType, userId, note 
         row: null,
         staffId: session.staffId,
         userId: session.userId,
+        bookingId: session.bookingId || null,
+        prepaidHours: session.prepaidHours || null,
+        prepaidAmount: session.prepaidAmount ? Number(session.prepaidAmount) : null,
+        paymentStatus: session.paymentStatus,
       };
     }
 

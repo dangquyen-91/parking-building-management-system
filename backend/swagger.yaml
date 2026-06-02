@@ -926,6 +926,27 @@ components:
           type: integer
           nullable: true
           example: 12
+        bookingId:
+          type: integer
+          nullable: true
+          description: Co gia tri neu plate co confirmed booking trong khung gio.
+          example: 13
+        prepaidHours:
+          type: integer
+          nullable: true
+          description: So gio khach da tra truoc qua booking. Dung de tinh excess o check-out.
+          example: 4
+        prepaidAmount:
+          type: number
+          nullable: true
+          description: So tien khach da tra qua booking (VND).
+          example: 80000
+        paymentStatus:
+          type: string
+          enum: [paid, unpaid]
+          description: |
+            `paid` neu booking da tra du, hoac resident co sub.
+            `unpaid` neu walk-in pure (thu phi luc exit).
 
     CheckInMotorcycleResponse:
       type: object
