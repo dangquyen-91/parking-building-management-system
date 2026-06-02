@@ -3321,19 +3321,43 @@ paths:
   /parking-sessions/{id}/check-out:
     post:
       tags: [Parking Sessions]
-      summary: Vehicle check-out (admin, manager, staff)
+      summary: Vehicle check-out — cash or VNPay (admin, manager, staff)
       description: |
-        Hoan tat xe ra: dong session (completed), set exitTime + fee, va giai phong cho:
-        - O to vang lai → slot ve `empty`; o to cu dan (slot dat truoc con han) → ve `reserved`
-        - Xe may → row.occupiedCount giam 1
-        Phi: cu dan co goi = 0; vang lai = phi flat (xe may 5.000, o to 20.000) thu tien mat.
+        Hoan tat xe ra. Body chon hinh thuc thanh toan:
+          - `paymentMethod: 'cash'`  → dong session ngay, tao Payment audit (cash).
+          - `paymentMethod: 'vnpay'` → tao Payment pending + tra paymentUrl; session VAN active, doi IPN/queryDr.
+
+        **Pricing (spec A):**
+          - Xe may: 5.000/luot (qua 24h → cong luot), +5.000/dem (cham 22:00-06:00)
+          - O to:   20.000/h (round up), cap 120.000/24h, +30.000/dem
+          - Cu dan co goi (sub active match plate + floor=resident) → fee=0 ("covered")
+          - Booking (session co prepaidHours): chi tinh phan vuot gio bang pricing A
+
+        **Giai phong cho khi session dong (cash hoac VNPay success):**
+          - O to vang lai → slot ve `empty`; o to cu dan (slot reserved con han) → giu `reserved`
+          - Xe may → row.occupiedCount giam 1
       security:
         - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/pathId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                paymentMethod:
+                  type: string
+                  enum: [cash, vnpay]
+                  default: cash
+                  description: Hinh thuc thanh toan. Mac dinh 'cash' neu khong truyen.
       responses:
         '200':
-          description: Check-out thanh cong (bien lai)
+          description: |
+            Check-out xu ly xong. Hai shape:
+              - `cash`: session da dong, fee = so tien thu, paymentId co gia tri.
+              - `vnpay`: session VAN active (cho IPN), paymentUrl + orderId tra ve cho FE.
           content:
             application/json:
               schema:
@@ -3348,12 +3372,19 @@ paths:
                           licensePlate: { type: string }
                           vehicleType: { type: string }
                           entryTime: { type: string, format: date-time }
-                          exitTime: { type: string, format: date-time }
-                          durationMinutes: { type: integer }
+                          exitTime: { type: string, format: date-time, nullable: true }
+                          durationMinutes: { type: integer, nullable: true }
                           fee: { type: integer }
                           covered: { type: boolean }
                           coveredBy: { type: string, nullable: true }
-                          paymentMethod: { type: string, enum: [cash, package] }
+                          paymentMethod: { type: string, enum: [cash, vnpay, package] }
+                          paymentId: { type: integer, nullable: true, description: 'Chi co o cash' }
+                          paymentUrl: { type: string, nullable: true, description: 'Chi co o vnpay (fee>0)' }
+                          orderId: { type: string, nullable: true, description: 'Chi co o vnpay' }
+                          breakdown:
+                            type: object
+                            description: Chi tiet pricing (baseFee, overnightFee, mode, overnightNights, ...)
+        '400': { description: 'Invalid paymentMethod (must be cash or vnpay)' }
         '404': { description: Session not found }
         '409': { description: Session is not active (already checked out?) }
 

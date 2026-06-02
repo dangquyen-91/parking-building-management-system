@@ -7,7 +7,8 @@
   "scripts": {
     "start": "node src/app.js",
     "dev": "nodemon src/app.js",
-    "seed:packages": "node src/seeds/package.seed.js"
+    "seed:packages": "node src/seeds/package.seed.js",
+    "seed:users": "node src/seeds/user.seed.js"
   },
   "keywords": [
     "parking",

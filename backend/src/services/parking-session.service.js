@@ -7,8 +7,10 @@ import Floor from '../models/floor.model.js';
 import Building from '../models/building.model.js';
 import User from '../models/user.model.js';
 import ResidentSubscription from '../models/resident-subscription.model.js';
+import Payment from '../models/payment.model.js';
 import AppError from '../utils/appError.js';
-import { getVisitorFlatFee } from '../constants/pricing.js';
+import { calculateFee, calculateExcessFee } from './pricing.service.js';
+import * as vnpayService from './vnpay.service.js';
 
 const slotInclude = (slotWhere, floorWhere) => ({
   model: ParkingSlot,
@@ -391,22 +393,6 @@ const findActiveSubByPlate = (licensePlate, t) =>
     transaction: t,
   });
 
-/**
- * Determine the fee for a session. Residents on a resident floor with an active
- * subscription are covered (fee 0); everyone else pays the flat visitor fee.
- */
-const resolveFee = async (session, floorType, t) => {
-  if (floorType === 'resident') {
-    const activeSub = await findActiveSubByPlate(session.licensePlate, t);
-    if (activeSub) {
-      return { fee: 0, covered: true, coveredBy: 'subscription', subscriptionId: activeSub.id };
-    }
-    // On a resident floor but no valid package → charge as visitor.
-    return { fee: getVisitorFlatFee(session.vehicleType), covered: false, coveredBy: null, note: 'no active resident package' };
-  }
-  return { fee: getVisitorFlatFee(session.vehicleType), covered: false, coveredBy: null };
-};
-
 const loadFloorType = async (session, t) => {
   if (session.slotId) {
     const slot = await ParkingSlot.findByPk(session.slotId, {
@@ -426,8 +412,76 @@ const loadFloorType = async (session, t) => {
 };
 
 /**
- * Preview the fee for an active session without completing check-out.
- * Lets staff quote the amount, collect cash, then confirm.
+ * Resolve the fee for a session at exit time. Three cases:
+ *   1) Resident floor + active sub matching plate → covered (fee 0).
+ *   2) Booking session with prepaidHours → charge ONLY the excess over prepaid window.
+ *   3) Walk-in (or resident no-sub) → full pricing A (motor per-visit, car hourly + cap + overnight).
+ */
+const resolveFee = async (session, floorType, t, exitTime = new Date()) => {
+  // Case 1 — resident with active sub
+  if (floorType === 'resident') {
+    const activeSub = await findActiveSubByPlate(session.licensePlate, t);
+    if (activeSub) {
+      return {
+        fee: 0,
+        covered: true,
+        coveredBy: 'subscription',
+        subscriptionId: activeSub.id,
+        breakdown: null,
+      };
+    }
+  }
+
+  // Case 2 — booking prepaid
+  if (session.bookingId && session.prepaidHours) {
+    const excess = calculateExcessFee(session.entryTime, exitTime, session.vehicleType, session.prepaidHours);
+    return {
+      fee: excess.totalFee,
+      covered: excess.totalFee === 0,
+      coveredBy: excess.totalFee === 0 ? 'booking' : null,
+      breakdown: excess,
+    };
+  }
+
+  // Case 3 — walk-in (or resident with no active sub)
+  const fee = calculateFee(session.entryTime, exitTime, session.vehicleType);
+  return {
+    fee: fee.totalFee,
+    covered: false,
+    coveredBy: null,
+    breakdown: fee,
+  };
+};
+
+const releaseSpot = async (session, t, exitTime) => {
+  if (session.slotId) {
+    const stillReserved = await ResidentSubscription.findOne({
+      where: { slotId: session.slotId, status: 'active', endDate: { [Op.gt]: exitTime } },
+      transaction: t,
+    });
+    await ParkingSlot.update(
+      { status: stillReserved ? 'reserved' : 'empty' },
+      { where: { id: session.slotId }, transaction: t }
+    );
+  } else if (session.rowId) {
+    const row = await ParkingRow.findByPk(session.rowId, { transaction: t, lock: t.LOCK.UPDATE });
+    if (row) {
+      const newCount = Math.max(0, row.occupiedCount - 1);
+      const newStatus = row.status === 'maintenance' ? 'maintenance' : newCount >= row.capacity ? 'full' : 'available';
+      await row.update({ occupiedCount: newCount, status: newStatus }, { transaction: t });
+    }
+  }
+};
+
+const generateSessionOrderId = () => {
+  const ts = Date.now();
+  const rand = Math.random().toString(36).slice(2, 9).toUpperCase();
+  return `SESS-${ts}-${rand}`;
+};
+
+/**
+ * Read-only quote for an active session. Used by staff UI to display fee
+ * before choosing cash vs VNPay.
  */
 const previewCheckout = async (id) => {
   const session = await ParkingSession.findByPk(id);
@@ -435,9 +489,8 @@ const previewCheckout = async (id) => {
   if (session.status !== 'active') throw new AppError(`Session is not active (current: ${session.status})`, 409);
 
   const floorType = await loadFloorType(session);
-  const { fee, covered, coveredBy } = await resolveFee(session, floorType);
-
   const now = new Date();
+  const { fee, covered, coveredBy, breakdown } = await resolveFee(session, floorType, null, now);
   const durationMinutes = Math.max(0, Math.round((now - new Date(session.entryTime)) / 60000));
 
   return {
@@ -450,17 +503,19 @@ const previewCheckout = async (id) => {
     floorType,
     covered,
     coveredBy,
+    prepaidHours: session.prepaidHours,
+    prepaidAmount: session.prepaidAmount ? Number(session.prepaidAmount) : null,
     fee,
-    paymentMethod: covered ? 'package' : 'cash',
+    breakdown,
+    suggestedPaymentMethod: covered ? 'package' : 'cash_or_vnpay',
   };
 };
 
 /**
- * Complete check-out: mark the session completed, set exit time + fee, and
- * release the spot. A reserved resident slot returns to 'reserved' (still
- * theirs); a visitor slot returns to 'empty'. Motorcycle rows decrement.
+ * Check-out with CASH: close the session in one atomic step. Writes an
+ * audited Payment row (paymentMethod='cash', status='success').
  */
-const checkOut = async (id) => {
+const checkOutCash = async (id, staffId) => {
   return sequelize.transaction(async (t) => {
     const session = await ParkingSession.findByPk(id, { transaction: t, lock: t.LOCK.UPDATE });
     if (!session) throw new AppError('Session not found', 404);
@@ -469,28 +524,35 @@ const checkOut = async (id) => {
     }
 
     const floorType = await loadFloorType(session, t);
-    const { fee, covered, coveredBy } = await resolveFee(session, floorType, t);
-
     const exitTime = new Date();
-    await session.update({ status: 'completed', exitTime, fee }, { transaction: t });
+    const { fee, covered, coveredBy, breakdown } = await resolveFee(session, floorType, t, exitTime);
 
-    // Release the spot
-    if (session.slotId) {
-      const stillReserved = await ResidentSubscription.findOne({
-        where: { slotId: session.slotId, status: 'active', endDate: { [Op.gt]: exitTime } },
-        transaction: t,
-      });
-      await ParkingSlot.update(
-        { status: stillReserved ? 'reserved' : 'empty' },
-        { where: { id: session.slotId }, transaction: t }
+    await session.update(
+      { status: 'completed', exitTime, fee, paymentStatus: 'paid' },
+      { transaction: t }
+    );
+
+    await releaseSpot(session, t, exitTime);
+
+    // Audit: write a Payment row even for covered sessions (amount may be 0)
+    // so every closed session has a corresponding payment record. Skip only
+    // when fee is 0 AND covered by subscription (resident — no money moved).
+    let payment = null;
+    if (!(covered && coveredBy === 'subscription')) {
+      payment = await Payment.create(
+        {
+          orderId: generateSessionOrderId(),
+          provider: 'vnpay',
+          paymentMethod: 'cash',
+          paymentType: 'session',
+          amount: fee,
+          orderInfo: `Phi gui xe ${session.vehicleType} ${session.licensePlate}`.replace(/[^\x20-\x7E]/g, ''),
+          status: 'success',
+          sessionId: session.id,
+          paidAt: exitTime,
+        },
+        { transaction: t }
       );
-    } else if (session.rowId) {
-      const row = await ParkingRow.findByPk(session.rowId, { transaction: t, lock: t.LOCK.UPDATE });
-      if (row) {
-        const newCount = Math.max(0, row.occupiedCount - 1);
-        const newStatus = row.status === 'maintenance' ? 'maintenance' : newCount >= row.capacity ? 'full' : 'available';
-        await row.update({ occupiedCount: newCount, status: newStatus }, { transaction: t });
-      }
     }
 
     const durationMinutes = Math.max(0, Math.round((exitTime - new Date(session.entryTime)) / 60000));
@@ -505,9 +567,133 @@ const checkOut = async (id) => {
       fee,
       covered,
       coveredBy,
-      paymentMethod: covered ? 'package' : 'cash',
+      paymentMethod: 'cash',
+      paymentId: payment?.id || null,
+      breakdown,
     };
   });
 };
 
-export { checkIn, getActiveSessions, getById, lookup, previewCheckout, checkOut };
+/**
+ * Check-out with VNPay: compute fee, create a pending Payment + VNPay URL.
+ * Does NOT close the session — the IPN/return handler will close it on
+ * payment success. If fee is 0 (covered), behaves like checkOutCash.
+ */
+const checkOutVnpay = async (id, staffId, ipAddr) => {
+  return sequelize.transaction(async (t) => {
+    const session = await ParkingSession.findByPk(id, { transaction: t, lock: t.LOCK.UPDATE });
+    if (!session) throw new AppError('Session not found', 404);
+    if (session.status !== 'active') {
+      throw new AppError(`Session is not active (current: ${session.status})`, 409);
+    }
+
+    const floorType = await loadFloorType(session, t);
+    const { fee, covered, coveredBy, breakdown } = await resolveFee(session, floorType, t, new Date());
+
+    // If nothing to charge, close the session immediately (no point creating a
+    // pending VNPay payment for 0đ). Same semantics as checkOutCash for fee=0.
+    if (fee === 0) {
+      const exitTime = new Date();
+      await session.update(
+        { status: 'completed', exitTime, fee: 0, paymentStatus: 'paid' },
+        { transaction: t }
+      );
+      await releaseSpot(session, t, exitTime);
+
+      return {
+        sessionId: session.id,
+        licensePlate: session.licensePlate,
+        vehicleType: session.vehicleType,
+        entryTime: session.entryTime,
+        exitTime,
+        durationMinutes: Math.max(0, Math.round((exitTime - new Date(session.entryTime)) / 60000)),
+        fee: 0,
+        covered,
+        coveredBy,
+        paymentMethod: 'package',
+        paymentUrl: null,
+        orderId: null,
+        breakdown,
+      };
+    }
+
+    // Cancel any prior pending VNPay payments for this session so we always
+    // have exactly one pending row to reconcile against.
+    await Payment.update(
+      { status: 'cancelled' },
+      { where: { sessionId: session.id, status: 'pending' }, transaction: t }
+    );
+
+    const orderId = generateSessionOrderId();
+    const orderInfo = `Phi gui xe ${session.vehicleType} ${session.licensePlate}`.replace(/[^\x20-\x7E]/g, '');
+    const { paymentUrl, createDate } = vnpayService.createPaymentUrl({
+      amount: fee,
+      orderId,
+      orderInfo,
+      ipAddr,
+    });
+
+    await Payment.create(
+      {
+        orderId,
+        provider: 'vnpay',
+        paymentMethod: 'vnpay',
+        paymentType: 'session',
+        amount: fee,
+        orderInfo,
+        status: 'pending',
+        sessionId: session.id,
+        ipAddress: ipAddr || null,
+        vnpCreateDate: createDate,
+      },
+      { transaction: t }
+    );
+
+    // Session stays 'active' until IPN/return confirms payment. Spot is still
+    // occupied. Staff should hold the gate until payment confirmation arrives.
+    return {
+      sessionId: session.id,
+      licensePlate: session.licensePlate,
+      vehicleType: session.vehicleType,
+      entryTime: session.entryTime,
+      exitTime: null,
+      fee,
+      covered: false,
+      coveredBy: null,
+      paymentMethod: 'vnpay',
+      paymentUrl,
+      orderId,
+      breakdown,
+    };
+  });
+};
+
+/**
+ * Internal helper called by payment.service.handleIpn when a 'session'
+ * payment succeeds. Closes the session, releases the spot, marks paid.
+ * Must be called from inside an existing transaction (`t`).
+ */
+const finalizeSessionPayment = async (sessionId, amount, t) => {
+  const session = await ParkingSession.findByPk(sessionId, { transaction: t, lock: t.LOCK.UPDATE });
+  if (!session) return { closed: false, reason: 'session_not_found' };
+  if (session.status !== 'active') return { closed: false, reason: 'session_not_active' };
+
+  const exitTime = new Date();
+  await session.update(
+    { status: 'completed', exitTime, fee: amount, paymentStatus: 'paid' },
+    { transaction: t }
+  );
+  await releaseSpot(session, t, exitTime);
+  return { closed: true, sessionId, exitTime };
+};
+
+export {
+  checkIn,
+  getActiveSessions,
+  getById,
+  lookup,
+  previewCheckout,
+  checkOutCash,
+  checkOutVnpay,
+  finalizeSessionPayment,
+};

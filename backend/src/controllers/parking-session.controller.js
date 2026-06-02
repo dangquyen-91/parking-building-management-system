@@ -1,6 +1,17 @@
 import * as parkingSessionService from '../services/parking-session.service.js';
 import response from '../utils/response.js';
 
+const getClientIp = (req) => {
+  let ip =
+    (req.headers['x-forwarded-for'] || '').split(',')[0].trim() ||
+    req.socket?.remoteAddress ||
+    req.ip ||
+    '127.0.0.1';
+  if (ip === '::1' || ip === '::ffff:127.0.0.1') return '127.0.0.1';
+  if (ip.startsWith('::ffff:')) return ip.slice(7);
+  return ip;
+};
+
 const checkIn = async (req, res, next) => {
   try {
     const session = await parkingSessionService.checkIn(req.body, req.user.id);
@@ -46,9 +57,25 @@ const previewCheckout = async (req, res, next) => {
   }
 };
 
+/**
+ * Single check-out endpoint. Body picks the payment method:
+ *   { paymentMethod: 'cash' }  → close session + audited cash Payment row
+ *   { paymentMethod: 'vnpay' } → create pending Payment + return VNPay URL
+ * If the session is covered (sub or fully prepaid), both methods short-circuit
+ * to a free close.
+ */
 const checkOut = async (req, res, next) => {
   try {
-    const result = await parkingSessionService.checkOut(req.params.id);
+    const method = req.body?.paymentMethod || 'cash';
+    if (method !== 'cash' && method !== 'vnpay') {
+      return response.error(res, "paymentMethod must be 'cash' or 'vnpay'", 400);
+    }
+
+    const result =
+      method === 'vnpay'
+        ? await parkingSessionService.checkOutVnpay(req.params.id, req.user.id, getClientIp(req))
+        : await parkingSessionService.checkOutCash(req.params.id, req.user.id);
+
     response.success(res, result);
   } catch (err) {
     next(err);

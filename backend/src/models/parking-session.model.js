@@ -2,6 +2,7 @@ import { DataTypes } from 'sequelize';
 import { sequelize } from '../config/database.js';
 
 export const SESSION_STATUSES = ['active', 'completed', 'cancelled'];
+export const SESSION_PAYMENT_STATUSES = ['paid', 'unpaid'];
 
 const ParkingSession = sequelize.define(
   'ParkingSession',
@@ -14,6 +15,10 @@ const ParkingSession = sequelize.define(
     entryTime: { type: DataTypes.DATE, allowNull: false, defaultValue: DataTypes.NOW },
     exitTime: { type: DataTypes.DATE, allowNull: true },
     fee: { type: DataTypes.DECIMAL(10, 2), defaultValue: 0 },
+    paymentStatus: { type: DataTypes.ENUM(...SESSION_PAYMENT_STATUSES), allowNull: false, defaultValue: 'unpaid' },
+    prepaidHours: { type: DataTypes.INTEGER, allowNull: true },
+    prepaidAmount: { type: DataTypes.DECIMAL(12, 2), allowNull: true },
+    bookingId: { type: DataTypes.INTEGER, allowNull: true },
     staffId: { type: DataTypes.INTEGER, allowNull: false },
     userId: { type: DataTypes.INTEGER, allowNull: true },
     status: { type: DataTypes.ENUM(...SESSION_STATUSES), defaultValue: 'active' },
@@ -26,6 +31,7 @@ const ParkingSession = sequelize.define(
       { fields: ['licensePlate', 'status'] },
       { fields: ['slotId', 'status'] },
       { fields: ['rowId', 'status'] },
+      { fields: ['bookingId'] },
     ],
   }
 );

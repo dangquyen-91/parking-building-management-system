@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { authenticate, authorize } from '../middlewares/auth.middleware.js';
 import validate from '../middlewares/validate.middleware.js';
 import * as parkingSessionController from '../controllers/parking-session.controller.js';
-import { checkInSchema, lookupSchema } from '../validations/parking-session.validation.js';
+import { checkInSchema, lookupSchema, checkOutSchema } from '../validations/parking-session.validation.js';
 
 const router = Router();
 
@@ -15,8 +15,13 @@ router.get('/:id', authorize('admin', 'manager', 'staff'), parkingSessionControl
 
 router.post('/check-in', authorize('admin', 'manager', 'staff'), validate(checkInSchema), parkingSessionController.checkIn);
 
-// Check-out: preview fee (quote), then confirm (collect cash, release spot)
+// Check-out: preview fee (quote), then confirm with paymentMethod=cash|vnpay
 router.get('/:id/checkout-preview', authorize('admin', 'manager', 'staff'), parkingSessionController.previewCheckout);
-router.post('/:id/check-out', authorize('admin', 'manager', 'staff'), parkingSessionController.checkOut);
+router.post(
+  '/:id/check-out',
+  authorize('admin', 'manager', 'staff'),
+  validate(checkOutSchema),
+  parkingSessionController.checkOut
+);
 
 export default router;
