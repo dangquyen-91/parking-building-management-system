@@ -17,6 +17,7 @@ import parkingSessionRoutes from './routes/parking-session.routes.js';
 import packageRoutes from './routes/package.routes.js';
 import subscriptionRoutes from './routes/subscription.routes.js';
 import paymentRoutes from './routes/payment.routes.js';
+import bookingRoutes from './routes/booking.routes.js';
 import errorHandler from './middlewares/error.middleware.js';
 import { apiLimiter, authLimiter } from './middlewares/rateLimiter.middleware.js';
 
@@ -54,6 +55,7 @@ app.use('/api/v1/parking-sessions', parkingSessionRoutes);
 app.use('/api/v1/packages', packageRoutes);
 app.use('/api/v1/subscriptions', subscriptionRoutes);
 app.use('/api/v1/payments', paymentRoutes);
+app.use('/api/v1/bookings', bookingRoutes);
 
 app.get('/health', (_req, res) =>
   res.json({ success: true, message: 'OK', data: { env: process.env.NODE_ENV } })
