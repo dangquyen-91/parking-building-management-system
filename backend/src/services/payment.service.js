@@ -99,6 +99,38 @@ const handleSessionOutcome = async (payment, success, t) => {
 };
 
 /**
+ * Booking outcome — delegated to booking.service via dynamic import so this
+ * module doesn't crash at startup before the booking module ships.
+ *
+ * Contract for the booking teammate to implement in booking.service.js:
+ *   export const handleBookingPaymentSuccess = async (bookingId, t) => { ... }
+ *   export const handleBookingPaymentFailure = async (bookingId, t) => { ... }
+ *
+ * Both must accept the bookingId + an existing Sequelize transaction (so the
+ * update participates in the same atomic IPN handler). They are responsible
+ * for whatever booking-side state change makes sense (confirm/cancel, send
+ * email, reserve resources, etc).
+ */
+const handleBookingOutcome = async (payment, success, t) => {
+  if (!payment.bookingId) return;
+  let bookingService;
+  try {
+    bookingService = await import('./booking.service.js');
+  } catch (err) {
+    console.warn(`[booking hook] booking.service.js not yet available — payment ${payment.orderId} processed but no booking-side action: ${err.message}`);
+    return;
+  }
+  const fn = success
+    ? bookingService.handleBookingPaymentSuccess
+    : bookingService.handleBookingPaymentFailure;
+  if (typeof fn !== 'function') {
+    console.warn(`[booking hook] booking.service.js missing ${success ? 'handleBookingPaymentSuccess' : 'handleBookingPaymentFailure'} export`);
+    return;
+  }
+  await fn(payment.bookingId, t);
+};
+
+/**
  * Apply a confirmed payment outcome (from IPN or queryDr) to a still-pending
  * payment: update the payment row, then branch on paymentType to mutate the
  * linked entity (subscription / session / booking). Assumes `payment` is
@@ -126,12 +158,86 @@ const applyOutcome = async (payment, { success, vnp, raw, rawField }, t) => {
       await handleSessionOutcome(payment, success, t);
       break;
     case 'booking':
-      // Booking outcome handled by teammate's booking.service via a hook
-      // that they'll import and call here. Left as a no-op until then.
+      await handleBookingOutcome(payment, success, t);
       break;
     default:
       break;
   }
+};
+
+/**
+ * Public API for the booking teammate: build a VNPay payment URL for a
+ * booking. Cancels any prior pending payment for the same bookingId so we
+ * always have exactly one pending row to reconcile against.
+ *
+ * Callable inside an existing Sequelize transaction (pass `t`) or standalone
+ * (will open its own). Returns { paymentUrl, orderId, paymentId }.
+ *
+ * Contract:
+ *   - `bookingId` (int, required): FK to the bookings table.
+ *   - `amount`    (number, required): VND, integer, > 0.
+ *   - `ipAddr`    (string, optional): caller IP for vnp_IpAddr.
+ *   - `orderInfo` (string, optional): max 255 chars, auto-sanitised to ASCII.
+ *
+ * After the user pays on VNPay, IPN / queryDr will eventually invoke
+ * booking.service.handleBookingPaymentSuccess(bookingId, t). The booking
+ * module owns whatever business mutation that implies.
+ */
+const generateBookingOrderId = () => {
+  const ts = Date.now();
+  const rand = Math.random().toString(36).slice(2, 9).toUpperCase();
+  return `BOOK-${ts}-${rand}`;
+};
+
+export const createBookingPayment = async ({ bookingId, amount, ipAddr, orderInfo }, externalTxn = null) => {
+  if (!bookingId) throw new AppError('bookingId is required', 400);
+  const amt = Number(amount);
+  if (!amt || amt <= 0) throw new AppError('amount must be greater than 0', 400);
+
+  const run = async (t) => {
+    // Cancel prior pending booking payments for this bookingId so retries
+    // don't accumulate dangling rows (same logic as checkOutVnpay).
+    await Payment.update(
+      { status: 'cancelled' },
+      {
+        where: { bookingId, paymentType: 'booking', status: 'pending' },
+        transaction: t,
+      }
+    );
+
+    const orderId = generateBookingOrderId();
+    const safeOrderInfo = (orderInfo || `Booking ${bookingId}`)
+      .replace(/[^\x20-\x7E]/g, '')
+      .slice(0, 255)
+      .trim() || `Booking ${bookingId}`;
+
+    const { paymentUrl, createDate } = vnpayService.createPaymentUrl({
+      amount: amt,
+      orderId,
+      orderInfo: safeOrderInfo,
+      ipAddr,
+    });
+
+    const payment = await Payment.create(
+      {
+        orderId,
+        provider: 'vnpay',
+        paymentMethod: 'vnpay',
+        paymentType: 'booking',
+        amount: amt,
+        orderInfo: safeOrderInfo,
+        status: 'pending',
+        bookingId,
+        ipAddress: ipAddr || null,
+        vnpCreateDate: createDate,
+      },
+      { transaction: t }
+    );
+
+    return { paymentUrl, orderId, paymentId: payment.id };
+  };
+
+  return externalTxn ? run(externalTxn) : sequelize.transaction(run);
 };
 
 export const handleIpn = async (query) => {
