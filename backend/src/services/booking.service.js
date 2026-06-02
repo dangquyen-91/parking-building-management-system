@@ -4,6 +4,7 @@ import Booking from '../models/booking.model.js';
 import Floor from '../models/floor.model.js';
 import ParkingSlot from '../models/parking-slot.model.js';
 import User from '../models/user.model.js';
+import ResidentSubscription from '../models/resident-subscription.model.js';
 import AppError from '../utils/appError.js';
 import { calculateFee } from './pricing.service.js';
 import { createBookingPayment } from './payment.service.js';
@@ -12,6 +13,7 @@ import { createBookingPayment } from './payment.service.js';
 const FREE_SLOT_THRESHOLD = 0.20;            // booking ngắt khi free slot < 20%
 const MAX_ADVANCE_BOOKING_MS = 24 * 3600_000; // chỉ cho book trong vòng 24h tới
 const MIN_DURATION_MS = 60 * 60_000;          // booking tối thiểu 1 giờ
+const EARLY_GRACE_MS = 30 * 60_000;          // cho khách check-in sớm 30 phút trước startTime
 
 const normalizePlate = (plate) => plate.toUpperCase().replace(/\s/g, '');
 
@@ -69,11 +71,9 @@ const validateTimeWindow = (startTime, endTime) => {
 };
 
 /**
- * Resolve customer fields. Three flows:
+ * Resolve customer fields.
  *   - Guest (no requester): body MUST have customerName + customerPhone.
  *   - Logged-in user: auto-fill from profile; body overrides allowed.
- *   - Logged-in resident booking "hộ" (different plate): same as above —
- *     userId = booker, name/phone may differ for the actual driver.
  */
 const resolveCustomer = async (body, requester, t) => {
   if (!requester) {
@@ -98,6 +98,33 @@ const resolveCustomer = async (body, requester, t) => {
 };
 
 /**
+ * Cư dân (user có sub active) chỉ được book cho plate đã đăng ký trong sub
+ * của họ — không cho book hộ plate người khác. User không có sub không bị
+ * giới hạn (book bất kỳ plate). Guest cũng không bị giới hạn.
+ */
+const ensureResidentBooksOwnPlate = async (requester, plate, t) => {
+  if (!requester) return; // guest, no restriction
+  const now = new Date();
+  const subs = await ResidentSubscription.findAll({
+    where: {
+      userId: requester.id,
+      status: 'active',
+      endDate: { [Op.gt]: now },
+    },
+    attributes: ['licensePlate'],
+    transaction: t,
+  });
+  if (subs.length === 0) return; // not a resident, no restriction
+  const ownPlates = subs.map((s) => s.licensePlate);
+  if (!ownPlates.includes(plate)) {
+    throw new AppError(
+      `Cư dân chỉ được book cho biển số đã có gói: ${ownPlates.join(', ')}. Không thể book hộ plate khác.`,
+      403
+    );
+  }
+};
+
+/**
  * Create a booking + VNPay payment URL.
  *
  * Flow:
@@ -115,6 +142,9 @@ export const createBooking = async ({ body, requester, ipAddr }) => {
   return sequelize.transaction(async (t) => {
     const plate = normalizePlate(body.licensePlate);
     validateTimeWindow(body.startTime, body.endTime);
+
+    // Resident chỉ được book plate của họ (không cho book hộ)
+    await ensureResidentBooksOwnPlate(requester, plate, t);
 
     const floor = await findVisitorCarFloor(body.floorId, t);
     await checkFloorCapacity(floor.id, t);
@@ -198,19 +228,24 @@ export const handleBookingPaymentFailure = async (bookingId, t) => {
 // ── Helper used by check-in (PR4 — not wired yet) ───────────
 
 /**
- * Find a confirmed booking whose time window covers `now` for this plate.
- * Returns null if no matching booking (caller treats as walk-in).
+ * Find a confirmed booking whose time window (with EARLY_GRACE_MS) covers
+ * `now` for this plate. Returns null if no match (caller treats as walk-in).
+ *
+ * Grace period: a customer may check in up to EARLY_GRACE_MS before the
+ * booking's startTime. If they arrive earlier than that, the booking won't
+ * match and they get treated as walk-in (booking expires later via sweep).
  *
  * Used by parking-session.checkIn to set session.bookingId + prepaidHours +
  * prepaidAmount + paymentStatus='paid' when the customer shows up.
  */
 export const findActiveBookingByPlate = async (licensePlate, t) => {
   const now = new Date();
+  const graceCutoff = new Date(now.getTime() + EARLY_GRACE_MS);
   return Booking.findOne({
     where: {
       licensePlate: normalizePlate(licensePlate),
       status: 'confirmed',
-      startTime: { [Op.lte]: now },
+      startTime: { [Op.lte]: graceCutoff },
       endTime: { [Op.gte]: now },
       sessionId: null,
     },
