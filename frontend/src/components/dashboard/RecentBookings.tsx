@@ -12,6 +12,12 @@ const statusClasses: Record<BookingStatus, string> = {
   Cancelled: 'border-red-400/20 bg-red-400/10 text-red-300',
 };
 
+const statusLabels: Record<BookingStatus, string> = {
+  Confirmed: 'Đã xác nhận',
+  Pending: 'Đang chờ',
+  Cancelled: 'Đã hủy',
+};
+
 export function RecentBookings({ bookings }: RecentBookingsProps) {
   return (
     <motion.section
@@ -21,19 +27,19 @@ export function RecentBookings({ bookings }: RecentBookingsProps) {
       className="rounded-[30px] border border-white/10 bg-[#0F172A]/80 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl"
     >
       <div className="mb-5">
-        <p className="text-sm font-medium text-slate-400">Recent Bookings</p>
-        <h2 className="mt-1 text-xl font-bold tracking-tight text-white">Dat cho gan day</h2>
+        <p className="text-sm font-medium text-slate-400">Đặt chỗ gần đây</p>
+        <h2 className="mt-1 text-xl font-bold tracking-tight text-white">Lịch đặt chỗ mới nhất</h2>
       </div>
 
       <div className="overflow-x-auto">
         <table className="w-full min-w-[640px] text-left">
           <thead>
             <tr className="border-b border-white/10 text-xs uppercase tracking-[0.16em] text-slate-500">
-              <th className="pb-3 font-semibold">Booking Code</th>
-              <th className="pb-3 font-semibold">Bien so</th>
-              <th className="pb-3 font-semibold">Ngay</th>
-              <th className="pb-3 font-semibold">Gio</th>
-              <th className="pb-3 text-right font-semibold">Trang thai</th>
+              <th className="pb-3 font-semibold">Mã đặt chỗ</th>
+              <th className="pb-3 font-semibold">Biển số</th>
+              <th className="pb-3 font-semibold">Ngày</th>
+              <th className="pb-3 font-semibold">Giờ</th>
+              <th className="pb-3 text-right font-semibold">Trạng thái</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/[0.06]">
@@ -45,7 +51,7 @@ export function RecentBookings({ bookings }: RecentBookingsProps) {
                 <td className="py-4 text-sm text-slate-400">{booking.time}</td>
                 <td className="py-4 text-right">
                   <span className={cn('inline-flex rounded-full border px-3 py-1 text-xs font-semibold', statusClasses[booking.status])}>
-                    {booking.status}
+                    {statusLabels[booking.status]}
                   </span>
                 </td>
               </tr>

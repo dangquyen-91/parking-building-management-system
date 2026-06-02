@@ -12,8 +12,8 @@ export function Header() {
         <div className="relative max-w-2xl flex-1">
           <Search className="pointer-events-none absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-slate-500" />
           <input
-            aria-label="Search dashboard"
-            placeholder="Search buildings, sessions, bookings..."
+            aria-label="Tìm kiếm trên bảng điều khiển"
+            placeholder="Tìm tòa nhà, phiên gửi xe, đặt chỗ..."
             className="h-12 w-full rounded-2xl border border-white/10 bg-white/[0.04] pl-11 pr-4 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-blue-400/60 focus:bg-white/[0.06] focus:shadow-[0_0_0_4px_rgba(59,130,246,0.10)]"
           />
         </div>
@@ -41,8 +41,8 @@ export function Header() {
               SA
             </div>
             <div className="hidden leading-tight md:block">
-              <p className="text-sm font-semibold text-white">System Administrator</p>
-              <p className="text-xs text-slate-500">Enterprise Admin</p>
+              <p className="text-sm font-semibold text-white">Quản trị viên hệ thống</p>
+              <p className="text-xs text-slate-500">Quản trị hệ thống</p>
             </div>
           </div>
         </div>

@@ -14,7 +14,7 @@ export default function DashboardPage() {
       subtitle={dashboardData.meta.subtitle}
       meta={
         <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-slate-300 backdrop-blur-xl">
-          Last updated: <span className="font-semibold text-white">{dashboardData.meta.lastUpdated}</span>
+          Cập nhật lần cuối: <span className="font-semibold text-white">{dashboardData.meta.lastUpdated}</span>
         </div>
       }
     >
