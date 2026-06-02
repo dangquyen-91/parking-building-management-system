@@ -42,3 +42,10 @@ Payment.belongsTo(ResidentSubscription, { foreignKey: 'subscriptionId', as: 'sub
 // Car packages reserve a fixed slot
 ParkingSlot.hasMany(ResidentSubscription, { foreignKey: 'slotId', as: 'subscriptions' });
 ResidentSubscription.belongsTo(ParkingSlot, { foreignKey: 'slotId', as: 'slot' });
+
+// ── Session payments (walk-in checkout via cash or VNPay) ──
+ParkingSession.hasMany(Payment, { foreignKey: 'sessionId', as: 'payments', onDelete: 'SET NULL' });
+Payment.belongsTo(ParkingSession, { foreignKey: 'sessionId', as: 'session' });
+
+// Booking payments — Payment.bookingId column already exists; FK wiring
+// added when teammate ships the Booking model (booking.model.js).
