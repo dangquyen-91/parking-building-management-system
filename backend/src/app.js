@@ -19,7 +19,7 @@ import subscriptionRoutes from './routes/subscription.routes.js';
 import paymentRoutes from './routes/payment.routes.js';
 import bookingRoutes from './routes/booking.routes.js';
 import errorHandler from './middlewares/error.middleware.js';
-import { apiLimiter, authLimiter } from './middlewares/rateLimiter.middleware.js';
+import { apiLimiter } from './middlewares/rateLimiter.middleware.js';
 
 const app = express();
 
@@ -45,7 +45,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, { explorer: true }));
 
 app.use('/api/v1', apiLimiter);
-app.use('/api/v1/auth', authLimiter, authRoutes);
+app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/buildings', buildingRoutes);
 app.use('/api/v1/floors', floorRoutes);
