@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import {
   BarChart3,
+  Boxes,
   Building2,
   CalendarCheck,
   Car,
@@ -29,6 +30,7 @@ const menuItems = [
   { label: 'Bookings', icon: CalendarCheck, to: '/admin/bookings' },
   { label: 'Parking Sessions', icon: Clock3, to: '/admin/parking-sessions' },
   { label: 'Payments', icon: CreditCard, to: '/admin/payments' },
+  { label: 'Packages', icon: Boxes, to: '/admin/packages' },
   { label: 'Users', icon: UsersRound, to: '/admin/users' },
   { label: 'Staff', icon: ShieldCheck, to: '/admin/staff' },
   { label: 'Reports', icon: BarChart3, to: '/admin/reports' },

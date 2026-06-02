@@ -7,9 +7,16 @@ import Contact from '../pages/Contact';
 import { Login } from '../pages/auth/Login';
 import { Register } from '../pages/auth/Register';
 import DashboardPage from '../pages/admin/DashboardPage';
+import UsersPage from '../pages/admin/UsersPage';
+import BuildingsPage from '../pages/admin/BuildingsPage';
+import FloorsPage from '../pages/admin/FloorsPage';
+import SlotsPage from '../pages/admin/SlotsPage';
+import PackagesPage from '../pages/admin/PackagesPage';
+import PaymentsPage from '../pages/admin/PaymentsPage';
 import { useAuth } from '../hooks/useAuth';
+import type { ReactNode } from 'react';
 
-function AdminRoute() {
+function AdminRoute({ children }: { children: ReactNode }) {
   const { user, loading, isAuthenticated } = useAuth();
 
   if (loading) {
@@ -28,7 +35,7 @@ function AdminRoute() {
     return <Navigate to="/" replace />;
   }
 
-  return <DashboardPage />;
+  return <>{children}</>;
 }
 
 export default function AppRoutes() {
@@ -42,7 +49,13 @@ export default function AppRoutes() {
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
-      <Route path="/admin/dashboard" element={<AdminRoute />} />
+      <Route path="/admin/dashboard" element={<AdminRoute><DashboardPage /></AdminRoute>} />
+      <Route path="/admin/buildings" element={<AdminRoute><BuildingsPage /></AdminRoute>} />
+      <Route path="/admin/floors" element={<AdminRoute><FloorsPage /></AdminRoute>} />
+      <Route path="/admin/slots" element={<AdminRoute><SlotsPage /></AdminRoute>} />
+      <Route path="/admin/payments" element={<AdminRoute><PaymentsPage /></AdminRoute>} />
+      <Route path="/admin/packages" element={<AdminRoute><PackagesPage /></AdminRoute>} />
+      <Route path="/admin/users" element={<AdminRoute><UsersPage /></AdminRoute>} />
       <Route path="/signin" element={<Navigate to="/login" replace />} />
       <Route path="/signup" element={<Navigate to="/register" replace />} />
     </Routes>
