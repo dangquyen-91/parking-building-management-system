@@ -13,6 +13,7 @@ import { createBookingPayment } from './payment.service.js';
 const FREE_SLOT_THRESHOLD = 0.20;            // booking ngắt khi free slot < 20%
 const MAX_ADVANCE_BOOKING_MS = 24 * 3600_000; // chỉ cho book trong vòng 24h tới
 const MIN_DURATION_MS = 60 * 60_000;          // booking tối thiểu 1 giờ
+const EARLY_GRACE_MS = 30 * 60_000;          // cho khách check-in sớm 30 phút trước startTime
 
 const normalizePlate = (plate) => plate.toUpperCase().replace(/\s/g, '');
 
@@ -227,19 +228,24 @@ export const handleBookingPaymentFailure = async (bookingId, t) => {
 // ── Helper used by check-in (PR4 — not wired yet) ───────────
 
 /**
- * Find a confirmed booking whose time window covers `now` for this plate.
- * Returns null if no matching booking (caller treats as walk-in).
+ * Find a confirmed booking whose time window (with EARLY_GRACE_MS) covers
+ * `now` for this plate. Returns null if no match (caller treats as walk-in).
+ *
+ * Grace period: a customer may check in up to EARLY_GRACE_MS before the
+ * booking's startTime. If they arrive earlier than that, the booking won't
+ * match and they get treated as walk-in (booking expires later via sweep).
  *
  * Used by parking-session.checkIn to set session.bookingId + prepaidHours +
  * prepaidAmount + paymentStatus='paid' when the customer shows up.
  */
 export const findActiveBookingByPlate = async (licensePlate, t) => {
   const now = new Date();
+  const graceCutoff = new Date(now.getTime() + EARLY_GRACE_MS);
   return Booking.findOne({
     where: {
       licensePlate: normalizePlate(licensePlate),
       status: 'confirmed',
-      startTime: { [Op.lte]: now },
+      startTime: { [Op.lte]: graceCutoff },
       endTime: { [Op.gte]: now },
       sessionId: null,
     },
