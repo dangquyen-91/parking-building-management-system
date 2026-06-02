@@ -7,6 +7,7 @@ import ParkingSession from './parking-session.model.js';
 import ParkingPackage from './parking-package.model.js';
 import ResidentSubscription from './resident-subscription.model.js';
 import Payment from './payment.model.js';
+import Booking from './booking.model.js';
 
 Building.hasMany(Floor, { foreignKey: 'buildingId', as: 'floors', onDelete: 'RESTRICT' });
 Floor.belongsTo(Building, { foreignKey: 'buildingId', as: 'building' });
@@ -47,5 +48,19 @@ ResidentSubscription.belongsTo(ParkingSlot, { foreignKey: 'slotId', as: 'slot' }
 ParkingSession.hasMany(Payment, { foreignKey: 'sessionId', as: 'payments', onDelete: 'SET NULL' });
 Payment.belongsTo(ParkingSession, { foreignKey: 'sessionId', as: 'session' });
 
-// Booking payments — Payment.bookingId column already exists; FK wiring
-// added when teammate ships the Booking model (booking.model.js).
+// ── Bookings (advance reservations, "ảo" — no slot lock) ──
+Floor.hasMany(Booking, { foreignKey: 'floorId', as: 'bookings', onDelete: 'RESTRICT' });
+Booking.belongsTo(Floor, { foreignKey: 'floorId', as: 'floor' });
+
+User.hasMany(Booking, { foreignKey: 'userId', as: 'bookings' });
+Booking.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
+User.hasMany(Booking, { foreignKey: 'handledBy', as: 'handledBookings' });
+Booking.belongsTo(User, { foreignKey: 'handledBy', as: 'handler' });
+
+ParkingSession.hasOne(Booking, { foreignKey: 'sessionId', as: 'booking' });
+Booking.belongsTo(ParkingSession, { foreignKey: 'sessionId', as: 'session' });
+
+// Booking payments — payments.bookingId already there from migration 001.
+Booking.hasMany(Payment, { foreignKey: 'bookingId', as: 'payments', onDelete: 'SET NULL' });
+Payment.belongsTo(Booking, { foreignKey: 'bookingId', as: 'booking' });
