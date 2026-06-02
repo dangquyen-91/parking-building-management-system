@@ -6,6 +6,7 @@ import ParkingPackage from '../models/parking-package.model.js';
 import AppError from '../utils/appError.js';
 import * as vnpayService from './vnpay.service.js';
 import { freeSlotIfUnused } from './subscription.service.js';
+import { finalizeSessionPayment } from './parking-session.service.js';
 
 export const handleReturn = async (query) => {
   const valid = vnpayService.verifyCallback(query);
@@ -61,9 +62,47 @@ const computePeriod = async (subscription, durationDays, t) => {
 };
 
 /**
+ * Activate or cancel a subscription tied to a payment. Assumes the payment row
+ * has already been updated and is locked. Resolves the linked subscription if
+ * still pending; otherwise no-op (idempotent against replayed IPN).
+ */
+const handleSubscriptionOutcome = async (payment, success, t) => {
+  if (!payment.subscriptionId) return;
+  const subscription = await ResidentSubscription.findByPk(payment.subscriptionId, {
+    transaction: t,
+    lock: t.LOCK.UPDATE,
+  });
+  if (!subscription || subscription.status !== 'pending') return;
+
+  if (success) {
+    const pkg = await ParkingPackage.findByPk(subscription.packageId, { transaction: t });
+    const durationDays = pkg ? pkg.durationDays : 30;
+    const { startDate, endDate } = await computePeriod(subscription, durationDays, t);
+    await subscription.update({ status: 'active', startDate, endDate }, { transaction: t });
+  } else {
+    await subscription.update({ status: 'cancelled' }, { transaction: t });
+    await freeSlotIfUnused(subscription.slotId, subscription.id, t);
+  }
+};
+
+/**
+ * Close the parking session on payment success. On failure we leave the
+ * session 'active' so staff can retry payment (cash fallback or new VNPay QR).
+ */
+const handleSessionOutcome = async (payment, success, t) => {
+  if (!payment.sessionId) return;
+  if (success) {
+    await finalizeSessionPayment(payment.sessionId, Number(payment.amount), t);
+  }
+  // On failure: session stays active. Staff can call check-out again with
+  // another method. The pending row is already marked 'failed' in applyOutcome.
+};
+
+/**
  * Apply a confirmed payment outcome (from IPN or queryDr) to a still-pending
- * payment: update the payment row, then activate or cancel the linked
- * subscription. Assumes `payment` is locked and currently 'pending'.
+ * payment: update the payment row, then branch on paymentType to mutate the
+ * linked entity (subscription / session / booking). Assumes `payment` is
+ * locked and currently 'pending'.
  */
 const applyOutcome = async (payment, { success, vnp, raw, rawField }, t) => {
   await payment.update(
@@ -79,22 +118,19 @@ const applyOutcome = async (payment, { success, vnp, raw, rawField }, t) => {
     { transaction: t }
   );
 
-  if (!payment.subscriptionId) return;
-
-  const subscription = await ResidentSubscription.findByPk(payment.subscriptionId, {
-    transaction: t,
-    lock: t.LOCK.UPDATE,
-  });
-  if (!subscription || subscription.status !== 'pending') return;
-
-  if (success) {
-    const pkg = await ParkingPackage.findByPk(subscription.packageId, { transaction: t });
-    const durationDays = pkg ? pkg.durationDays : 30;
-    const { startDate, endDate } = await computePeriod(subscription, durationDays, t);
-    await subscription.update({ status: 'active', startDate, endDate }, { transaction: t });
-  } else {
-    await subscription.update({ status: 'cancelled' }, { transaction: t });
-    await freeSlotIfUnused(subscription.slotId, subscription.id, t);
+  switch (payment.paymentType) {
+    case 'subscription':
+      await handleSubscriptionOutcome(payment, success, t);
+      break;
+    case 'session':
+      await handleSessionOutcome(payment, success, t);
+      break;
+    case 'booking':
+      // Booking outcome handled by teammate's booking.service via a hook
+      // that they'll import and call here. Left as a no-op until then.
+      break;
+    default:
+      break;
   }
 };
 

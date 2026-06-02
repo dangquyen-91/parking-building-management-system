@@ -46,3 +46,7 @@ export const lookupSchema = Joi.object({
       'string.pattern.base': 'License plate only allows letters, numbers and hyphens',
     }),
 });
+
+export const checkOutSchema = Joi.object({
+  paymentMethod: Joi.string().valid('cash', 'vnpay').default('cash'),
+});
