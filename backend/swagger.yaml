@@ -3990,6 +3990,11 @@ paths:
     get:
       tags: [Payments]
       summary: Get payment status by orderId
+      description: |
+        Tra cuu payment theo orderId. Ownership-aware:
+          - admin/manager/staff: doc duoc moi payment
+          - user thuong: chi doc payment cua minh (lien ket qua subscription/session/booking.userId)
+          - guest payment: chi staff+ doc duoc
       security:
         - bearerAuth: []
       parameters:
@@ -4004,5 +4009,205 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SuccessResponse'
+        '403':
+          description: Access denied (not the owner, not staff)
         '404':
           description: Payment not found
+
+  # ── BOOKINGS ──────────────────────────────────────────
+  /bookings:
+    post:
+      tags: [Bookings]
+      summary: Tao booking (guest hoac user dang nhap)
+      description: |
+        Tao booking + tra ve VNPay paymentUrl.
+        - **Guest** (khong gui Bearer token): chi can `licensePlate` + `startTime` + `endTime`.
+          `customerName`/`customerPhone` optional — BE auto-fill placeholder neu trong.
+        - **User dang nhap**: auto-fill tu profile; body override duoc.
+          PHAI co `customerPhone` (tu body hoac tu `user.phone`); neu ca 2 deu trong → reject 400.
+        - **Cu dan** (user co sub active): chi book duoc plate trong sub cua minh (chong "book ho").
+
+        **Business rules:**
+          - Chi booking xe ô tô (`vehicleType='car'`, BE auto-set).
+          - Tang visitor car: BE auto-pick floor neu khong truyen `floorId`.
+          - Booking nay rat "ao" — KHONG lock slot. Khi check-in BE chon slot trong.
+          - `startTime` phai trong vong 24h toi va o tuong lai.
+          - Thoi luong toi thieu 1 gio.
+          - 20% rule: bai phai con ≥ 20% slot trong tang visitor car, neu khong se reject.
+          - Khong duplicate active booking cho cung plate.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [licensePlate, startTime, endTime]
+              properties:
+                licensePlate:
+                  type: string
+                  pattern: '^[A-Z0-9\\-]+$'
+                  minLength: 4
+                  maxLength: 20
+                  example: '30A-12345'
+                startTime:
+                  type: string
+                  format: date-time
+                  description: ISO 8601. Phai > now va ≤ now+24h.
+                  example: '2026-06-03T10:30:00.000Z'
+                endTime:
+                  type: string
+                  format: date-time
+                  description: ISO 8601. Phai > startTime va ≥ startTime+1h.
+                  example: '2026-06-03T12:30:00.000Z'
+                customerName:
+                  type: string
+                  description: Optional. BE auto-fill 'Khach vang lai' neu trong (guest), hoac user.fullName (logged-in).
+                  example: 'Nguyen Van A'
+                customerPhone:
+                  type: string
+                  pattern: '^\\d{9,15}$'
+                  description: Optional. BE auto-fill '' (guest) hoac user.phone (logged-in).
+                  example: '0901234567'
+                floorId:
+                  type: integer
+                  description: Optional. BE auto-pick visitor car floor neu bo trong.
+                  example: 9
+                note:
+                  type: string
+                  maxLength: 500
+      responses:
+        '201':
+          description: Booking tao thanh cong, tra paymentUrl
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          bookingId: { type: integer, example: 13 }
+                          amount: { type: integer, example: 60000 }
+                          prepaidHours: { type: integer, example: 3 }
+                          paymentUrl: { type: string }
+                          orderId: { type: string, example: 'BOOK-1780...' }
+                          floor:
+                            type: object
+                            properties:
+                              id: { type: integer }
+                              floorNumber: { type: integer }
+                          breakdown:
+                            type: object
+                            properties:
+                              baseFee: { type: integer }
+                              overnightFee: { type: integer }
+                              totalFee: { type: integer }
+                              mode: { type: string, enum: [hourly] }
+                              durationMinutes: { type: integer }
+                              overnightNights: { type: integer }
+        '400': { description: 'Validation error or time-window violation' }
+        '403': { description: 'Resident book ho plate khac' }
+        '404': { description: 'Khong co tang visitor car khả dụng' }
+        '409': { description: 'Plate da co booking active hoac bai qua tai (<20% trong)' }
+
+    get:
+      tags: [Bookings]
+      summary: List bookings (staff/manager/admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/queryPage'
+        - $ref: '#/components/parameters/queryLimit'
+        - name: status
+          in: query
+          schema: { type: string, enum: [pending, confirmed, cancelled, expired] }
+        - name: licensePlate
+          in: query
+          schema: { type: string }
+        - name: startDate
+          in: query
+          schema: { type: string, format: date-time }
+        - name: endDate
+          in: query
+          schema: { type: string, format: date-time }
+      responses:
+        '200':
+          description: Paginated list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '401': { description: 'Unauthorized' }
+        '403': { description: 'Forbidden — staff+ only' }
+
+  /bookings/me:
+    get:
+      tags: [Bookings]
+      summary: Booking cua user dang dang nhap
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List booking
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '401': { description: 'Unauthorized' }
+
+  /bookings/{id}:
+    get:
+      tags: [Bookings]
+      summary: Booking detail (owner hoac staff+)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/pathId'
+      responses:
+        '200':
+          description: Booking detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '403': { description: 'Not the owner, not staff+' }
+        '404': { description: 'Not found' }
+
+  /bookings/{id}/cancel:
+    post:
+      tags: [Bookings]
+      summary: Huy booking (KHONG hoan tien)
+      description: |
+        Owner hoac staff+ huy duoc booking dang `pending` hoac `confirmed`.
+        Theo business rule: KHONG hoan tien. Booking chuyen status='cancelled'.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/pathId'
+      responses:
+        '200':
+          description: Da huy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '403': { description: 'Access denied' }
+        '404': { description: 'Booking not found' }
+        '409': { description: 'Booking khong o status pending/confirmed' }
+
+  /bookings/expire:
+    post:
+      tags: [Bookings]
+      summary: Sweep mark `expired` cho bookings qua endTime ma chua dung (admin/manager)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 'Tra ve { expired: N } — so booking duoc mark expired'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '403': { description: 'Forbidden' }
