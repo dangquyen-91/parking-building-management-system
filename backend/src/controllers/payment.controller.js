@@ -23,7 +23,7 @@ const vnpayIpn = async (req, res, next) => {
 
 const getByOrderId = async (req, res, next) => {
   try {
-    const payment = await paymentService.getByOrderId(req.params.orderId);
+    const payment = await paymentService.getByOrderId(req.params.orderId, req.user);
     response.success(res, payment);
   } catch (err) {
     next(err);
