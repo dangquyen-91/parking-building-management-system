@@ -72,28 +72,37 @@ const validateTimeWindow = (startTime, endTime) => {
 
 /**
  * Resolve customer fields.
- *   - Guest (no requester): body MUST have customerName + customerPhone.
+ *   - Guest (no requester): body chỉ cần plate + time + payment.
+ *     `customerName`/`customerPhone` optional; auto-fill placeholder nếu trống.
  *   - Logged-in user: auto-fill from profile; body overrides allowed.
  */
+const GUEST_DEFAULT_NAME = 'Khách vãng lai';
+const GUEST_DEFAULT_PHONE = '';
+
 const resolveCustomer = async (body, requester, t) => {
   if (!requester) {
-    if (!body.customerName || !body.customerPhone) {
-      throw new AppError('Khách vãng lai cần customerName và customerPhone', 400);
-    }
     return {
       userId: null,
-      customerName: body.customerName.trim(),
-      customerPhone: body.customerPhone.trim(),
+      customerName: body.customerName?.trim() || GUEST_DEFAULT_NAME,
+      customerPhone: body.customerPhone?.trim() || GUEST_DEFAULT_PHONE,
     };
   }
 
   const user = await User.findByPk(requester.id, { transaction: t });
   if (!user) throw new AppError('User not found', 404);
 
+  const resolvedPhone = body.customerPhone?.trim() || user.phone;
+  if (!resolvedPhone) {
+    throw new AppError(
+      'Vui lòng cập nhật số điện thoại trong profile (hoặc truyền customerPhone trong request) trước khi booking.',
+      400
+    );
+  }
+
   return {
     userId: user.id,
     customerName: body.customerName?.trim() || user.fullName,
-    customerPhone: body.customerPhone?.trim() || user.phone || '',
+    customerPhone: resolvedPhone,
   };
 };
 
@@ -139,69 +148,84 @@ const ensureResidentBooksOwnPlate = async (requester, plate, t) => {
  * handleBookingPaymentSuccess/Failure exports to flip the booking status.
  */
 export const createBooking = async ({ body, requester, ipAddr }) => {
-  return sequelize.transaction(async (t) => {
-    const plate = normalizePlate(body.licensePlate);
-    validateTimeWindow(body.startTime, body.endTime);
+  return sequelize
+    .transaction(async (t) => {
+      const plate = normalizePlate(body.licensePlate);
+      validateTimeWindow(body.startTime, body.endTime);
 
-    // Resident chỉ được book plate của họ (không cho book hộ)
-    await ensureResidentBooksOwnPlate(requester, plate, t);
+      // Resident chỉ được book plate của họ (không cho book hộ)
+      await ensureResidentBooksOwnPlate(requester, plate, t);
 
-    const floor = await findVisitorCarFloor(body.floorId, t);
-    await checkFloorCapacity(floor.id, t);
+      const floor = await findVisitorCarFloor(body.floorId, t);
+      await checkFloorCapacity(floor.id, t);
 
-    const existing = await Booking.findOne({
-      where: {
-        licensePlate: plate,
-        status: { [Op.in]: ['pending', 'confirmed'] },
-        endTime: { [Op.gt]: new Date() },
-      },
-      transaction: t,
-    });
-    if (existing) {
-      throw new AppError(`Biển số ${plate} đã có booking đang hoạt động (#${existing.id})`, 409);
-    }
+      // Pre-check duplicate active booking. Combined with the unique index on
+      // `active_plate_lock` (migration 004), this gives both a friendly error
+      // for the normal case AND atomic protection against concurrent inserts.
+      const existing = await Booking.findOne({
+        where: {
+          licensePlate: plate,
+          status: { [Op.in]: ['pending', 'confirmed'] },
+          endTime: { [Op.gt]: new Date() },
+        },
+        transaction: t,
+      });
+      if (existing) {
+        throw new AppError(`Biển số ${plate} đã có booking đang hoạt động (#${existing.id})`, 409);
+      }
 
-    const fee = calculateFee(body.startTime, body.endTime, 'car');
-    const durationMs = new Date(body.endTime) - new Date(body.startTime);
-    const prepaidHours = Math.max(1, Math.ceil(durationMs / 3600_000));
+      const fee = calculateFee(body.startTime, body.endTime, 'car');
+      const durationMs = new Date(body.endTime) - new Date(body.startTime);
+      const prepaidHours = Math.max(1, Math.ceil(durationMs / 3600_000));
 
-    const customer = await resolveCustomer(body, requester, t);
+      const customer = await resolveCustomer(body, requester, t);
 
-    const booking = await Booking.create(
-      {
-        floorId: floor.id,
-        slotId: null,                 // booking "ảo" — không lock slot
-        userId: customer.userId,
-        customerName: customer.customerName,
-        customerPhone: customer.customerPhone,
-        licensePlate: plate,
-        vehicleType: 'car',
-        startTime: body.startTime,
-        endTime: body.endTime,
+      const booking = await Booking.create(
+        {
+          floorId: floor.id,
+          slotId: null,                 // booking "ảo" — không lock slot
+          userId: customer.userId,
+          customerName: customer.customerName,
+          customerPhone: customer.customerPhone,
+          licensePlate: plate,
+          vehicleType: 'car',
+          startTime: body.startTime,
+          endTime: body.endTime,
+          amount: fee.totalFee,
+          prepaidHours,
+          status: 'pending',
+          note: body.note || null,
+        },
+        { transaction: t }
+      );
+
+      const safeInfo = `Booking ${plate} ${prepaidHours}h`.slice(0, 80);
+      const { paymentUrl, orderId } = await createBookingPayment(
+        { bookingId: booking.id, amount: fee.totalFee, ipAddr, orderInfo: safeInfo },
+        t
+      );
+
+      return {
+        bookingId: booking.id,
         amount: fee.totalFee,
         prepaidHours,
-        status: 'pending',
-        note: body.note || null,
-      },
-      { transaction: t }
-    );
-
-    const safeInfo = `Booking ${plate} ${prepaidHours}h`.slice(0, 80);
-    const { paymentUrl, orderId } = await createBookingPayment(
-      { bookingId: booking.id, amount: fee.totalFee, ipAddr, orderInfo: safeInfo },
-      t
-    );
-
-    return {
-      bookingId: booking.id,
-      amount: fee.totalFee,
-      prepaidHours,
-      paymentUrl,
-      orderId,
-      breakdown: fee,
-      floor: { id: floor.id, floorNumber: floor.floorNumber },
-    };
-  });
+        paymentUrl,
+        orderId,
+        breakdown: fee,
+        floor: { id: floor.id, floorNumber: floor.floorNumber },
+      };
+    })
+    .catch((err) => {
+      // Two concurrent requests with the same plate race past the pre-check;
+      // the DB unique index makes the second one fail. Translate to 409.
+      if (err?.name === 'SequelizeUniqueConstraintError') {
+        throw new AppError(
+          `Biển số đã có booking đang hoạt động. Vui lòng kiểm tra lại.`,
+          409
+        );
+      }
+      throw err;
+    });
 };
 
 // ── Required by payment.service.handleBookingOutcome ────────

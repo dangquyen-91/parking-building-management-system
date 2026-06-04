@@ -24,6 +24,9 @@ const Booking = sequelize.define(
     handledBy: { type: DataTypes.INTEGER, allowNull: true },
     handledAt: { type: DataTypes.DATE, allowNull: true },
     sessionId: { type: DataTypes.INTEGER, allowNull: true }, // set by check-in
+    // NOTE: DB has an extra `active_plate_lock` STORED generated column added
+    // by migration 004 to power the unique-active-plate index. Sequelize does
+    // not need to know about it — it's auto-computed by MySQL on every write.
   },
   {
     tableName: 'parking_bookings',
