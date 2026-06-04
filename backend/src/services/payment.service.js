@@ -3,6 +3,8 @@ import { sequelize } from '../config/database.js';
 import Payment from '../models/payment.model.js';
 import ResidentSubscription from '../models/resident-subscription.model.js';
 import ParkingPackage from '../models/parking-package.model.js';
+import ParkingSession from '../models/parking-session.model.js';
+import Booking from '../models/booking.model.js';
 import AppError from '../utils/appError.js';
 import * as vnpayService from './vnpay.service.js';
 import { freeSlotIfUnused } from './subscription.service.js';
@@ -309,11 +311,35 @@ export const queryPayment = async (orderId, ipAddr) => {
   };
 };
 
-export const getByOrderId = async (orderId) => {
+/**
+ * Look up a payment by orderId with ownership enforcement.
+ *
+ * Staff/manager/admin can read any payment. Other users may only read
+ * payments tied to themselves via `subscription.userId`, `session.userId`, or
+ * `booking.userId`. Guest bookings (no userId) and payments not linked to any
+ * user are admin-only.
+ */
+export const getByOrderId = async (orderId, requester) => {
   const payment = await Payment.findOne({
     where: { orderId },
-    include: [{ model: ResidentSubscription, as: 'subscription' }],
+    include: [
+      { model: ResidentSubscription, as: 'subscription', attributes: ['id', 'userId', 'status'] },
+      { model: ParkingSession, as: 'session', attributes: ['id', 'userId', 'status'] },
+      { model: Booking, as: 'booking', attributes: ['id', 'userId', 'status'] },
+    ],
   });
   if (!payment) throw new AppError('Payment not found', 404);
+
+  const privileged = ['admin', 'manager', 'staff'].includes(requester?.role);
+  if (!privileged) {
+    const ownerId =
+      payment.subscription?.userId ??
+      payment.session?.userId ??
+      payment.booking?.userId ??
+      null;
+    if (!ownerId || ownerId !== requester?.id) {
+      throw new AppError('Access denied', 403);
+    }
+  }
   return payment;
 };
