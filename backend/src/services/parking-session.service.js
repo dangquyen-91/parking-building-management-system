@@ -48,6 +48,18 @@ const rowInclude = (rowWhere, floorWhere) => ({
   ],
 });
 
+/**
+ * Floor-type validation is driven by SUBSCRIPTION, not by `userId`.
+ *   - Resident floor: plate must have an active sub of matching vehicleType.
+ *     If sub has a fixed slotId, the chosen slot must match it.
+ *   - Visitor floor: anyone (guest, user-with-account, sub-holder paying extra).
+ *
+ * userId resolution at session-create time, in priority order:
+ *   1. booking.userId (visitor floor only, when an active booking matches)
+ *   2. activeSub.userId (resident floor when sub exists)
+ *   3. body `userId` (fallback for visitor floor with a logged-in customer)
+ *   4. null (guest)
+ */
 const checkIn = async ({ slotId, rowId, licensePlate, vehicleType, userId, note }, staffId) => {
   return sequelize.transaction(async (t) => {
     // ── Kiểm tra biển số chưa có session active ──
@@ -59,10 +71,17 @@ const checkIn = async ({ slotId, rowId, licensePlate, vehicleType, userId, note 
       throw new AppError(`License plate ${licensePlate} is already checked in (session #${activeSession.id})`, 409);
     }
 
-    if (userId) {
-      const user = await User.findByPk(userId, { transaction: t });
-      if (!user) throw new AppError('User not found', 404);
-    }
+    // ── Find active subscription for this plate (drives floor-type gating) ──
+    const activeSub = await ResidentSubscription.findOne({
+      where: {
+        licensePlate,
+        vehicleType,
+        status: 'active',
+        endDate: { [Op.gt]: new Date() },
+      },
+      order: [['endDate', 'DESC']],
+      transaction: t,
+    });
 
     if (vehicleType === 'car') {
       const slot = await ParkingSlot.findOne({
@@ -84,47 +103,53 @@ const checkIn = async ({ slotId, rowId, licensePlate, vehicleType, userId, note 
         // A car resident may check into a slot reserved by THEIR own active
         // package (matched by license plate). Any other non-empty slot is blocked.
         const ownReservation =
-          slot.status === 'reserved'
-            ? await ResidentSubscription.findOne({
-                where: { slotId, licensePlate, status: 'active', endDate: { [Op.gt]: new Date() } },
-                transaction: t,
-              })
-            : null;
+          slot.status === 'reserved' && activeSub?.slotId === slotId ? activeSub : null;
         if (!ownReservation) {
           throw new AppError(`Slot is not available (current status: ${slot.status})`, 409);
         }
-        // else: resident entering their own reserved slot — allowed
       }
       if (!slot.floor.isActive) throw new AppError('Floor is inactive', 400);
       if (!slot.floor.building.isActive) throw new AppError('Building is inactive', 400);
       if (slot.floor.vehicleType !== 'car') throw new AppError('This slot only accepts car', 400);
 
-      // ── Validate floorType vs userId ──
-      if (slot.floor.floorType === 'resident' && !userId) {
-        throw new AppError('This floor is for residents only. userId is required.', 403);
+      // ── Floor-type validation (sub-aware) ──
+      if (slot.floor.floorType === 'resident') {
+        if (!activeSub) {
+          throw new AppError(
+            'Tầng cư dân yêu cầu plate có gói (subscription) đang hoạt động. Vui lòng chọn tầng vãng lai.',
+            403
+          );
+        }
+        if (activeSub.slotId && activeSub.slotId !== slotId) {
+          throw new AppError(
+            `Plate này có gói gắn slot khác (slotId=${activeSub.slotId}). Vui lòng vào đúng slot đó.`,
+            403
+          );
+        }
       }
-      if (slot.floor.floorType === 'visitor' && userId) {
-        throw new AppError('This floor is for visitors only. Do not provide userId.', 403);
-      }
+      // Visitor floor: cho phép guest, user có account, hoặc sub-holder (trả thêm).
 
-      // ── Detect confirmed booking for this plate (cars only) ──
-      // Dynamic import to break the parking-session ↔ booking ↔ payment cycle.
-      // Booking customer prepaid for X hours; we copy that into the session so
-      // check-out can compute the excess (or zero) correctly.
+      // ── Detect confirmed booking (visitor floor only) ──
       let activeBooking = null;
       if (slot.floor.floorType === 'visitor') {
         const { findActiveBookingByPlate } = await import('./booking.service.js');
         const found = await findActiveBookingByPlate(licensePlate, t);
         if (found) {
-          // Lock the booking row to prevent two concurrent check-ins consuming it.
           const Booking = (await import('../models/booking.model.js')).default;
           activeBooking = await Booking.findByPk(found.id, {
             transaction: t,
             lock: t.LOCK.UPDATE,
           });
-          // Double-check after lock — another tx may have linked it first.
           if (!activeBooking || activeBooking.sessionId) activeBooking = null;
         }
+      }
+
+      // Resolve effective userId per priority above
+      const effectiveUserId =
+        activeBooking?.userId || activeSub?.userId || userId || null;
+      if (effectiveUserId) {
+        const user = await User.findByPk(effectiveUserId, { transaction: t });
+        if (!user) throw new AppError('User not found', 404);
       }
 
       const sessionPayload = {
@@ -134,7 +159,7 @@ const checkIn = async ({ slotId, rowId, licensePlate, vehicleType, userId, note 
         vehicleType,
         entryTime: new Date(),
         staffId,
-        userId: activeBooking?.userId || userId || null,
+        userId: effectiveUserId,
         status: 'active',
         note: note || null,
       };
@@ -179,6 +204,7 @@ const checkIn = async ({ slotId, rowId, licensePlate, vehicleType, userId, note 
       };
     }
 
+    // ── MOTORCYCLE branch ──
     const row = await ParkingRow.findOne({
       where: { id: rowId },
       include: [
@@ -200,12 +226,21 @@ const checkIn = async ({ slotId, rowId, licensePlate, vehicleType, userId, note 
     if (!row.floor.building.isActive) throw new AppError('Building is inactive', 400);
     if (row.floor.vehicleType !== 'motorcycle') throw new AppError('This row only accepts motorcycle', 400);
 
-    // ── Validate floorType vs userId ──
-    if (row.floor.floorType === 'resident' && !userId) {
-      throw new AppError('This floor is for residents only. userId is required.', 403);
+    // ── Floor-type validation (sub-aware) ──
+    if (row.floor.floorType === 'resident') {
+      if (!activeSub) {
+        throw new AppError(
+          'Tầng cư dân yêu cầu plate có gói (subscription) đang hoạt động. Vui lòng chọn tầng vãng lai.',
+          403
+        );
+      }
+      // TODO: enforce sub.floorId === row.floor.id when motorcycle floor-lock ships.
     }
-    if (row.floor.floorType === 'visitor' && userId) {
-      throw new AppError('This floor is for visitors only. Do not provide userId.', 403);
+
+    const effectiveUserId = activeSub?.userId || userId || null;
+    if (effectiveUserId) {
+      const user = await User.findByPk(effectiveUserId, { transaction: t });
+      if (!user) throw new AppError('User not found', 404);
     }
 
     const session = await ParkingSession.create(
@@ -216,7 +251,7 @@ const checkIn = async ({ slotId, rowId, licensePlate, vehicleType, userId, note 
         vehicleType,
         entryTime: new Date(),
         staffId,
-        userId: userId || null,
+        userId: effectiveUserId,
         status: 'active',
         note: note || null,
       },
