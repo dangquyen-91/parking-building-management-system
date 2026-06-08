@@ -16,7 +16,7 @@ const create = async (req, res, next) => {
   try {
     const result = await bookingService.createBooking({
       body: req.body,
-      requester: req.user, // null for guest, object for logged in
+      requester: req.user,
       ipAddr: getClientIp(req),
     });
     response.success(res, result, 201);
@@ -61,7 +61,7 @@ const cancel = async (req, res, next) => {
   }
 };
 
-const expire = async (req, res, next) => {
+const expire = async (_req, res, next) => {
   try {
     const data = await bookingService.expireBookings();
     response.success(res, data);

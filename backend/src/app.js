@@ -23,7 +23,6 @@ import { apiLimiter } from './middlewares/rateLimiter.middleware.js';
 
 const app = express();
 
-// Trust the first proxy (Railway/nginx) so rate limiting reads the real client IP
 app.set('trust proxy', 1);
 
 connectDB().catch((err) => {

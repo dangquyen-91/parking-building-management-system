@@ -24,11 +24,6 @@ const authorize = (...roles) => {
   };
 };
 
-/**
- * Like authenticate but doesn't reject if no token. Sets req.user to the
- * decoded payload when a valid Bearer token is present, otherwise null.
- * Use for endpoints that accept both guest and logged-in users (e.g. booking).
- */
 const optionalAuthenticate = (req, res, next) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {

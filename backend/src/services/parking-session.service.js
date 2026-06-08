@@ -48,21 +48,8 @@ const rowInclude = (rowWhere, floorWhere) => ({
   ],
 });
 
-/**
- * Floor-type validation is driven by SUBSCRIPTION, not by `userId`.
- *   - Resident floor: plate must have an active sub of matching vehicleType.
- *     If sub has a fixed slotId, the chosen slot must match it.
- *   - Visitor floor: anyone (guest, user-with-account, sub-holder paying extra).
- *
- * userId resolution at session-create time, in priority order:
- *   1. booking.userId (visitor floor only, when an active booking matches)
- *   2. activeSub.userId (resident floor when sub exists)
- *   3. body `userId` (fallback for visitor floor with a logged-in customer)
- *   4. null (guest)
- */
 const checkIn = async ({ slotId, rowId, licensePlate, vehicleType, userId, note }, staffId) => {
   return sequelize.transaction(async (t) => {
-    // ── Kiểm tra biển số chưa có session active ──
     const activeSession = await ParkingSession.findOne({
       where: { licensePlate, status: 'active' },
       transaction: t,
@@ -71,7 +58,6 @@ const checkIn = async ({ slotId, rowId, licensePlate, vehicleType, userId, note 
       throw new AppError(`License plate ${licensePlate} is already checked in (session #${activeSession.id})`, 409);
     }
 
-    // ── Find active subscription for this plate (drives floor-type gating) ──
     const activeSub = await ResidentSubscription.findOne({
       where: {
         licensePlate,
@@ -100,8 +86,6 @@ const checkIn = async ({ slotId, rowId, licensePlate, vehicleType, userId, note 
 
       if (!slot) throw new AppError('Parking slot not found', 404);
       if (slot.status !== 'empty') {
-        // A car resident may check into a slot reserved by THEIR own active
-        // package (matched by license plate). Any other non-empty slot is blocked.
         const ownReservation =
           slot.status === 'reserved' && activeSub?.slotId === slotId ? activeSub : null;
         if (!ownReservation) {
@@ -112,7 +96,6 @@ const checkIn = async ({ slotId, rowId, licensePlate, vehicleType, userId, note 
       if (!slot.floor.building.isActive) throw new AppError('Building is inactive', 400);
       if (slot.floor.vehicleType !== 'car') throw new AppError('This slot only accepts car', 400);
 
-      // ── Floor-type validation (sub-aware) ──
       if (slot.floor.floorType === 'resident') {
         if (!activeSub) {
           throw new AppError(
@@ -127,9 +110,7 @@ const checkIn = async ({ slotId, rowId, licensePlate, vehicleType, userId, note 
           );
         }
       }
-      // Visitor floor: cho phép guest, user có account, hoặc sub-holder (trả thêm).
 
-      // ── Detect confirmed booking (visitor floor only) ──
       let activeBooking = null;
       if (slot.floor.floorType === 'visitor') {
         const { findActiveBookingByPlate } = await import('./booking.service.js');
@@ -144,7 +125,6 @@ const checkIn = async ({ slotId, rowId, licensePlate, vehicleType, userId, note 
         }
       }
 
-      // Resolve effective userId per priority above
       const effectiveUserId =
         activeBooking?.userId || activeSub?.userId || userId || null;
       if (effectiveUserId) {
@@ -204,7 +184,6 @@ const checkIn = async ({ slotId, rowId, licensePlate, vehicleType, userId, note 
       };
     }
 
-    // ── MOTORCYCLE branch ──
     const row = await ParkingRow.findOne({
       where: { id: rowId },
       include: [
@@ -226,7 +205,6 @@ const checkIn = async ({ slotId, rowId, licensePlate, vehicleType, userId, note 
     if (!row.floor.building.isActive) throw new AppError('Building is inactive', 400);
     if (row.floor.vehicleType !== 'motorcycle') throw new AppError('This row only accepts motorcycle', 400);
 
-    // ── Floor-type validation (sub-aware) ──
     if (row.floor.floorType === 'resident') {
       if (!activeSub) {
         throw new AppError(
@@ -234,7 +212,6 @@ const checkIn = async ({ slotId, rowId, licensePlate, vehicleType, userId, note 
           403
         );
       }
-      // TODO: enforce sub.floorId === row.floor.id when motorcycle floor-lock ships.
     }
 
     const effectiveUserId = activeSub?.userId || userId || null;
@@ -452,8 +429,6 @@ const lookup = async (licensePlate) => {
   };
 };
 
-// ── CHECK-OUT ──────────────────────────────────────────
-
 const findActiveSubByPlate = (licensePlate, t) =>
   ResidentSubscription.findOne({
     where: { licensePlate, status: 'active', endDate: { [Op.gt]: new Date() } },
@@ -479,14 +454,7 @@ const loadFloorType = async (session, t) => {
   return null;
 };
 
-/**
- * Resolve the fee for a session at exit time. Three cases:
- *   1) Resident floor + active sub matching plate → covered (fee 0).
- *   2) Booking session with prepaidHours → charge ONLY the excess over prepaid window.
- *   3) Walk-in (or resident no-sub) → full pricing A (motor per-visit, car hourly + cap + overnight).
- */
 const resolveFee = async (session, floorType, t, exitTime = new Date()) => {
-  // Case 1 — resident with active sub
   if (floorType === 'resident') {
     const activeSub = await findActiveSubByPlate(session.licensePlate, t);
     if (activeSub) {
@@ -500,7 +468,6 @@ const resolveFee = async (session, floorType, t, exitTime = new Date()) => {
     }
   }
 
-  // Case 2 — booking prepaid
   if (session.bookingId && session.prepaidHours) {
     const excess = calculateExcessFee(session.entryTime, exitTime, session.vehicleType, session.prepaidHours);
     return {
@@ -511,7 +478,6 @@ const resolveFee = async (session, floorType, t, exitTime = new Date()) => {
     };
   }
 
-  // Case 3 — walk-in (or resident with no active sub)
   const fee = calculateFee(session.entryTime, exitTime, session.vehicleType);
   return {
     fee: fee.totalFee,
@@ -547,10 +513,6 @@ const generateSessionOrderId = () => {
   return `SESS-${ts}-${rand}`;
 };
 
-/**
- * Read-only quote for an active session. Used by staff UI to display fee
- * before choosing cash vs VNPay.
- */
 const previewCheckout = async (id) => {
   const session = await ParkingSession.findByPk(id);
   if (!session) throw new AppError('Session not found', 404);
@@ -579,10 +541,6 @@ const previewCheckout = async (id) => {
   };
 };
 
-/**
- * Check-out with CASH: close the session in one atomic step. Writes an
- * audited Payment row (paymentMethod='cash', status='success').
- */
 const checkOutCash = async (id, staffId) => {
   return sequelize.transaction(async (t) => {
     const session = await ParkingSession.findByPk(id, { transaction: t, lock: t.LOCK.UPDATE });
@@ -602,9 +560,6 @@ const checkOutCash = async (id, staffId) => {
 
     await releaseSpot(session, t, exitTime);
 
-    // Audit: write a Payment row even for covered sessions (amount may be 0)
-    // so every closed session has a corresponding payment record. Skip only
-    // when fee is 0 AND covered by subscription (resident — no money moved).
     let payment = null;
     if (!(covered && coveredBy === 'subscription')) {
       payment = await Payment.create(
@@ -642,11 +597,6 @@ const checkOutCash = async (id, staffId) => {
   });
 };
 
-/**
- * Check-out with VNPay: compute fee, create a pending Payment + VNPay URL.
- * Does NOT close the session — the IPN/return handler will close it on
- * payment success. If fee is 0 (covered), behaves like checkOutCash.
- */
 const checkOutVnpay = async (id, staffId, ipAddr) => {
   return sequelize.transaction(async (t) => {
     const session = await ParkingSession.findByPk(id, { transaction: t, lock: t.LOCK.UPDATE });
@@ -658,8 +608,6 @@ const checkOutVnpay = async (id, staffId, ipAddr) => {
     const floorType = await loadFloorType(session, t);
     const { fee, covered, coveredBy, breakdown } = await resolveFee(session, floorType, t, new Date());
 
-    // If nothing to charge, close the session immediately (no point creating a
-    // pending VNPay payment for 0đ). Same semantics as checkOutCash for fee=0.
     if (fee === 0) {
       const exitTime = new Date();
       await session.update(
@@ -685,8 +633,6 @@ const checkOutVnpay = async (id, staffId, ipAddr) => {
       };
     }
 
-    // Cancel any prior pending VNPay payments for this session so we always
-    // have exactly one pending row to reconcile against.
     await Payment.update(
       { status: 'cancelled' },
       { where: { sessionId: session.id, status: 'pending' }, transaction: t }
@@ -717,8 +663,6 @@ const checkOutVnpay = async (id, staffId, ipAddr) => {
       { transaction: t }
     );
 
-    // Session stays 'active' until IPN/return confirms payment. Spot is still
-    // occupied. Staff should hold the gate until payment confirmation arrives.
     return {
       sessionId: session.id,
       licensePlate: session.licensePlate,
@@ -736,11 +680,6 @@ const checkOutVnpay = async (id, staffId, ipAddr) => {
   });
 };
 
-/**
- * Internal helper called by payment.service.handleIpn when a 'session'
- * payment succeeds. Closes the session, releases the spot, marks paid.
- * Must be called from inside an existing transaction (`t`).
- */
 const finalizeSessionPayment = async (sessionId, amount, t) => {
   const session = await ParkingSession.findByPk(sessionId, { transaction: t, lock: t.LOCK.UPDATE });
   if (!session) return { closed: false, reason: 'session_not_found' };

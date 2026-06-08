@@ -7,7 +7,12 @@ const validate = (schema, source = 'body') => {
       return res.status(400).json({ success: false, message: messages });
     }
     if (source === 'query') {
-      req.query = value;
+      Object.defineProperty(req, 'query', {
+        value,
+        writable: true,
+        configurable: true,
+        enumerable: true,
+      });
     } else {
       req.body = value;
     }

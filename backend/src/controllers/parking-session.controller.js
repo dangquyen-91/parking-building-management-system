@@ -57,13 +57,6 @@ const previewCheckout = async (req, res, next) => {
   }
 };
 
-/**
- * Single check-out endpoint. Body picks the payment method:
- *   { paymentMethod: 'cash' }  → close session + audited cash Payment row
- *   { paymentMethod: 'vnpay' } → create pending Payment + return VNPay URL
- * If the session is covered (sub or fully prepaid), both methods short-circuit
- * to a free close.
- */
 const checkOut = async (req, res, next) => {
   try {
     const method = req.body?.paymentMethod || 'cash';

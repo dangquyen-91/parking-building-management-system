@@ -30,7 +30,6 @@ ParkingSession.belongsTo(User, { foreignKey: 'staffId', as: 'staff' });
 User.hasMany(ParkingSession, { foreignKey: 'userId', as: 'userSessions' });
 ParkingSession.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 
-// ── Resident package subscriptions ──
 ParkingPackage.hasMany(ResidentSubscription, { foreignKey: 'packageId', as: 'subscriptions', onDelete: 'RESTRICT' });
 ResidentSubscription.belongsTo(ParkingPackage, { foreignKey: 'packageId', as: 'package' });
 
@@ -40,15 +39,12 @@ ResidentSubscription.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 ResidentSubscription.hasMany(Payment, { foreignKey: 'subscriptionId', as: 'payments', onDelete: 'SET NULL' });
 Payment.belongsTo(ResidentSubscription, { foreignKey: 'subscriptionId', as: 'subscription' });
 
-// Car packages reserve a fixed slot
 ParkingSlot.hasMany(ResidentSubscription, { foreignKey: 'slotId', as: 'subscriptions' });
 ResidentSubscription.belongsTo(ParkingSlot, { foreignKey: 'slotId', as: 'slot' });
 
-// ── Session payments (walk-in checkout via cash or VNPay) ──
 ParkingSession.hasMany(Payment, { foreignKey: 'sessionId', as: 'payments', onDelete: 'SET NULL' });
 Payment.belongsTo(ParkingSession, { foreignKey: 'sessionId', as: 'session' });
 
-// ── Bookings (advance reservations, "ảo" — no slot lock) ──
 Floor.hasMany(Booking, { foreignKey: 'floorId', as: 'bookings', onDelete: 'RESTRICT' });
 Booking.belongsTo(Floor, { foreignKey: 'floorId', as: 'floor' });
 
@@ -61,6 +57,5 @@ Booking.belongsTo(User, { foreignKey: 'handledBy', as: 'handler' });
 ParkingSession.hasOne(Booking, { foreignKey: 'sessionId', as: 'booking' });
 Booking.belongsTo(ParkingSession, { foreignKey: 'sessionId', as: 'session' });
 
-// Booking payments — payments.bookingId already there from migration 001.
 Booking.hasMany(Payment, { foreignKey: 'bookingId', as: 'payments', onDelete: 'SET NULL' });
 Payment.belongsTo(Booking, { foreignKey: 'bookingId', as: 'booking' });
