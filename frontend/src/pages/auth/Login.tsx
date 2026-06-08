@@ -41,7 +41,13 @@ export const Login: React.FC = () => {
 
         setIsSuccess(true);
         setTimeout(() => {
-          navigate(profile.role === 'admin' ? '/admin/dashboard' : '/');
+          if (profile.role === 'admin') {
+            navigate('/admin/dashboard');
+          } else if (profile.role === 'staff' || profile.role === 'manager') {
+            navigate('/staff/check-in');
+          } else {
+            navigate('/');
+          }
         }, 800);
       } catch (err: any) {
         setApiError(err.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.');
@@ -112,7 +118,7 @@ export const Login: React.FC = () => {
           </div>
           <div>
             <h4 className="font-bold text-white text-base">Đăng nhập thành công!</h4>
-            <p className="text-xs text-slate-400 mt-1">Đang chuyển hướng về trang chủ...</p>
+            <p className="text-xs text-slate-400 mt-1">Đang chuyển hướng...</p>
           </div>
         </motion.div>
       )}

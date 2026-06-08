@@ -9,16 +9,17 @@ function AppContent() {
   const location = useLocation();
   const isAuthPage = ['/login', '/register', '/signin', '/signup'].includes(location.pathname);
   const isAdminPage = location.pathname.startsWith('/admin');
+  const isStaffPage = location.pathname.startsWith('/staff');
 
   return (
     <div className="bg-white min-h-screen text-slate-900 font-sans selection:bg-blue-200 selection:text-blue-900 overflow-x-hidden relative">
-      {!isAuthPage && !isAdminPage && <Navbar />}
+      {!isAuthPage && !isAdminPage && !isStaffPage && <Navbar />}
       
       <main>
         <AppRoutes />
       </main>
 
-      {!isAuthPage && !isAdminPage && <Footer />}
+      {!isAuthPage && !isAdminPage && !isStaffPage && <Footer />}
     </div>
   );
 }
