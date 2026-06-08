@@ -41,6 +41,5 @@ export const update = async (id, data) => {
 export const remove = async (id) => {
   const pkg = await ParkingPackage.findByPk(id);
   if (!pkg) throw new AppError('Package not found', 404);
-  // Soft-disable instead of hard delete to preserve subscription history (FK RESTRICT).
   await pkg.update({ isActive: false });
 };

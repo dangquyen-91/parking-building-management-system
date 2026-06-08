@@ -52,8 +52,8 @@ const getById = async (id) => {
   const floor = await Floor.findByPk(id, {
     include: [
       { model: Building, as: 'building', attributes: ['id', 'name', 'address'] },
-      { model: ParkingSlot, as: 'slots' },      // car floors
-      { model: ParkingRow,  as: 'rows'  },      // motorcycle floors
+      { model: ParkingSlot, as: 'slots' },
+      { model: ParkingRow,  as: 'rows'  },
     ],
   });
   if (!floor) throw new AppError('Floor not found', 404);

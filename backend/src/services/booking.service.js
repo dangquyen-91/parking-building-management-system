@@ -9,19 +9,13 @@ import AppError from '../utils/appError.js';
 import { calculateFee } from './pricing.service.js';
 import { createBookingPayment } from './payment.service.js';
 
-// ── Business rules (chốt với product) ─────────────────────
-const FREE_SLOT_THRESHOLD = 0.20;            // booking ngắt khi free slot < 20%
-const MAX_ADVANCE_BOOKING_MS = 24 * 3600_000; // chỉ cho book trong vòng 24h tới
-const MIN_DURATION_MS = 60 * 60_000;          // booking tối thiểu 1 giờ
-const EARLY_GRACE_MS = 30 * 60_000;          // cho khách check-in sớm 30 phút trước startTime
+const FREE_SLOT_THRESHOLD = 0.20;
+const MAX_ADVANCE_BOOKING_MS = 24 * 3600_000;
+const MIN_DURATION_MS = 60 * 60_000;
+const EARLY_GRACE_MS = 30 * 60_000;
 
 const normalizePlate = (plate) => plate.toUpperCase().replace(/\s/g, '');
 
-/**
- * Find the visitor-car floor that booking should land on. Currently picks the
- * first active one; if multiple visitor car floors exist and you want
- * balancing or explicit selection, pass `floorId` in the body.
- */
 const findVisitorCarFloor = async (floorId, t) => {
   const where = { vehicleType: 'car', floorType: 'visitor', isActive: true };
   if (floorId) where.id = floorId;
@@ -30,10 +24,6 @@ const findVisitorCarFloor = async (floorId, t) => {
   return floor;
 };
 
-/**
- * 20% rule: at least 20% of slots on the floor must be 'empty' right now.
- * Booking is "ảo" — doesn't reserve a slot — so we just gate availability.
- */
 const checkFloorCapacity = async (floorId, t) => {
   const total = await ParkingSlot.count({ where: { floorId }, transaction: t });
   if (total === 0) throw new AppError('Tầng này không có slot nào', 400);
@@ -70,12 +60,6 @@ const validateTimeWindow = (startTime, endTime) => {
   }
 };
 
-/**
- * Resolve customer fields.
- *   - Guest (no requester): body chỉ cần plate + time + payment.
- *     `customerName`/`customerPhone` optional; auto-fill placeholder nếu trống.
- *   - Logged-in user: auto-fill from profile; body overrides allowed.
- */
 const GUEST_DEFAULT_NAME = 'Khách vãng lai';
 const GUEST_DEFAULT_PHONE = '';
 
@@ -106,13 +90,8 @@ const resolveCustomer = async (body, requester, t) => {
   };
 };
 
-/**
- * Cư dân (user có sub active) chỉ được book cho plate đã đăng ký trong sub
- * của họ — không cho book hộ plate người khác. User không có sub không bị
- * giới hạn (book bất kỳ plate). Guest cũng không bị giới hạn.
- */
 const ensureResidentBooksOwnPlate = async (requester, plate, t) => {
-  if (!requester) return; // guest, no restriction
+  if (!requester) return;
   const now = new Date();
   const subs = await ResidentSubscription.findAll({
     where: {
@@ -123,7 +102,7 @@ const ensureResidentBooksOwnPlate = async (requester, plate, t) => {
     attributes: ['licensePlate'],
     transaction: t,
   });
-  if (subs.length === 0) return; // not a resident, no restriction
+  if (subs.length === 0) return;
   const ownPlates = subs.map((s) => s.licensePlate);
   if (!ownPlates.includes(plate)) {
     throw new AppError(
@@ -133,35 +112,17 @@ const ensureResidentBooksOwnPlate = async (requester, plate, t) => {
   }
 };
 
-/**
- * Create a booking + VNPay payment URL.
- *
- * Flow:
- *   1. Validate time window (24h advance, ≥1h duration).
- *   2. Pick visitor car floor + check 20% capacity gate.
- *   3. Reject duplicate active booking for the same plate.
- *   4. Compute amount via pricing.service (car hourly + cap + overnight).
- *   5. Insert Booking(status='pending').
- *   6. Hand off to payment.service.createBookingPayment → VNPay URL.
- *
- * After user pays, payment.service.handleBookingOutcome will call our
- * handleBookingPaymentSuccess/Failure exports to flip the booking status.
- */
 export const createBooking = async ({ body, requester, ipAddr }) => {
   return sequelize
     .transaction(async (t) => {
       const plate = normalizePlate(body.licensePlate);
       validateTimeWindow(body.startTime, body.endTime);
 
-      // Resident chỉ được book plate của họ (không cho book hộ)
       await ensureResidentBooksOwnPlate(requester, plate, t);
 
       const floor = await findVisitorCarFloor(body.floorId, t);
       await checkFloorCapacity(floor.id, t);
 
-      // Pre-check duplicate active booking. Combined with the unique index on
-      // `active_plate_lock` (migration 004), this gives both a friendly error
-      // for the normal case AND atomic protection against concurrent inserts.
       const existing = await Booking.findOne({
         where: {
           licensePlate: plate,
@@ -183,7 +144,7 @@ export const createBooking = async ({ body, requester, ipAddr }) => {
       const booking = await Booking.create(
         {
           floorId: floor.id,
-          slotId: null,                 // booking "ảo" — không lock slot
+          slotId: null,
           userId: customer.userId,
           customerName: customer.customerName,
           customerPhone: customer.customerPhone,
@@ -216,8 +177,6 @@ export const createBooking = async ({ body, requester, ipAddr }) => {
       };
     })
     .catch((err) => {
-      // Two concurrent requests with the same plate race past the pre-check;
-      // the DB unique index makes the second one fail. Translate to 409.
       if (err?.name === 'SequelizeUniqueConstraintError') {
         throw new AppError(
           `Biển số đã có booking đang hoạt động. Vui lòng kiểm tra lại.`,
@@ -228,40 +187,18 @@ export const createBooking = async ({ body, requester, ipAddr }) => {
     });
 };
 
-// ── Required by payment.service.handleBookingOutcome ────────
-
-/**
- * VNPay confirmed payment → activate booking. Idempotent (no-op if not pending).
- * Must run inside the IPN transaction so booking state matches payment state.
- */
 export const handleBookingPaymentSuccess = async (bookingId, t) => {
   const booking = await Booking.findByPk(bookingId, { transaction: t, lock: t.LOCK.UPDATE });
   if (!booking || booking.status !== 'pending') return;
   await booking.update({ status: 'confirmed' }, { transaction: t });
 };
 
-/**
- * VNPay confirmed payment failure → cancel booking. Idempotent.
- */
 export const handleBookingPaymentFailure = async (bookingId, t) => {
   const booking = await Booking.findByPk(bookingId, { transaction: t, lock: t.LOCK.UPDATE });
   if (!booking || booking.status !== 'pending') return;
   await booking.update({ status: 'cancelled' }, { transaction: t });
 };
 
-// ── Helper used by check-in (PR4 — not wired yet) ───────────
-
-/**
- * Find a confirmed booking whose time window (with EARLY_GRACE_MS) covers
- * `now` for this plate. Returns null if no match (caller treats as walk-in).
- *
- * Grace period: a customer may check in up to EARLY_GRACE_MS before the
- * booking's startTime. If they arrive earlier than that, the booking won't
- * match and they get treated as walk-in (booking expires later via sweep).
- *
- * Used by parking-session.checkIn to set session.bookingId + prepaidHours +
- * prepaidAmount + paymentStatus='paid' when the customer shows up.
- */
 export const findActiveBookingByPlate = async (licensePlate, t) => {
   const now = new Date();
   const graceCutoff = new Date(now.getTime() + EARLY_GRACE_MS);
@@ -276,8 +213,6 @@ export const findActiveBookingByPlate = async (licensePlate, t) => {
     transaction: t,
   });
 };
-
-// ── Standard CRUD ───────────────────────────────────────────
 
 const baseInclude = [
   { model: Floor, as: 'floor', attributes: ['id', 'floorNumber', 'buildingId'] },
@@ -328,10 +263,6 @@ export const getAll = async (filters = {}) => {
   };
 };
 
-/**
- * Cancel a booking. Per business rule "hủy booking KHÔNG hoàn tiền".
- * Only the booking owner or staff/admin/manager may cancel.
- */
 export const cancelBooking = async (id, requester) => {
   return sequelize.transaction(async (t) => {
     const booking = await Booking.findByPk(id, { transaction: t, lock: t.LOCK.UPDATE });
@@ -358,11 +289,6 @@ export const cancelBooking = async (id, requester) => {
   });
 };
 
-/**
- * Sweep: mark 'expired' for confirmed bookings whose endTime has passed and
- * which never linked to a session (customer no-show). Call from admin
- * endpoint or a scheduled job.
- */
 export const expireBookings = async () => {
   const now = new Date();
   const [count] = await Booking.update(

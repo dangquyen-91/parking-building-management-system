@@ -16,14 +16,12 @@ export const checkInSchema = Joi.object({
   vehicleType: Joi.string().valid(...VEHICLE_TYPES).required(),
   licensePlate: licensePlateField,
 
-  // car: slotId bắt buộc, rowId không được có
   slotId: Joi.number().integer().positive().when('vehicleType', {
     is: 'car',
     then: Joi.required(),
     otherwise: Joi.forbidden(),
   }),
 
-  // motorcycle: rowId bắt buộc, slotId không được có
   rowId: Joi.number().integer().positive().when('vehicleType', {
     is: 'motorcycle',
     then: Joi.required(),

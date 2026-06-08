@@ -8,8 +8,8 @@ const ParkingSession = sequelize.define(
   'ParkingSession',
   {
     id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
-    slotId: { type: DataTypes.INTEGER, allowNull: true },   // car sessions only
-    rowId: { type: DataTypes.INTEGER, allowNull: true },    // motorcycle sessions only
+    slotId: { type: DataTypes.INTEGER, allowNull: true },
+    rowId: { type: DataTypes.INTEGER, allowNull: true },
     licensePlate: { type: DataTypes.STRING, allowNull: false },
     vehicleType: { type: DataTypes.ENUM('motorcycle', 'car'), allowNull: false },
     entryTime: { type: DataTypes.DATE, allowNull: false, defaultValue: DataTypes.NOW },

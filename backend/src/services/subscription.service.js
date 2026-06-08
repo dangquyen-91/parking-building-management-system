@@ -9,7 +9,7 @@ import User from '../models/user.model.js';
 import AppError from '../utils/appError.js';
 import * as vnpayService from './vnpay.service.js';
 
-const PENDING_TTL_MS = 15 * 60 * 1000; // matches vnp_ExpireDate
+const PENDING_TTL_MS = 15 * 60 * 1000;
 
 const generateOrderId = () => {
   const ts = Date.now();
@@ -21,11 +21,6 @@ const normalizePlate = (plate) => plate.toUpperCase().replace(/\s/g, '');
 
 const ACTIVE_HOLD = ['pending', 'active'];
 
-/**
- * Validate and reserve a fixed slot for a car package. Reserves the slot
- * immediately (option A): the slot is held while payment is pending and freed
- * by expireSubscriptions() if the resident never pays.
- */
 const reserveCarSlot = async (slotId, plate, t) => {
   if (!slotId) throw new AppError('slotId is required for car packages', 400);
 
@@ -42,7 +37,6 @@ const reserveCarSlot = async (slotId, plate, t) => {
   }
 
   if (slot.status !== 'empty') {
-    // Allow re-buying the same slot the same plate already holds (renewal)
     const heldBySamePlate = await ResidentSubscription.findOne({
       where: { slotId, licensePlate: plate, status: { [Op.in]: ACTIVE_HOLD } },
       transaction: t,
@@ -72,7 +66,6 @@ export const buyPackage = async ({ userId, packageId, licensePlate, slotId, ipAd
       throw new AppError('A pending purchase already exists for this plate and package', 409);
     }
 
-    // Car packages reserve a fixed slot; motorcycle packages park freely.
     let reservedSlotId = null;
     if (pkg.vehicleType === 'car') {
       const slot = await reserveCarSlot(slotId, plate, t);
@@ -157,11 +150,6 @@ export const getActiveByPlate = async (licensePlate) => {
   });
 };
 
-/**
- * Free a reserved slot when its subscription ends — but only if no other
- * pending/active subscription still holds it, and the slot isn't physically
- * occupied by a parked car (that is the check-in flow's state).
- */
 const freeSlotIfUnused = async (slotId, excludeSubId, t) => {
   if (!slotId) return;
   const stillHeld = await ResidentSubscription.findOne({
@@ -176,11 +164,6 @@ const freeSlotIfUnused = async (slotId, excludeSubId, t) => {
   }
 };
 
-/**
- * Sweep: cancel pending subscriptions older than the TTL and mark active
- * subscriptions past their endDate as expired, freeing any reserved slots.
- * Call from an admin endpoint or a scheduled job.
- */
 export const expireSubscriptions = async () => {
   const now = new Date();
   return sequelize.transaction(async (t) => {
@@ -209,8 +192,6 @@ export const expireSubscriptions = async () => {
       activeExpired += 1;
     }
 
-    // Reconcile: release any slot stuck in 'reserved' that no pending/active
-    // subscription still holds (e.g. after data churn) — self-healing.
     const [orphanResult] = await sequelize.query(
       `UPDATE parking_slots SET status = 'empty'
        WHERE status = 'reserved'
@@ -226,5 +207,4 @@ export const expireSubscriptions = async () => {
   });
 };
 
-// Exposed so payment.service can release a slot when a payment fails.
 export { freeSlotIfUnused };

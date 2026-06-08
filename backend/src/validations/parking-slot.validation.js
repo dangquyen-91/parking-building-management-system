@@ -1,7 +1,6 @@
 import Joi from 'joi';
 import { SLOT_STATUSES } from '../models/parking-slot.model.js';
 
-// Slots chỉ dành cho xe hơi. Xe máy dùng ParkingRow.
 const SLOT_VEHICLE_TYPE = 'car';
 
 export const createParkingSlotSchema = Joi.object({

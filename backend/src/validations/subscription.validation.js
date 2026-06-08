@@ -14,9 +14,7 @@ const licensePlateField = Joi.string()
 export const buyPackageSchema = Joi.object({
   packageId: Joi.number().integer().positive().required(),
   licensePlate: licensePlateField,
-  // Required for car packages (fixed slot); ignored for motorcycle. Enforced in service.
   slotId: Joi.number().integer().positive(),
-  // Only privileged roles may buy on behalf of another resident; ignored otherwise.
   userId: Joi.number().integer().positive(),
 });
 

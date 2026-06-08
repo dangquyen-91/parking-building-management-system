@@ -15,7 +15,6 @@ router.get('/:id', authorize('admin', 'manager', 'staff'), parkingSessionControl
 
 router.post('/check-in', authorize('admin', 'manager', 'staff'), validate(checkInSchema), parkingSessionController.checkIn);
 
-// Check-out: preview fee (quote), then confirm with paymentMethod=cash|vnpay
 router.get('/:id/checkout-preview', authorize('admin', 'manager', 'staff'), parkingSessionController.previewCheckout);
 router.post(
   '/:id/check-out',
