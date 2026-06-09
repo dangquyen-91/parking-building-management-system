@@ -93,7 +93,6 @@ const create = async ({ floorId, rowCode, capacity, note }) => {
   });
   if (existing) throw new AppError(`Row code "${rowCode}" already exists on this floor`, 409);
 
-  // Kiểm tra tổng capacity của floor sau khi thêm row mới
   const usedCapacity = (await ParkingRow.sum('capacity', { where: { floorId } })) || 0;
   if (usedCapacity + capacity > floor.totalSlots) {
     throw new AppError(
@@ -134,7 +133,6 @@ const update = async (id, { rowCode, capacity, note }) => {
       );
     }
 
-    // Kiểm tra tổng capacity của floor sau khi update (loại trừ row hiện tại)
     const floor = await Floor.findByPk(row.floorId);
     const otherCapacity =
       (await ParkingRow.sum('capacity', {
@@ -148,7 +146,6 @@ const update = async (id, { rowCode, capacity, note }) => {
     }
 
     data.capacity = capacity;
-    // Cập nhật lại status nếu cần
     if (data.capacity <= row.occupiedCount) data.status = 'full';
     else if (row.status === 'full') data.status = 'available';
   }

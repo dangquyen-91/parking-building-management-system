@@ -38,11 +38,6 @@ export const handleReturn = async (query) => {
   };
 };
 
-/**
- * Compute the start date for an activating subscription. If the same plate
- * already has a valid subscription, the new period stacks on top of it
- * (renewal); otherwise it starts now.
- */
 const computePeriod = async (subscription, durationDays, t) => {
   const now = new Date();
   const existing = await ResidentSubscription.findOne({
@@ -63,11 +58,6 @@ const computePeriod = async (subscription, durationDays, t) => {
   return { startDate, endDate };
 };
 
-/**
- * Activate or cancel a subscription tied to a payment. Assumes the payment row
- * has already been updated and is locked. Resolves the linked subscription if
- * still pending; otherwise no-op (idempotent against replayed IPN).
- */
 const handleSubscriptionOutcome = async (payment, success, t) => {
   if (!payment.subscriptionId) return;
   const subscription = await ResidentSubscription.findByPk(payment.subscriptionId, {
@@ -87,32 +77,13 @@ const handleSubscriptionOutcome = async (payment, success, t) => {
   }
 };
 
-/**
- * Close the parking session on payment success. On failure we leave the
- * session 'active' so staff can retry payment (cash fallback or new VNPay QR).
- */
 const handleSessionOutcome = async (payment, success, t) => {
   if (!payment.sessionId) return;
   if (success) {
     await finalizeSessionPayment(payment.sessionId, Number(payment.amount), t);
   }
-  // On failure: session stays active. Staff can call check-out again with
-  // another method. The pending row is already marked 'failed' in applyOutcome.
 };
 
-/**
- * Booking outcome — delegated to booking.service via dynamic import so this
- * module doesn't crash at startup before the booking module ships.
- *
- * Contract for the booking teammate to implement in booking.service.js:
- *   export const handleBookingPaymentSuccess = async (bookingId, t) => { ... }
- *   export const handleBookingPaymentFailure = async (bookingId, t) => { ... }
- *
- * Both must accept the bookingId + an existing Sequelize transaction (so the
- * update participates in the same atomic IPN handler). They are responsible
- * for whatever booking-side state change makes sense (confirm/cancel, send
- * email, reserve resources, etc).
- */
 const handleBookingOutcome = async (payment, success, t) => {
   if (!payment.bookingId) return;
   let bookingService;
@@ -132,12 +103,6 @@ const handleBookingOutcome = async (payment, success, t) => {
   await fn(payment.bookingId, t);
 };
 
-/**
- * Apply a confirmed payment outcome (from IPN or queryDr) to a still-pending
- * payment: update the payment row, then branch on paymentType to mutate the
- * linked entity (subscription / session / booking). Assumes `payment` is
- * locked and currently 'pending'.
- */
 const applyOutcome = async (payment, { success, vnp, raw, rawField }, t) => {
   await payment.update(
     {
@@ -167,24 +132,6 @@ const applyOutcome = async (payment, { success, vnp, raw, rawField }, t) => {
   }
 };
 
-/**
- * Public API for the booking teammate: build a VNPay payment URL for a
- * booking. Cancels any prior pending payment for the same bookingId so we
- * always have exactly one pending row to reconcile against.
- *
- * Callable inside an existing Sequelize transaction (pass `t`) or standalone
- * (will open its own). Returns { paymentUrl, orderId, paymentId }.
- *
- * Contract:
- *   - `bookingId` (int, required): FK to the bookings table.
- *   - `amount`    (number, required): VND, integer, > 0.
- *   - `ipAddr`    (string, optional): caller IP for vnp_IpAddr.
- *   - `orderInfo` (string, optional): max 255 chars, auto-sanitised to ASCII.
- *
- * After the user pays on VNPay, IPN / queryDr will eventually invoke
- * booking.service.handleBookingPaymentSuccess(bookingId, t). The booking
- * module owns whatever business mutation that implies.
- */
 const generateBookingOrderId = () => {
   const ts = Date.now();
   const rand = Math.random().toString(36).slice(2, 9).toUpperCase();
@@ -197,8 +144,6 @@ export const createBookingPayment = async ({ bookingId, amount, ipAddr, orderInf
   if (!amt || amt <= 0) throw new AppError('amount must be greater than 0', 400);
 
   const run = async (t) => {
-    // Cancel prior pending booking payments for this bookingId so retries
-    // don't accumulate dangling rows (same logic as checkOutVnpay).
     await Payment.update(
       { status: 'cancelled' },
       {
@@ -263,11 +208,6 @@ export const handleIpn = async (query) => {
   });
 };
 
-/**
- * Reconcile a payment by actively asking VNPay (queryDr). Updates the payment
- * and subscription if VNPay reports success but our record is still pending.
- * Works without IPN — usable on localhost and for staff/admin reconciliation.
- */
 export const queryPayment = async (orderId, ipAddr) => {
   const payment = await Payment.findOne({ where: { orderId } });
   if (!payment) throw new AppError('Payment not found', 404);
@@ -284,7 +224,6 @@ export const queryPayment = async (orderId, ipAddr) => {
   const queryOk = res.vnp_ResponseCode === '00';
   const paid = queryOk && res.vnp_TransactionStatus === '00';
 
-  // Only mutate if VNPay answered cleanly and our record is still pending.
   if (queryOk && payment.status === 'pending' && res.vnp_TransactionStatus) {
     await sequelize.transaction(async (t) => {
       const locked = await Payment.findOne({ where: { orderId }, transaction: t, lock: t.LOCK.UPDATE });
@@ -311,14 +250,6 @@ export const queryPayment = async (orderId, ipAddr) => {
   };
 };
 
-/**
- * Look up a payment by orderId with ownership enforcement.
- *
- * Staff/manager/admin can read any payment. Other users may only read
- * payments tied to themselves via `subscription.userId`, `session.userId`, or
- * `booking.userId`. Guest bookings (no userId) and payments not linked to any
- * user are admin-only.
- */
 export const getByOrderId = async (orderId, requester) => {
   const payment = await Payment.findOne({
     where: { orderId },

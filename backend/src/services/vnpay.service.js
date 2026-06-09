@@ -76,11 +76,6 @@ export const createPaymentUrl = ({ amount, orderId, orderInfo, orderType = 'othe
   return { paymentUrl, createDate };
 };
 
-/**
- * Actively query VNPay for a transaction's true status (queryDr). Used for
- * reconciliation when an IPN was missed. Returns VNPay's raw JSON response.
- * `transactionDate` must be the vnp_CreateDate sent at checkout (yyyyMMddHHmmss).
- */
 export const queryTransaction = async ({ orderId, transactionDate, ipAddr }) => {
   const requestId = `${Date.now()}`;
   const version = '2.1.0';

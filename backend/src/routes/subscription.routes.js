@@ -8,7 +8,6 @@ const router = Router();
 
 router.use(authenticate);
 
-// Specific routes before /:id
 router.get('/me', subscriptionController.getMine);
 router.get(
   '/active',
