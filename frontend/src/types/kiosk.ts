@@ -241,16 +241,45 @@ export interface CheckoutPreviewApiResponse {
   licensePlate: string;
   vehicleType: VehicleType;
   entryTime: string;
-  exitTime: string;
+  now: string;
   durationMinutes: number;
+  floorType: FloorType | null;
+  covered: boolean;
+  coveredBy: 'subscription' | 'booking' | null;
+  prepaidHours: number | null;
+  prepaidAmount: number | null;
   fee: number;
-  isResident: boolean;
-  slotCode: string;
+  breakdown: {
+    baseFee?: number;
+    overnightFee?: number;
+    totalFee?: number;
+    mode?: string;
+    durationMinutes?: number;
+    overnightNights?: number;
+  } | null;
+  suggestedPaymentMethod: 'package' | 'cash_or_vnpay';
 }
 
 // POST /parking-sessions/{id}/check-out
 export interface CheckOutPayload {
   paymentMethod: PaymentMethod;
+}
+
+export interface CheckOutApiResponse {
+  sessionId: number;
+  licensePlate: string;
+  vehicleType: VehicleType;
+  entryTime: string;
+  exitTime: string | null;
+  durationMinutes?: number;
+  fee: number;
+  covered: boolean;
+  coveredBy: 'subscription' | 'booking' | null;
+  paymentMethod: PaymentMethod | 'package';
+  paymentId?: number | null;
+  paymentUrl?: string | null;
+  orderId?: string | null;
+  breakdown: CheckoutPreviewApiResponse['breakdown'];
 }
 
 // ─── Parking Map ──────────────────────────────────────────────────────────────

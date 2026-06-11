@@ -11,6 +11,7 @@ import type {
   PaginatedResponse,
   CheckoutPreviewApiResponse,
   CheckOutPayload,
+  CheckOutApiResponse,
   FloorApiItem,
 } from '../types/kiosk';
 
@@ -182,7 +183,7 @@ export async function getCheckoutPreview(
 export async function checkOut(
   sessionId: number,
   payload: CheckOutPayload
-): Promise<ActiveSessionApiItem> {
+): Promise<CheckOutApiResponse> {
   const response = await fetch(
     `${API_BASE_URL}/parking-sessions/${sessionId}/check-out`,
     {
@@ -191,7 +192,7 @@ export async function checkOut(
       body: JSON.stringify(payload),
     }
   );
-  return handleResponse<ActiveSessionApiItem>(response);
+  return handleResponse<CheckOutApiResponse>(response);
 }
 
 // ─── Parking Map ──────────────────────────────────────────────────────────────
