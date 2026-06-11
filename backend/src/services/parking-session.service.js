@@ -7,7 +7,7 @@ import Floor from '../models/floor.model.js';
 import Building from '../models/building.model.js';
 import User from '../models/user.model.js';
 import ResidentSubscription from '../models/resident-subscription.model.js';
-import Payment from '../models/payment.model.js';
+import SessionPayment from '../models/session-payment.model.js';
 import AppError from '../utils/appError.js';
 import { calculateFee, calculateExcessFee } from './pricing.service.js';
 import * as vnpayService from './vnpay.service.js';
@@ -562,12 +562,11 @@ const checkOutCash = async (id, staffId) => {
 
     let payment = null;
     if (!(covered && coveredBy === 'subscription')) {
-      payment = await Payment.create(
+      payment = await SessionPayment.create(
         {
           orderId: generateSessionOrderId(),
           provider: 'vnpay',
           paymentMethod: 'cash',
-          paymentType: 'session',
           amount: fee,
           orderInfo: `Phi gui xe ${session.vehicleType} ${session.licensePlate}`.replace(/[^\x20-\x7E]/g, ''),
           status: 'success',
@@ -633,7 +632,7 @@ const checkOutVnpay = async (id, staffId, ipAddr) => {
       };
     }
 
-    await Payment.update(
+    await SessionPayment.update(
       { status: 'cancelled' },
       { where: { sessionId: session.id, status: 'pending' }, transaction: t }
     );
@@ -647,12 +646,11 @@ const checkOutVnpay = async (id, staffId, ipAddr) => {
       ipAddr,
     });
 
-    await Payment.create(
+    await SessionPayment.create(
       {
         orderId,
         provider: 'vnpay',
         paymentMethod: 'vnpay',
-        paymentType: 'session',
         amount: fee,
         orderInfo,
         status: 'pending',

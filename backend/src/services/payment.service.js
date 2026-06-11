@@ -1,6 +1,8 @@
 import { Op } from 'sequelize';
 import { sequelize } from '../config/database.js';
-import Payment from '../models/payment.model.js';
+import SubscriptionPayment from '../models/subscription-payment.model.js';
+import BookingPayment from '../models/booking-payment.model.js';
+import SessionPayment from '../models/session-payment.model.js';
 import ResidentSubscription from '../models/resident-subscription.model.js';
 import ParkingPackage from '../models/parking-package.model.js';
 import ParkingSession from '../models/parking-session.model.js';
@@ -10,32 +12,18 @@ import * as vnpayService from './vnpay.service.js';
 import { freeSlotIfUnused } from './subscription.service.js';
 import { finalizeSessionPayment } from './parking-session.service.js';
 
-export const handleReturn = async (query) => {
-  const valid = vnpayService.verifyCallback(query);
+const TYPE_BY_PREFIX = {
+  'SUB-': { model: SubscriptionPayment, kind: 'subscription' },
+  'BOOK-': { model: BookingPayment,      kind: 'booking' },
+  'SESS-': { model: SessionPayment,      kind: 'session' },
+};
 
-  const payment = query.vnp_TxnRef
-    ? await Payment.findOne({ where: { orderId: query.vnp_TxnRef } })
-    : null;
-
-  if (payment) {
-    await payment.update({ rawReturn: JSON.stringify(query) });
+const resolveByOrderId = (orderId) => {
+  if (!orderId) return null;
+  for (const [prefix, cfg] of Object.entries(TYPE_BY_PREFIX)) {
+    if (orderId.startsWith(prefix)) return cfg;
   }
-
-  if (!valid) {
-    return { success: false, code: '97', message: 'Invalid signature', orderId: query.vnp_TxnRef };
-  }
-
-  const success = vnpayService.isSuccessResponse(query.vnp_ResponseCode, query.vnp_TransactionStatus);
-
-  return {
-    success,
-    code: query.vnp_ResponseCode,
-    message: vnpayService.getResponseMessage(query.vnp_ResponseCode),
-    orderId: query.vnp_TxnRef,
-    amount: payment ? Number(payment.amount) : Number(query.vnp_Amount) / 100,
-    status: payment?.status,
-    subscriptionId: payment?.subscriptionId || null,
-  };
+  return null;
 };
 
 const computePeriod = async (subscription, durationDays, t) => {
@@ -59,7 +47,6 @@ const computePeriod = async (subscription, durationDays, t) => {
 };
 
 const handleSubscriptionOutcome = async (payment, success, t) => {
-  if (!payment.subscriptionId) return;
   const subscription = await ResidentSubscription.findByPk(payment.subscriptionId, {
     transaction: t,
     lock: t.LOCK.UPDATE,
@@ -78,14 +65,12 @@ const handleSubscriptionOutcome = async (payment, success, t) => {
 };
 
 const handleSessionOutcome = async (payment, success, t) => {
-  if (!payment.sessionId) return;
   if (success) {
     await finalizeSessionPayment(payment.sessionId, Number(payment.amount), t);
   }
 };
 
 const handleBookingOutcome = async (payment, success, t) => {
-  if (!payment.bookingId) return;
   let bookingService;
   try {
     bookingService = await import('./booking.service.js');
@@ -96,14 +81,17 @@ const handleBookingOutcome = async (payment, success, t) => {
   const fn = success
     ? bookingService.handleBookingPaymentSuccess
     : bookingService.handleBookingPaymentFailure;
-  if (typeof fn !== 'function') {
-    console.warn(`[booking hook] booking.service.js missing ${success ? 'handleBookingPaymentSuccess' : 'handleBookingPaymentFailure'} export`);
-    return;
-  }
+  if (typeof fn !== 'function') return;
   await fn(payment.bookingId, t);
 };
 
-const applyOutcome = async (payment, { success, vnp, raw, rawField }, t) => {
+const OUTCOME_HANDLERS = {
+  subscription: handleSubscriptionOutcome,
+  booking: handleBookingOutcome,
+  session: handleSessionOutcome,
+};
+
+const applyOutcome = async (payment, kind, { success, vnp, raw, rawField }, t) => {
   await payment.update(
     {
       status: success ? 'success' : 'failed',
@@ -117,74 +105,56 @@ const applyOutcome = async (payment, { success, vnp, raw, rawField }, t) => {
     { transaction: t }
   );
 
-  switch (payment.paymentType) {
-    case 'subscription':
-      await handleSubscriptionOutcome(payment, success, t);
-      break;
-    case 'session':
-      await handleSessionOutcome(payment, success, t);
-      break;
-    case 'booking':
-      await handleBookingOutcome(payment, success, t);
-      break;
-    default:
-      break;
+  const handler = OUTCOME_HANDLERS[kind];
+  if (handler) await handler(payment, success, t);
+};
+
+export const handleReturn = async (query) => {
+  const orderId = query.vnp_TxnRef;
+  const valid = vnpayService.verifyCallback(query);
+  const route = resolveByOrderId(orderId);
+
+  if (orderId && route) {
+    await route.model.update(
+      { rawReturn: JSON.stringify(query) },
+      { where: { orderId } }
+    );
   }
-};
 
-const generateBookingOrderId = () => {
-  const ts = Date.now();
-  const rand = Math.random().toString(36).slice(2, 9).toUpperCase();
-  return `BOOK-${ts}-${rand}`;
-};
+  if (!valid) {
+    return { success: false, code: '97', message: 'Invalid signature', orderId };
+  }
+  if (!route) {
+    return { success: false, code: '01', message: 'Unknown order prefix', orderId };
+  }
 
-export const createBookingPayment = async ({ bookingId, amount, ipAddr, orderInfo }, externalTxn = null) => {
-  if (!bookingId) throw new AppError('bookingId is required', 400);
-  const amt = Number(amount);
-  if (!amt || amt <= 0) throw new AppError('amount must be greater than 0', 400);
+  const success = vnpayService.isSuccessResponse(query.vnp_ResponseCode, query.vnp_TransactionStatus);
+  const vnpAmount = Number(query.vnp_Amount) / 100;
 
-  const run = async (t) => {
-    await Payment.update(
-      { status: 'cancelled' },
-      {
-        where: { bookingId, paymentType: 'booking', status: 'pending' },
-        transaction: t,
-      }
-    );
-
-    const orderId = generateBookingOrderId();
-    const safeOrderInfo = (orderInfo || `Booking ${bookingId}`)
-      .replace(/[^\x20-\x7E]/g, '')
-      .slice(0, 255)
-      .trim() || `Booking ${bookingId}`;
-
-    const { paymentUrl, createDate } = vnpayService.createPaymentUrl({
-      amount: amt,
-      orderId,
-      orderInfo: safeOrderInfo,
-      ipAddr,
+  await sequelize.transaction(async (t) => {
+    const payment = await route.model.findOne({
+      where: { orderId },
+      transaction: t,
+      lock: t.LOCK.UPDATE,
     });
+    if (!payment) return;
+    if (Number(payment.amount) !== vnpAmount) return;
+    if (payment.status !== 'pending') return;
 
-    const payment = await Payment.create(
-      {
-        orderId,
-        provider: 'vnpay',
-        paymentMethod: 'vnpay',
-        paymentType: 'booking',
-        amount: amt,
-        orderInfo: safeOrderInfo,
-        status: 'pending',
-        bookingId,
-        ipAddress: ipAddr || null,
-        vnpCreateDate: createDate,
-      },
-      { transaction: t }
-    );
+    await applyOutcome(payment, route.kind, { success, vnp: query, raw: query, rawField: 'rawReturn' }, t);
+  });
 
-    return { paymentUrl, orderId, paymentId: payment.id };
+  const fresh = await route.model.findOne({ where: { orderId } });
+
+  return {
+    success,
+    code: query.vnp_ResponseCode,
+    message: vnpayService.getResponseMessage(query.vnp_ResponseCode),
+    orderId,
+    amount: fresh ? Number(fresh.amount) : vnpAmount,
+    status: fresh?.status,
+    kind: route.kind,
   };
-
-  return externalTxn ? run(externalTxn) : sequelize.transaction(run);
 };
 
 export const handleIpn = async (query) => {
@@ -193,23 +163,33 @@ export const handleIpn = async (query) => {
   }
 
   const orderId = query.vnp_TxnRef;
+  const route = resolveByOrderId(orderId);
+  if (!route) return { RspCode: '01', Message: 'Order not found' };
+
   const vnpAmount = Number(query.vnp_Amount) / 100;
   const success = vnpayService.isSuccessResponse(query.vnp_ResponseCode, query.vnp_TransactionStatus);
 
   return sequelize.transaction(async (t) => {
-    const payment = await Payment.findOne({ where: { orderId }, transaction: t, lock: t.LOCK.UPDATE });
+    const payment = await route.model.findOne({
+      where: { orderId },
+      transaction: t,
+      lock: t.LOCK.UPDATE,
+    });
 
     if (!payment) return { RspCode: '01', Message: 'Order not found' };
     if (Number(payment.amount) !== vnpAmount) return { RspCode: '04', Message: 'Invalid amount' };
     if (payment.status !== 'pending') return { RspCode: '02', Message: 'Order already confirmed' };
 
-    await applyOutcome(payment, { success, vnp: query, raw: query, rawField: 'rawIpn' }, t);
+    await applyOutcome(payment, route.kind, { success, vnp: query, raw: query, rawField: 'rawIpn' }, t);
     return { RspCode: '00', Message: 'Confirm Success' };
   });
 };
 
-export const queryPayment = async (orderId, ipAddr) => {
-  const payment = await Payment.findOne({ where: { orderId } });
+export const queryPayment = async (orderId, ipAddr, _requester) => {
+  const route = resolveByOrderId(orderId);
+  if (!route) throw new AppError('Unknown order prefix', 400);
+
+  const payment = await route.model.findOne({ where: { orderId } });
   if (!payment) throw new AppError('Payment not found', 404);
   if (!payment.vnpCreateDate) {
     throw new AppError('Cannot query: original transaction date not recorded for this order', 400);
@@ -226,39 +206,39 @@ export const queryPayment = async (orderId, ipAddr) => {
 
   if (queryOk && payment.status === 'pending' && res.vnp_TransactionStatus) {
     await sequelize.transaction(async (t) => {
-      const locked = await Payment.findOne({ where: { orderId }, transaction: t, lock: t.LOCK.UPDATE });
+      const locked = await route.model.findOne({ where: { orderId }, transaction: t, lock: t.LOCK.UPDATE });
       if (locked && locked.status === 'pending') {
-        await applyOutcome(locked, { success: paid, vnp: res, raw: res, rawField: 'rawIpn' }, t);
+        await applyOutcome(locked, route.kind, { success: paid, vnp: res, raw: res, rawField: 'rawIpn' }, t);
       }
     });
   }
 
-  const fresh = await Payment.findOne({
-    where: { orderId },
-    include: [{ model: ResidentSubscription, as: 'subscription' }],
-  });
+  const fresh = await route.model.findOne({ where: { orderId } });
 
   return {
     orderId,
     paid,
+    kind: route.kind,
     queryResponseCode: res.vnp_ResponseCode,
     transactionStatus: res.vnp_TransactionStatus || null,
     message: res.vnp_Message || vnpayService.getResponseMessage(res.vnp_TransactionStatus),
     paymentStatus: fresh.status,
-    subscriptionStatus: fresh.subscription?.status || null,
     amount: Number(fresh.amount),
   };
 };
 
 export const getByOrderId = async (orderId, requester) => {
-  const payment = await Payment.findOne({
-    where: { orderId },
-    include: [
-      { model: ResidentSubscription, as: 'subscription', attributes: ['id', 'userId', 'status'] },
-      { model: ParkingSession, as: 'session', attributes: ['id', 'userId', 'status'] },
-      { model: Booking, as: 'booking', attributes: ['id', 'userId', 'status'] },
-    ],
-  });
+  const route = resolveByOrderId(orderId);
+  if (!route) throw new AppError('Unknown order prefix', 400);
+
+  const include =
+    route.kind === 'subscription'
+      ? [{ model: ResidentSubscription, as: 'subscription', attributes: ['id', 'userId', 'status'] }]
+      : route.kind === 'session'
+        ? [{ model: ParkingSession, as: 'session', attributes: ['id', 'userId', 'status'] }]
+        : [{ model: Booking, as: 'booking', attributes: ['id', 'userId', 'status'] }];
+
+  const payment = await route.model.findOne({ where: { orderId }, include });
   if (!payment) throw new AppError('Payment not found', 404);
 
   const privileged = ['admin', 'manager', 'staff'].includes(requester?.role);
@@ -273,4 +253,133 @@ export const getByOrderId = async (orderId, requester) => {
     }
   }
   return payment;
+};
+
+const generateOrderId = (prefix) => {
+  const ts = Date.now();
+  const rand = Math.random().toString(36).slice(2, 9).toUpperCase();
+  return `${prefix}-${ts}-${rand}`;
+};
+
+export const createSubscriptionPayment = async ({ subscriptionId, amount, ipAddr, orderInfo }, externalTxn = null) => {
+  if (!subscriptionId) throw new AppError('subscriptionId is required', 400);
+  const amt = Number(amount);
+  if (!amt || amt <= 0) throw new AppError('amount must be greater than 0', 400);
+
+  const run = async (t) => {
+    const orderId = generateOrderId('SUB');
+    const safeInfo = (orderInfo || `Goi ${subscriptionId}`).replace(/[^\x20-\x7E]/g, '').slice(0, 255);
+    const { paymentUrl, createDate } = vnpayService.createPaymentUrl({ amount: amt, orderId, orderInfo: safeInfo, ipAddr });
+
+    const payment = await SubscriptionPayment.create(
+      {
+        orderId,
+        provider: 'vnpay',
+        paymentMethod: 'vnpay',
+        amount: amt,
+        orderInfo: safeInfo,
+        status: 'pending',
+        subscriptionId,
+        ipAddress: ipAddr || null,
+        vnpCreateDate: createDate,
+      },
+      { transaction: t }
+    );
+
+    return { paymentUrl, orderId, paymentId: payment.id };
+  };
+
+  return externalTxn ? run(externalTxn) : sequelize.transaction(run);
+};
+
+export const createBookingPayment = async ({ bookingId, amount, ipAddr, orderInfo }, externalTxn = null) => {
+  if (!bookingId) throw new AppError('bookingId is required', 400);
+  const amt = Number(amount);
+  if (!amt || amt <= 0) throw new AppError('amount must be greater than 0', 400);
+
+  const run = async (t) => {
+    await BookingPayment.update(
+      { status: 'cancelled' },
+      { where: { bookingId, status: 'pending' }, transaction: t }
+    );
+
+    const orderId = generateOrderId('BOOK');
+    const safeInfo = (orderInfo || `Booking ${bookingId}`).replace(/[^\x20-\x7E]/g, '').slice(0, 255).trim() || `Booking ${bookingId}`;
+
+    const { paymentUrl, createDate } = vnpayService.createPaymentUrl({ amount: amt, orderId, orderInfo: safeInfo, ipAddr });
+
+    const payment = await BookingPayment.create(
+      {
+        orderId,
+        provider: 'vnpay',
+        paymentMethod: 'vnpay',
+        amount: amt,
+        orderInfo: safeInfo,
+        status: 'pending',
+        bookingId,
+        ipAddress: ipAddr || null,
+        vnpCreateDate: createDate,
+      },
+      { transaction: t }
+    );
+
+    return { paymentUrl, orderId, paymentId: payment.id };
+  };
+
+  return externalTxn ? run(externalTxn) : sequelize.transaction(run);
+};
+
+export const createSessionPayment = async ({ sessionId, amount, ipAddr, orderInfo }, externalTxn = null) => {
+  if (!sessionId) throw new AppError('sessionId is required', 400);
+  const amt = Number(amount);
+  if (!amt || amt <= 0) throw new AppError('amount must be greater than 0', 400);
+
+  const run = async (t) => {
+    await SessionPayment.update(
+      { status: 'cancelled' },
+      { where: { sessionId, status: 'pending' }, transaction: t }
+    );
+
+    const orderId = generateOrderId('SESS');
+    const safeInfo = (orderInfo || `Phi gui xe session ${sessionId}`).replace(/[^\x20-\x7E]/g, '').slice(0, 255);
+
+    const { paymentUrl, createDate } = vnpayService.createPaymentUrl({ amount: amt, orderId, orderInfo: safeInfo, ipAddr });
+
+    const payment = await SessionPayment.create(
+      {
+        orderId,
+        provider: 'vnpay',
+        paymentMethod: 'vnpay',
+        amount: amt,
+        orderInfo: safeInfo,
+        status: 'pending',
+        sessionId,
+        ipAddress: ipAddr || null,
+        vnpCreateDate: createDate,
+      },
+      { transaction: t }
+    );
+
+    return { paymentUrl, orderId, paymentId: payment.id };
+  };
+
+  return externalTxn ? run(externalTxn) : sequelize.transaction(run);
+};
+
+export const recordCashSessionPayment = async ({ sessionId, amount, orderInfo, paidAt = new Date() }, t) => {
+  const orderId = generateOrderId('SESS');
+  const safeInfo = (orderInfo || `Cash for session ${sessionId}`).replace(/[^\x20-\x7E]/g, '').slice(0, 255);
+  return SessionPayment.create(
+    {
+      orderId,
+      provider: 'vnpay',
+      paymentMethod: 'cash',
+      amount,
+      orderInfo: safeInfo,
+      status: 'success',
+      sessionId,
+      paidAt,
+    },
+    { transaction: t }
+  );
 };

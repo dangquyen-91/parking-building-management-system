@@ -4,7 +4,7 @@ import ResidentSubscription from '../models/resident-subscription.model.js';
 import ParkingPackage from '../models/parking-package.model.js';
 import ParkingSlot from '../models/parking-slot.model.js';
 import Floor from '../models/floor.model.js';
-import Payment from '../models/payment.model.js';
+import SubscriptionPayment from '../models/subscription-payment.model.js';
 import User from '../models/user.model.js';
 import AppError from '../utils/appError.js';
 import * as vnpayService from './vnpay.service.js';
@@ -90,10 +90,11 @@ export const buyPackage = async ({ userId, packageId, licensePlate, slotId, ipAd
 
     const { paymentUrl, createDate } = vnpayService.createPaymentUrl({ amount: pkg.price, orderId, orderInfo, ipAddr });
 
-    await Payment.create(
+    await SubscriptionPayment.create(
       {
         orderId,
         provider: 'vnpay',
+        paymentMethod: 'vnpay',
         amount: pkg.price,
         orderInfo,
         subscriptionId: subscription.id,
