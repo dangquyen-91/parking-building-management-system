@@ -33,10 +33,12 @@ import {
   checkIn,
   confirmBooking,
 } from '../../services/kiosk.service';
+import { floorService } from '../../services/floor.service';
 
 // ─── Discriminated scenario union ─────────────────────────────────────────────
 type CheckInScenario =
   | { kind: 'resolving' }
+  | { kind: 'error'; message: string }
   | { kind: 'already_in'; lookup: LookupApiResponse }
   | { kind: 'resident'; lookup: LookupApiResponse; subscription: ActiveSubscription; availableSlots: ParkingSlotApiItem[]; availableRows: ParkingRowApiItem[] }
   | { kind: 'booking'; lookup: LookupApiResponse; booking: BookingApiItem; availableSlots: ParkingSlotApiItem[] }
@@ -191,9 +193,11 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
     async function resolve() {
       setScenario({ kind: 'resolving' });
       setSubmitError(null);
+      setResidentSlotId(null);
+      setResidentRowId(null);
 
       // Step 1: Already checked in?
-      if (lookup.status === 'active' && lookup.activeSession) {
+      if ((lookup.status === 'already_active' || lookup.status === 'active') && lookup.activeSession) {
         if (!cancelled) setScenario({ kind: 'already_in', lookup });
         return;
       }
@@ -201,31 +205,48 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
       let isExpiredResident = false;
 
       // Step 2: Has linked resident? → check active subscription
-      if (lookup.hint.linkedResident) {
-        try {
-          const subResult = await checkActiveSubscription(lookup.licensePlate);
-          if (!cancelled && subResult.active && subResult.subscription) {
-            const sub = subResult.subscription;
-            const vt = sub.vehicleType;
-            const [slotsRes, rowsRes] = await Promise.all([
-              vt === 'car'
-                ? getAvailableSlots('car')
-                : Promise.resolve({ data: [] as ParkingSlotApiItem[] }),
-              vt === 'motorcycle'
-                ? getAvailableRows()
-                : Promise.resolve({ data: [] as ParkingRowApiItem[] }),
-            ]);
-            if (!cancelled) {
-              setScenario({ kind: 'resident', lookup, subscription: sub, availableSlots: slotsRes.data, availableRows: rowsRes.data });
-              if (sub.slotId) setResidentSlotId(sub.slotId);
-            }
-            return;
-          } else if (!cancelled && !subResult.active) {
-            isExpiredResident = true;
+      try {
+        const subResult = await checkActiveSubscription(lookup.licensePlate);
+        if (!cancelled && subResult.active && subResult.subscription) {
+          const sub = subResult.subscription;
+          const vt = sub.vehicleType;
+          const [slotsRes, rowsRes, floorsRes] = await Promise.all([
+            vt === 'car'
+              ? getAvailableSlots('car')
+              : Promise.resolve({ data: [] as ParkingSlotApiItem[] }),
+            vt === 'motorcycle'
+              ? getAvailableRows()
+              : Promise.resolve({ data: [] as ParkingRowApiItem[] }),
+            floorService.getFloors({ vehicleType: vt, isActive: true, page: 1, limit: 100 }),
+          ]);
+          const residentFloorIds = new Set(
+            floorsRes.floors.filter((floor) => floor.floorType === 'resident').map((floor) => floor.id)
+          );
+          const residentSlots = slotsRes.data.filter((slot) => residentFloorIds.has(slot.floorId));
+          const residentRows = rowsRes.data.filter((row) => residentFloorIds.has(row.floorId));
+          if (!cancelled) {
+            setScenario({
+              kind: 'resident',
+              lookup,
+              subscription: sub,
+              availableSlots: residentSlots,
+              availableRows: residentRows,
+            });
+            if (sub.slotId) setResidentSlotId(sub.slotId);
           }
-        } catch {
-          // fall through
+          return;
         }
+        if (!cancelled && lookup.hint.linkedResident && !subResult.active) {
+          isExpiredResident = true;
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setScenario({
+            kind: 'error',
+            message: err instanceof Error ? err.message : 'Không kiểm tra được gói cư dân của biển số này.',
+          });
+        }
+        return;
       }
 
       // Step 3: Pending booking?
@@ -237,8 +258,14 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
           if (!cancelled) setScenario({ kind: 'booking', lookup, booking, availableSlots: slotsRes.data });
           return;
         }
-      } catch {
-        // fall through
+      } catch (err) {
+        if (!cancelled) {
+          setScenario({
+            kind: 'error',
+            message: err instanceof Error ? err.message : 'Không kiểm tra được gói cư dân của biển số này.',
+          });
+        }
+        return;
       }
 
       // Step 4: Walk-in
@@ -260,13 +287,22 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
     setIsSubmitting(true);
     setSubmitError(null);
     try {
+      const residentScenario = scenario.kind === 'resident' ? scenario : null;
       let payload: Parameters<typeof checkIn>[0];
       if (sub.vehicleType === 'car') {
         const slotId = sub.slotId ?? residentSlotId;
         if (!slotId) { setSubmitError('Vui lòng chọn ô đỗ xe.'); return; }
+        if (!sub.slotId && !residentScenario?.availableSlots.some((slot) => slot.id === slotId)) {
+          setSubmitError('Vui lòng chọn ô thuộc tầng cư dân.');
+          return;
+        }
         payload = { vehicleType: 'car', licensePlate: lookup.licensePlate, slotId, userId: sub.userId };
       } else {
         if (!residentRowId) { setSubmitError('Vui lòng chọn hàng xe máy.'); return; }
+        if (!residentScenario?.availableRows.some((row) => row.id === residentRowId)) {
+          setSubmitError('Vui lòng chọn hàng xe máy thuộc tầng cư dân.');
+          return;
+        }
         payload = { vehicleType: 'motorcycle', licensePlate: lookup.licensePlate, rowId: residentRowId, userId: sub.userId };
       }
       const res = await checkIn(payload);
@@ -325,6 +361,29 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
         <Loader2 className="h-8 w-8 animate-spin text-blue-400" />
         <p className="text-sm text-slate-400">Đang phân tích biển số…</p>
       </div>
+    );
+  }
+
+  if (scenario.kind === 'error') {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="rounded-[28px] border border-red-500/30 bg-red-500/[0.08] p-6 shadow-2xl shadow-black/20 backdrop-blur-xl"
+      >
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-500/20">
+            <AlertTriangle className="h-5 w-5 text-red-400" />
+          </div>
+          <div>
+            <h3 className="font-bold text-red-300">Không kiểm tra được gói cư dân</h3>
+            <p className="mt-1 text-sm leading-6 text-red-400/80">{scenario.message}</p>
+            <p className="mt-2 text-xs leading-5 text-slate-500">
+              Vui lòng kiểm tra backend, token nhân viên hoặc thử tra cứu lại biển số trước khi check-in.
+            </p>
+          </div>
+        </div>
+      </motion.div>
     );
   }
 

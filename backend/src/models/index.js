@@ -1,4 +1,5 @@
 import User from './user.model.js';
+import Role from './role.model.js';
 import Building from './building.model.js';
 import Floor from './floor.model.js';
 import ParkingSlot from './parking-slot.model.js';
@@ -6,8 +7,13 @@ import ParkingRow from './parking-row.model.js';
 import ParkingSession from './parking-session.model.js';
 import ParkingPackage from './parking-package.model.js';
 import ResidentSubscription from './resident-subscription.model.js';
-import Payment from './payment.model.js';
 import Booking from './booking.model.js';
+import SubscriptionPayment from './subscription-payment.model.js';
+import BookingPayment from './booking-payment.model.js';
+import SessionPayment from './session-payment.model.js';
+
+Role.hasMany(User, { foreignKey: 'roleId', as: 'users', onDelete: 'RESTRICT' });
+User.belongsTo(Role, { foreignKey: 'roleId', as: 'role' });
 
 Building.hasMany(Floor, { foreignKey: 'buildingId', as: 'floors', onDelete: 'RESTRICT' });
 Floor.belongsTo(Building, { foreignKey: 'buildingId', as: 'building' });
@@ -36,14 +42,8 @@ ResidentSubscription.belongsTo(ParkingPackage, { foreignKey: 'packageId', as: 'p
 User.hasMany(ResidentSubscription, { foreignKey: 'userId', as: 'subscriptions' });
 ResidentSubscription.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 
-ResidentSubscription.hasMany(Payment, { foreignKey: 'subscriptionId', as: 'payments', onDelete: 'SET NULL' });
-Payment.belongsTo(ResidentSubscription, { foreignKey: 'subscriptionId', as: 'subscription' });
-
 ParkingSlot.hasMany(ResidentSubscription, { foreignKey: 'slotId', as: 'subscriptions' });
 ResidentSubscription.belongsTo(ParkingSlot, { foreignKey: 'slotId', as: 'slot' });
-
-ParkingSession.hasMany(Payment, { foreignKey: 'sessionId', as: 'payments', onDelete: 'SET NULL' });
-Payment.belongsTo(ParkingSession, { foreignKey: 'sessionId', as: 'session' });
 
 Floor.hasMany(Booking, { foreignKey: 'floorId', as: 'bookings', onDelete: 'RESTRICT' });
 Booking.belongsTo(Floor, { foreignKey: 'floorId', as: 'floor' });
@@ -57,5 +57,11 @@ Booking.belongsTo(User, { foreignKey: 'handledBy', as: 'handler' });
 ParkingSession.hasOne(Booking, { foreignKey: 'sessionId', as: 'booking' });
 Booking.belongsTo(ParkingSession, { foreignKey: 'sessionId', as: 'session' });
 
-Booking.hasMany(Payment, { foreignKey: 'bookingId', as: 'payments', onDelete: 'SET NULL' });
-Payment.belongsTo(Booking, { foreignKey: 'bookingId', as: 'booking' });
+ResidentSubscription.hasMany(SubscriptionPayment, { foreignKey: 'subscriptionId', as: 'payments', onDelete: 'CASCADE' });
+SubscriptionPayment.belongsTo(ResidentSubscription, { foreignKey: 'subscriptionId', as: 'subscription' });
+
+Booking.hasMany(BookingPayment, { foreignKey: 'bookingId', as: 'payments', onDelete: 'CASCADE' });
+BookingPayment.belongsTo(Booking, { foreignKey: 'bookingId', as: 'booking' });
+
+ParkingSession.hasMany(SessionPayment, { foreignKey: 'sessionId', as: 'payments', onDelete: 'CASCADE' });
+SessionPayment.belongsTo(ParkingSession, { foreignKey: 'sessionId', as: 'session' });

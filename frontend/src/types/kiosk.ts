@@ -33,7 +33,7 @@ export interface LookupActiveSession {
 
 export interface LookupApiResponse {
   licensePlate: string;
-  status: 'available' | 'active';
+  status: 'available' | 'already_active' | 'active';
   activeSession: LookupActiveSession | null;
   hint: {
     linkedResident: LookupLinkedResident | null;
