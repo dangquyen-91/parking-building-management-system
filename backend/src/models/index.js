@@ -1,4 +1,5 @@
 import User from './user.model.js';
+import Role from './role.model.js';
 import Building from './building.model.js';
 import Floor from './floor.model.js';
 import ParkingSlot from './parking-slot.model.js';
@@ -10,6 +11,9 @@ import Booking from './booking.model.js';
 import SubscriptionPayment from './subscription-payment.model.js';
 import BookingPayment from './booking-payment.model.js';
 import SessionPayment from './session-payment.model.js';
+
+Role.hasMany(User, { foreignKey: 'roleId', as: 'users', onDelete: 'RESTRICT' });
+User.belongsTo(Role, { foreignKey: 'roleId', as: 'role' });
 
 Building.hasMany(Floor, { foreignKey: 'buildingId', as: 'floors', onDelete: 'RESTRICT' });
 Floor.belongsTo(Building, { foreignKey: 'buildingId', as: 'building' });
