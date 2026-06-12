@@ -14,6 +14,15 @@ export interface ParkingPackage {
   updatedAt: string;
 }
 
+export interface PackagePayload {
+  name: string;
+  vehicleType: PackageVehicleType;
+  durationDays: number;
+  price: number;
+  description?: string | null;
+  isActive?: boolean;
+}
+
 async function parseResponse<T>(response: Response): Promise<T> {
   const result = await response.json().catch(() => ({ success: false, message: 'Invalid server response' }));
   if (!response.ok || !result.success) {
@@ -27,7 +36,10 @@ function authHeaders() {
   if (!accessToken) {
     throw new Error('Access token not found');
   }
-  return { Authorization: `Bearer ${accessToken}` };
+  return {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${accessToken}`,
+  };
 }
 
 export const packageService = {
@@ -42,5 +54,33 @@ export const packageService = {
     });
     const result = await parseResponse<{ data: ParkingPackage[] }>(response);
     return result.data;
+  },
+
+  async createPackage(payload: PackagePayload): Promise<ParkingPackage> {
+    const response = await fetch(`${API_BASE_URL}/packages`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(payload),
+    });
+    const result = await parseResponse<{ data: ParkingPackage }>(response);
+    return result.data;
+  },
+
+  async updatePackage(id: number, payload: PackagePayload): Promise<ParkingPackage> {
+    const response = await fetch(`${API_BASE_URL}/packages/${id}`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify(payload),
+    });
+    const result = await parseResponse<{ data: ParkingPackage }>(response);
+    return result.data;
+  },
+
+  async deletePackage(id: number): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/packages/${id}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    });
+    await parseResponse<void>(response);
   },
 };
