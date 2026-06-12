@@ -43,7 +43,9 @@ export const Login: React.FC = () => {
         setTimeout(() => {
           if (profile.role === 'admin') {
             navigate('/admin/dashboard');
-          } else if (profile.role === 'staff' || profile.role === 'manager') {
+          } else if (profile.role === 'manager') {
+            navigate('/manager/dashboard');
+          } else if (profile.role === 'staff') {
             navigate('/staff/check-in');
           } else {
             navigate('/');

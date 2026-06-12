@@ -24,6 +24,14 @@ export interface ParkingSlot {
   floor: SlotFloor;
 }
 
+export interface SlotPayload {
+  floorId?: number;
+  slotCode: string;
+  vehicleType: 'car';
+  status?: SlotStatus;
+  note?: string | null;
+}
+
 interface Pagination {
   page: number;
   limit: number;
@@ -49,7 +57,10 @@ function authHeaders() {
   if (!accessToken) {
     throw new Error('Access token not found');
   }
-  return { Authorization: `Bearer ${accessToken}` };
+  return {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${accessToken}`,
+  };
 }
 
 export const slotService = {
@@ -75,5 +86,26 @@ export const slotService = {
     });
     const result = await parseResponse<{ data: ParkingSlot[]; pagination: Pagination }>(response);
     return { slots: result.data, pagination: result.pagination };
+  },
+
+  async createSlot(payload: SlotPayload & { floorId: number }): Promise<ParkingSlot> {
+    const response = await fetch(`${API_BASE_URL}/parking-slots`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(payload),
+    });
+    const result = await parseResponse<{ data: ParkingSlot }>(response);
+    return result.data;
+  },
+
+  async updateSlot(id: number, payload: SlotPayload): Promise<ParkingSlot> {
+    const { floorId, ...updatePayload } = payload;
+    const response = await fetch(`${API_BASE_URL}/parking-slots/${id}`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify(updatePayload),
+    });
+    const result = await parseResponse<{ data: ParkingSlot }>(response);
+    return result.data;
   },
 };

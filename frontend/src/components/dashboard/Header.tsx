@@ -4,12 +4,20 @@ import { motion } from 'framer-motion';
 import { Bell, Loader2, LogOut, Menu, Moon, Search } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 
+const roleLabels = {
+  admin: 'Quản trị hệ thống',
+  manager: 'Quản lý bãi đỗ',
+  staff: 'Nhân viên vận hành',
+  user: 'Người dùng',
+} as const;
+
 export function Header() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  const displayName = user?.fullName || 'Quản trị viên hệ thống';
+  const displayName = user?.fullName || roleLabels[user?.role ?? 'admin'];
+  const roleLabel = roleLabels[user?.role ?? 'admin'];
   const initials =
     displayName
       .split(' ')
@@ -73,7 +81,7 @@ export function Header() {
             </div>
             <div className="leading-tight">
               <p className="text-sm font-semibold text-white">{displayName}</p>
-              <p className="text-xs text-slate-500">Quản trị hệ thống</p>
+              <p className="text-xs text-slate-500">{roleLabel}</p>
             </div>
           </div>
 

@@ -23,6 +23,16 @@ export interface Floor {
   building: FloorBuilding;
 }
 
+export interface FloorPayload {
+  buildingId?: number;
+  floorNumber: number;
+  vehicleType: VehicleType;
+  floorType: FloorType;
+  totalSlots: number;
+  description?: string | null;
+  isActive?: boolean;
+}
+
 interface Pagination {
   page: number;
   limit: number;
@@ -48,7 +58,10 @@ function authHeaders() {
   if (!accessToken) {
     throw new Error('Access token not found');
   }
-  return { Authorization: `Bearer ${accessToken}` };
+  return {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${accessToken}`,
+  };
 }
 
 export const floorService = {
@@ -74,5 +87,26 @@ export const floorService = {
     });
     const result = await parseResponse<{ data: Floor[]; pagination: Pagination }>(response);
     return { floors: result.data, pagination: result.pagination };
+  },
+
+  async createFloor(payload: FloorPayload & { buildingId: number }): Promise<Floor> {
+    const response = await fetch(`${API_BASE_URL}/floors`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(payload),
+    });
+    const result = await parseResponse<{ data: Floor }>(response);
+    return result.data;
+  },
+
+  async updateFloor(id: number, payload: FloorPayload): Promise<Floor> {
+    const { buildingId, ...updatePayload } = payload;
+    const response = await fetch(`${API_BASE_URL}/floors/${id}`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify(updatePayload),
+    });
+    const result = await parseResponse<{ data: Floor }>(response);
+    return result.data;
   },
 };
