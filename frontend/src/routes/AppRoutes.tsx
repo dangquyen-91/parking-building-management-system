@@ -16,6 +16,7 @@ import PackagesPage from '../pages/admin/PackagesPage';
 import PaymentsPage from '../pages/admin/PaymentsPage';
 import CheckInPage from '../pages/staff/CheckInPage';
 import CheckOutPage from '../pages/staff/CheckOutPage';
+import ActiveSessionsPage from '../pages/staff/ActiveSessionsPage';
 import StaffDashboardPage from '../pages/staff/StaffDashboardPage';
 import { useAuth } from '../hooks/useAuth';
 import type { ReactNode } from 'react';
@@ -95,7 +96,7 @@ export default function AppRoutes() {
       <Route path="/staff/check-in" element={<StaffRoute><CheckInPage /></StaffRoute>} />
       {/* Placeholder routes — pages will be added iteratively */}
       <Route path="/staff/check-out" element={<StaffRoute><CheckOutPage /></StaffRoute>} />
-      <Route path="/staff/sessions" element={<StaffRoute><CheckInPage /></StaffRoute>} />
+      <Route path="/staff/sessions" element={<StaffRoute><ActiveSessionsPage /></StaffRoute>} />
       <Route path="/staff/map" element={<StaffRoute><CheckInPage /></StaffRoute>} />
       <Route path="/staff/dashboard" element={<StaffRoute><StaffDashboardPage /></StaffRoute>} />
     </Routes>

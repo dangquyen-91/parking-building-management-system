@@ -109,6 +109,11 @@ const checkIn = async ({ slotId, rowId, licensePlate, vehicleType, userId, note 
             403
           );
         }
+      } else if (slot.floor.floorType === 'visitor' && activeSub) {
+        throw new AppError(
+          `Plate này có gói cư dân (sub #${activeSub.id}) đang hoạt động. Vui lòng vào tầng cư dân, không được sử dụng tầng vãng lai.`,
+          403
+        );
       }
 
       let activeBooking = null;
@@ -212,6 +217,11 @@ const checkIn = async ({ slotId, rowId, licensePlate, vehicleType, userId, note 
           403
         );
       }
+    } else if (row.floor.floorType === 'visitor' && activeSub) {
+      throw new AppError(
+        `Plate này có gói cư dân (sub #${activeSub.id}) đang hoạt động. Vui lòng vào tầng cư dân, không được sử dụng tầng vãng lai.`,
+        403
+      );
     }
 
     const effectiveUserId = activeSub?.userId || userId || null;

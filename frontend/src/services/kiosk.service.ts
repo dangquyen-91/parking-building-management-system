@@ -113,9 +113,15 @@ export async function confirmBooking(
 // ─── Slots & Rows (for walk-in picker) ───────────────────────────────────────
 // GET /parking-slots?status=empty&vehicleType=car
 export async function getAvailableSlots(
-  vehicleType: 'car'
+  vehicleType: 'car',
+  options: { floorId?: number; limit?: number } = {}
 ): Promise<{ data: ParkingSlotApiItem[] }> {
-  const params = new URLSearchParams({ status: 'empty', vehicleType });
+  const params = new URLSearchParams({
+    status: 'empty',
+    vehicleType,
+    limit: String(options.limit ?? 100),
+  });
+  if (options.floorId) params.set('floorId', String(options.floorId));
   const response = await fetch(
     `${API_BASE_URL}/parking-slots?${params.toString()}`,
     { headers: getAuthHeaders() }

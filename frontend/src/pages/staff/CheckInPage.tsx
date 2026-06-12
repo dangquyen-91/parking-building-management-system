@@ -195,7 +195,7 @@ export default function CheckInPage() {
           <div className="grid grid-cols-2 gap-4">
             <InfoCard icon={Activity}    label="Phiên đang hoạt động" value="—"   tone="blue" />
             <InfoCard icon={Car}         label="Chỗ ô tô còn trống"   value={lookupResult?.availableSlots.car ?? '—'} tone="emerald" />
-            <InfoCard icon={Motorbike}   label="Chỗ xe máy còn trống" value={lookupResult?.availableSlots.motorcycle ?? '—'} tone="amber" />
+            <InfoCard icon={Motorbike}   label="Tổng chỗ xe máy còn trống" value={lookupResult?.availableSlots.motorcycle ?? '—'} tone="amber" />
             <InfoCard icon={Clock}       label="Thời gian hiện tại"    value={new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} tone="purple" />
           </div>
 

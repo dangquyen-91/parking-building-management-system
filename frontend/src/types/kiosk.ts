@@ -28,6 +28,26 @@ export interface LookupActiveSession {
   entryTime: string;
   slotCode?: string;
   rowCode?: string;
+  slot?: {
+    id: number;
+    slotCode: string;
+    floorId?: number;
+    floor?: {
+      id: number;
+      floorNumber: number;
+      building?: { id: number; name: string };
+    };
+  } | null;
+  row?: {
+    id: number;
+    rowCode: string;
+    floorId?: number;
+    floor?: {
+      id: number;
+      floorNumber: number;
+      building?: { id: number; name: string };
+    };
+  } | null;
   status: string;
 }
 
@@ -75,7 +95,7 @@ export interface ActiveSubscription {
   status: string;
   package: ActiveSubscriptionPackage;
   user: ActiveSubscriptionUser;
-  slot: { id: number; slotCode: string } | null;
+  slot: { id: number; slotCode: string; floorId?: number; status?: SlotStatus } | null;
 }
 
 export interface SubscriptionApiResponse {
@@ -219,9 +239,10 @@ export interface ActiveSessionApiItem {
   userId: number | null;
   slotId: number | null;
   rowId: number | null;
-  slot?: { id: number; slotCode: string; floor?: { floorNumber: number } } | null;
-  row?: { id: number; rowCode: string; floor?: { floorNumber: number } } | null;
+  slot?: { id: number; slotCode: string; floor?: { floorNumber: number; building?: { id: number; name: string } } } | null;
+  row?: { id: number; rowCode: string; floor?: { floorNumber: number; building?: { id: number; name: string } } } | null;
   user?: { id: number; fullName: string; email: string } | null;
+  staff?: { id: number; fullName: string } | null;
 }
 
 export interface PaginatedResponse<T> {

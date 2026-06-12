@@ -11,13 +11,12 @@ import {
 import { NavLink } from 'react-router-dom';
 import { cn } from '../../lib/utils';
 
-// Dashboard first, then the high-frequency ops: Check-In, Check-Out
 const menuItems = [
-  { label: 'Dashboard',      icon: LayoutDashboard, to: '/staff/dashboard', shortcut: null },
-  { label: 'Check-In',       icon: LogIn,           to: '/staff/check-in',  shortcut: 'F1' },
-  { label: 'Check-Out',      icon: LogOut,          to: '/staff/check-out', shortcut: 'F2' },
-  { label: 'Active Sessions', icon: Clock3,         to: '/staff/sessions',  shortcut: 'F3' },
-  { label: 'Parking Map',    icon: MapPinned,       to: '/staff/map',       shortcut: 'F4' },
+  { label: 'Tổng quan', icon: LayoutDashboard, to: '/staff/dashboard', shortcut: null },
+  { label: 'Check-in', icon: LogIn, to: '/staff/check-in', shortcut: 'F1' },
+  { label: 'Check-out', icon: LogOut, to: '/staff/check-out', shortcut: 'F2' },
+  { label: 'Phiên đang gửi', icon: Clock3, to: '/staff/sessions', shortcut: 'F3' },
+  { label: 'Sơ đồ bãi xe', icon: MapPinned, to: '/staff/map', shortcut: 'F4' },
 ];
 
 export function StaffSidebar() {
@@ -35,14 +34,14 @@ export function StaffSidebar() {
           <div>
             <p className="text-lg font-bold tracking-tight text-white">Smart Parking</p>
             <p className="text-xs font-medium uppercase tracking-[0.22em] text-slate-500">
-              Staff Kiosk
+              Kiosk nhân viên
             </p>
           </div>
         </div>
 
         {/* Shortcut hint */}
         <p className="mb-3 px-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-600">
-          Navigation
+          Điều hướng
         </p>
 
         <nav className="space-y-1 overflow-y-auto pr-1">
@@ -88,9 +87,9 @@ export function StaffSidebar() {
           <div className="flex items-center gap-3">
             <Car className="h-4 w-4 text-slate-500" />
             <div>
-              <p className="text-xs font-semibold text-slate-400">Staff Portal</p>
+              <p className="text-xs font-semibold text-slate-400">Cổng nhân viên</p>
               <p className="mt-0.5 text-[11px] text-slate-600">
-                F1–F4 for quick navigation
+                F1-F4 để chuyển nhanh
               </p>
             </div>
           </div>

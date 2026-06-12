@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import { motion } from 'framer-motion';
+import { useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle,
   BadgeCheck,
@@ -40,6 +41,18 @@ const formatDuration = (minutes: number) => {
   const mins = minutes % 60;
   if (hours <= 0) return `${mins} phút`;
   return `${hours} giờ ${mins} phút`;
+};
+
+const formatSessionLocation = (session: LookupActiveSession | null) => {
+  if (!session) return '--';
+
+  const spotCode = session.slot?.slotCode ?? session.row?.rowCode ?? session.slotCode ?? session.rowCode;
+  if (!spotCode) return '--';
+
+  const floor = session.slot?.floor ?? session.row?.floor;
+  const floorText = floor?.floorNumber ? `Tầng ${floor.floorNumber}` : null;
+  const buildingText = floor?.building?.name ?? null;
+  return [spotCode, floorText, buildingText].filter(Boolean).join(' · ');
 };
 
 interface SuccessData {
@@ -100,7 +113,8 @@ function PaymentMethodButton({
 }
 
 export default function CheckOutPage() {
-  const [plate, setPlate] = useState('');
+  const [searchParams] = useSearchParams();
+  const [plate, setPlate] = useState(() => searchParams.get('plate')?.toUpperCase() ?? '');
   const [isSearching, setIsSearching] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -164,7 +178,7 @@ export default function CheckOutPage() {
         type: 'checkout',
         sessionId: result.sessionId,
         licensePlate: result.licensePlate,
-        slotCode: activeSession.slotCode ?? activeSession.rowCode ?? '--',
+        slotCode: formatSessionLocation(activeSession),
         entryTime: result.entryTime,
         exitTime: result.exitTime ?? undefined,
         durationMinutes: result.durationMinutes,
@@ -189,7 +203,7 @@ export default function CheckOutPage() {
   });
 
   const covered = Boolean(preview?.covered || preview?.fee === 0);
-  const locationCode = activeSession?.slotCode ?? activeSession?.rowCode ?? '--';
+  const locationCode = formatSessionLocation(activeSession);
 
   return (
     <KioskLayout

@@ -182,16 +182,16 @@ export default function Membership() {
 
       setSlotsLoading(true);
       try {
-        const [slotResult, floorResult] = await Promise.all([
-          getAvailableSlots('car'),
-          floorService.getFloors({ vehicleType: 'car', floorType: 'resident', isActive: true, page: 1, limit: 100 }),
-        ]);
+        const floorResult = await floorService.getFloors({ vehicleType: 'car', floorType: 'resident', isActive: true, page: 1, limit: 100 });
         if (cancelled) return;
 
-        const residentFloorIds = new Set(floorResult.floors.map((floor) => floor.id));
-        const slots = slotResult.data.filter(
-          (slot) => slot.floor?.floorType === 'resident' || residentFloorIds.has(slot.floorId)
+        const residentFloors = floorResult.floors.filter((floor) => floor.floorType === 'resident');
+        const slotResults = await Promise.all(
+          residentFloors.map((floor) => getAvailableSlots('car', { floorId: floor.id, limit: 100 }))
         );
+        if (cancelled) return;
+
+        const slots = slotResults.flatMap((result) => result.data);
         setResidentSlots(slots);
         setSelectedSlotId((current) => (current && slots.some((slot) => slot.id === current) ? current : null));
       } catch (err) {

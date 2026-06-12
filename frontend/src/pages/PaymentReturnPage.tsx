@@ -46,6 +46,7 @@ export default function PaymentReturnPage() {
 
     async function loadPayment() {
       if (!orderId || !isAuthenticated) {
+        setPayment(null);
         setLoading(false);
         return;
       }
@@ -88,14 +89,16 @@ export default function PaymentReturnPage() {
               <p className="text-sm font-semibold uppercase tracking-[0.16em] text-blue-600">Kết quả VNPay</p>
               <h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-950">{title}</h1>
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                Backend redirect về trang này kèm `orderId`. Nếu IPN từ VNPay đã xử lý, trạng thái payment và gói cư dân sẽ được cập nhật tự động.
+                {!isAuthenticated
+                  ? 'Thanh toán đã được VNPay chuyển về hệ thống. Vì bạn đã đăng xuất, trang này chỉ hiển thị kết quả cơ bản và mã đơn hàng.'
+                  : 'Backend redirect về trang này kèm orderId. Nếu IPN từ VNPay đã xử lý, trạng thái payment và gói cư dân sẽ được cập nhật tự động.'}
               </p>
             </div>
           </div>
 
           {!isAuthenticated && (
             <div className="mb-5 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-900">
-              Bạn cần đăng nhập lại để xem chi tiết thanh toán. Mã đơn hàng: <span className="font-bold">{orderId || '--'}</span>
+              Bạn cần đăng nhập lại để xem chi tiết thanh toán và tiếp tục thao tác với gói cư dân. Mã đơn hàng: <span className="font-bold">{orderId || '--'}</span>
             </div>
           )}
 
@@ -149,19 +152,39 @@ export default function PaymentReturnPage() {
           )}
 
           <div className="mt-7 flex flex-wrap gap-3">
-            <Link
-              to="/membership"
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 text-sm font-bold text-white transition hover:bg-blue-500"
-            >
-              Quay lại mua gói
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-            <Link
-              to="/staff/check-in"
-              className="inline-flex h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 text-sm font-bold text-slate-700 transition hover:border-blue-300 hover:text-blue-600"
-            >
-              Sang check-in
-            </Link>
+            {!isAuthenticated ? (
+              <>
+                <Link
+                  to="/login"
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 text-sm font-bold text-white transition hover:bg-blue-500"
+                >
+                  Đăng nhập lại
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+                <Link
+                  to="/"
+                  className="inline-flex h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 text-sm font-bold text-slate-700 transition hover:border-blue-300 hover:text-blue-600"
+                >
+                  Về trang chủ
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link
+                  to="/membership"
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 text-sm font-bold text-white transition hover:bg-blue-500"
+                >
+                  Quay lại mua gói
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+                <Link
+                  to="/staff/check-in"
+                  className="inline-flex h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 text-sm font-bold text-slate-700 transition hover:border-blue-300 hover:text-blue-600"
+                >
+                  Sang check-in
+                </Link>
+              </>
+            )}
           </div>
         </motion.div>
       </div>
