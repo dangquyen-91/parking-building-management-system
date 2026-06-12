@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import Home from '../pages/Home';
 import Features from '../pages/Features';
 import Membership from '../pages/Membership';
+import PaymentReturnPage from '../pages/PaymentReturnPage';
 import About from '../pages/About';
 import Contact from '../pages/Contact';
 import { Login } from '../pages/auth/Login';
@@ -14,6 +15,8 @@ import SlotsPage from '../pages/admin/SlotsPage';
 import PackagesPage from '../pages/admin/PackagesPage';
 import PaymentsPage from '../pages/admin/PaymentsPage';
 import CheckInPage from '../pages/staff/CheckInPage';
+import CheckOutPage from '../pages/staff/CheckOutPage';
+import ActiveSessionsPage from '../pages/staff/ActiveSessionsPage';
 import StaffDashboardPage from '../pages/staff/StaffDashboardPage';
 import { useAuth } from '../hooks/useAuth';
 import type { ReactNode } from 'react';
@@ -72,6 +75,7 @@ export default function AppRoutes() {
       <Route path="/membership" element={<Membership />} />
       <Route path="/about" element={<About />} />
       <Route path="/contact" element={<Contact />} />
+      <Route path="/payment" element={<PaymentReturnPage />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/signin" element={<Navigate to="/login" replace />} />
@@ -91,8 +95,8 @@ export default function AppRoutes() {
       <Route path="/staff" element={<Navigate to="/staff/check-in" replace />} />
       <Route path="/staff/check-in" element={<StaffRoute><CheckInPage /></StaffRoute>} />
       {/* Placeholder routes — pages will be added iteratively */}
-      <Route path="/staff/check-out" element={<StaffRoute><CheckInPage /></StaffRoute>} />
-      <Route path="/staff/sessions" element={<StaffRoute><CheckInPage /></StaffRoute>} />
+      <Route path="/staff/check-out" element={<StaffRoute><CheckOutPage /></StaffRoute>} />
+      <Route path="/staff/sessions" element={<StaffRoute><ActiveSessionsPage /></StaffRoute>} />
       <Route path="/staff/map" element={<StaffRoute><CheckInPage /></StaffRoute>} />
       <Route path="/staff/dashboard" element={<StaffRoute><StaffDashboardPage /></StaffRoute>} />
     </Routes>

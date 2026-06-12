@@ -28,12 +28,32 @@ export interface LookupActiveSession {
   entryTime: string;
   slotCode?: string;
   rowCode?: string;
+  slot?: {
+    id: number;
+    slotCode: string;
+    floorId?: number;
+    floor?: {
+      id: number;
+      floorNumber: number;
+      building?: { id: number; name: string };
+    };
+  } | null;
+  row?: {
+    id: number;
+    rowCode: string;
+    floorId?: number;
+    floor?: {
+      id: number;
+      floorNumber: number;
+      building?: { id: number; name: string };
+    };
+  } | null;
   status: string;
 }
 
 export interface LookupApiResponse {
   licensePlate: string;
-  status: 'available' | 'active';
+  status: 'available' | 'already_active' | 'active';
   activeSession: LookupActiveSession | null;
   hint: {
     linkedResident: LookupLinkedResident | null;
@@ -75,7 +95,7 @@ export interface ActiveSubscription {
   status: string;
   package: ActiveSubscriptionPackage;
   user: ActiveSubscriptionUser;
-  slot: { id: number; slotCode: string } | null;
+  slot: { id: number; slotCode: string; floorId?: number; status?: SlotStatus } | null;
 }
 
 export interface SubscriptionApiResponse {
@@ -219,9 +239,10 @@ export interface ActiveSessionApiItem {
   userId: number | null;
   slotId: number | null;
   rowId: number | null;
-  slot?: { id: number; slotCode: string; floor?: { floorNumber: number } } | null;
-  row?: { id: number; rowCode: string; floor?: { floorNumber: number } } | null;
+  slot?: { id: number; slotCode: string; floor?: { floorNumber: number; building?: { id: number; name: string } } } | null;
+  row?: { id: number; rowCode: string; floor?: { floorNumber: number; building?: { id: number; name: string } } } | null;
   user?: { id: number; fullName: string; email: string } | null;
+  staff?: { id: number; fullName: string } | null;
 }
 
 export interface PaginatedResponse<T> {
@@ -241,16 +262,45 @@ export interface CheckoutPreviewApiResponse {
   licensePlate: string;
   vehicleType: VehicleType;
   entryTime: string;
-  exitTime: string;
+  now: string;
   durationMinutes: number;
+  floorType: FloorType | null;
+  covered: boolean;
+  coveredBy: 'subscription' | 'booking' | null;
+  prepaidHours: number | null;
+  prepaidAmount: number | null;
   fee: number;
-  isResident: boolean;
-  slotCode: string;
+  breakdown: {
+    baseFee?: number;
+    overnightFee?: number;
+    totalFee?: number;
+    mode?: string;
+    durationMinutes?: number;
+    overnightNights?: number;
+  } | null;
+  suggestedPaymentMethod: 'package' | 'cash_or_vnpay';
 }
 
 // POST /parking-sessions/{id}/check-out
 export interface CheckOutPayload {
   paymentMethod: PaymentMethod;
+}
+
+export interface CheckOutApiResponse {
+  sessionId: number;
+  licensePlate: string;
+  vehicleType: VehicleType;
+  entryTime: string;
+  exitTime: string | null;
+  durationMinutes?: number;
+  fee: number;
+  covered: boolean;
+  coveredBy: 'subscription' | 'booking' | null;
+  paymentMethod: PaymentMethod | 'package';
+  paymentId?: number | null;
+  paymentUrl?: string | null;
+  orderId?: string | null;
+  breakdown: CheckoutPreviewApiResponse['breakdown'];
 }
 
 // ─── Parking Map ──────────────────────────────────────────────────────────────

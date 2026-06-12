@@ -12,10 +12,14 @@ export interface Payment {
   id: number;
   orderId: string;
   provider: string;
+  paymentMethod?: 'cash' | 'vnpay';
+  paymentType?: 'subscription' | 'session' | 'booking';
   amount: string;
   orderInfo: string | null;
   status: PaymentStatus;
   subscriptionId: number | null;
+  sessionId?: number | null;
+  bookingId?: number | null;
   ipAddress: string | null;
   vnpTransactionNo: string | null;
   vnpResponseCode: string | null;
@@ -25,6 +29,17 @@ export interface Payment {
   createdAt: string;
   updatedAt: string;
   subscription?: PaymentSubscription | null;
+}
+
+export interface PaymentQueryResult {
+  orderId: string;
+  paid: boolean;
+  queryResponseCode: string;
+  transactionStatus: string | null;
+  message: string;
+  paymentStatus: PaymentStatus;
+  subscriptionStatus: string | null;
+  amount: number;
 }
 
 async function parseResponse<T>(response: Response): Promise<T> {
@@ -50,6 +65,15 @@ export const paymentService = {
       headers: authHeaders(),
     });
     const result = await parseResponse<{ data: Payment }>(response);
+    return result.data;
+  },
+
+  async queryPayment(orderId: string): Promise<PaymentQueryResult> {
+    const response = await fetch(`${API_BASE_URL}/payments/${encodeURIComponent(orderId)}/query`, {
+      method: 'GET',
+      headers: authHeaders(),
+    });
+    const result = await parseResponse<{ data: PaymentQueryResult }>(response);
     return result.data;
   },
 };
