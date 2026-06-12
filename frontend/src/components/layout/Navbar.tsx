@@ -26,6 +26,7 @@ export default function Navbar() {
     { name: 'Trang Chủ', href: '/' },
     { name: 'Tính Năng', href: '/features' },
     { name: 'Gói Dịch Vụ', href: '/membership' },
+    ...(isAuthenticated ? [{ name: 'Đặt Chỗ Của Tôi', href: '/my-bookings' }] : []),
     { name: 'Về Chúng Tôi', href: '/about' },
     { name: 'Liên Hệ', href: '/contact' },
   ];
@@ -47,7 +48,8 @@ export default function Navbar() {
             ParkEase<span className="text-blue-500">.</span>
           </span>
         </Link>
-        <div className="hidden md:flex items-center gap-8">
+
+        <div className="hidden md:flex items-center gap-6">
           {navLinks.map((link, idx) => (
             <NavLink
               key={idx}
@@ -77,13 +79,14 @@ export default function Navbar() {
             </NavLink>
           ))}
         </div>
+
         <div className="hidden md:flex items-center gap-4">
           {isAuthenticated && user ? (
             <>
               <span className={`text-sm font-semibold ${scrolled || !isHome ? 'text-slate-700' : 'text-slate-200'}`}>
                 Chào, <span className="text-blue-500 font-bold">{user.fullName.split(' ').slice(-1)[0]}</span>
               </span>
-              <button 
+              <button
                 onClick={() => logout()}
                 className={`text-sm font-medium transition-colors hover:text-red-500 cursor-pointer ${
                   scrolled || !isHome ? 'text-slate-600' : 'text-slate-300'
@@ -94,19 +97,19 @@ export default function Navbar() {
             </>
           ) : (
             <>
-              <Link 
-                to="/login" 
+              <Link
+                to="/login"
                 className={`text-sm font-medium transition-colors hover:text-blue-500 ${
                   scrolled || !isHome ? 'text-slate-700' : 'text-slate-200'
                 }`}
               >
                 Sign In
               </Link>
-              <Link 
-                to="/register" 
+              <Link
+                to="/register"
                 className={`px-4 py-2 rounded-full border text-sm font-medium transition-all ${
-                  scrolled || !isHome 
-                    ? 'border-slate-300 text-slate-700 hover:bg-slate-50' 
+                  scrolled || !isHome
+                    ? 'border-slate-300 text-slate-700 hover:bg-slate-50'
                     : 'border-white/20 text-white hover:bg-white/10'
                 }`}
               >
@@ -114,20 +117,22 @@ export default function Navbar() {
               </Link>
             </>
           )}
-          <Link to="/contact" className="px-5 py-2.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all shadow-[0_0_20px_rgba(37,99,235,0.3)] hover:shadow-[0_0_30px_rgba(37,99,235,0.5)] transform hover:-translate-y-0.5 inline-block">
+          <Link to="/booking" className="px-5 py-2.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all shadow-[0_0_20px_rgba(37,99,235,0.3)] hover:shadow-[0_0_30px_rgba(37,99,235,0.5)] transform hover:-translate-y-0.5 inline-block">
             Đặt Chỗ Ngay
           </Link>
         </div>
-        <button 
+
+        <button
           className={`md:hidden p-2 rounded-lg ${scrolled || !isHome ? 'text-slate-900' : 'text-white'}`}
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
         >
           {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
       </div>
+
       <AnimatePresence>
         {mobileMenuOpen && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
@@ -146,9 +151,9 @@ export default function Navbar() {
                 {link.name}
               </NavLink>
             ))}
-            
+
             <div className="mt-4 flex flex-col gap-3">
-              <Link to="/contact" className="px-6 py-3 rounded-full bg-blue-600 text-white font-medium w-full shadow-lg text-center inline-block">
+              <Link to="/booking" className="px-6 py-3 rounded-full bg-blue-600 text-white font-medium w-full shadow-lg text-center inline-block">
                 Đặt Chỗ Ngay
               </Link>
               {isAuthenticated && user ? (
@@ -156,8 +161,8 @@ export default function Navbar() {
                   <div className="text-sm font-semibold text-slate-800 px-2">
                     Tài khoản: <span className="text-blue-600">{user.fullName}</span>
                   </div>
-                  <button 
-                    onClick={() => logout()} 
+                  <button
+                    onClick={() => logout()}
                     className="px-4 py-2.5 rounded-full bg-red-50 text-red-600 border border-red-200 font-medium text-sm text-center shadow-sm w-full cursor-pointer hover:bg-red-100 transition-colors"
                   >
                     Đăng xuất

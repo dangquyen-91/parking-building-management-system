@@ -3,6 +3,8 @@ import Home from '../pages/Home';
 import Features from '../pages/Features';
 import Membership from '../pages/Membership';
 import PaymentReturnPage from '../pages/PaymentReturnPage';
+import BookingPage from '../pages/BookingPage';
+import MyBookingsPage from '../pages/MyBookingsPage';
 import About from '../pages/About';
 import Contact from '../pages/Contact';
 import { Login } from '../pages/auth/Login';
@@ -73,6 +75,8 @@ export default function AppRoutes() {
       <Route path="/" element={<Home />} />
       <Route path="/features" element={<Features />} />
       <Route path="/membership" element={<Membership />} />
+      <Route path="/booking" element={<BookingPage />} />
+      <Route path="/my-bookings" element={<MyBookingsPage />} />
       <Route path="/about" element={<About />} />
       <Route path="/contact" element={<Contact />} />
       <Route path="/payment" element={<PaymentReturnPage />} />
