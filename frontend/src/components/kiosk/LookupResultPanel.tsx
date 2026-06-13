@@ -100,8 +100,8 @@ function Badge({ label, tone }: { label: string; tone: 'green' | 'amber' | 'blue
   const map = {
     green: 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300',
     amber: 'border-amber-400/30 bg-amber-400/10 text-amber-300',
-    blue:  'border-blue-400/30 bg-blue-400/10 text-blue-300',
-    red:   'border-red-400/30 bg-red-400/10 text-red-300',
+    blue: 'border-blue-400/30 bg-blue-400/10 text-blue-300',
+    red: 'border-red-400/30 bg-red-400/10 text-red-300',
     slate: 'border-white/10 bg-white/[0.05] text-slate-400',
   };
   return (
@@ -269,40 +269,39 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
 
       let isExpiredResident = false;
 
-      // Step 2: Has linked resident? → check active subscription
-      try {
-        const subResult = await checkActiveSubscription(lookup.licensePlate);
-        if (!cancelled && subResult.active && subResult.subscription) {
-          const sub = subResult.subscription;
-          const residentAvailability = await getAvailabilityByFloorType(sub.vehicleType, 'resident');
-          if (!cancelled) {
-            setScenario({
-              kind: 'resident',
-              lookup,
-              subscription: sub,
-              availableSlots: residentAvailability.slots,
-              availableRows: residentAvailability.rows,
-              floors: residentAvailability.floors,
-            });
-            if (sub.slotId) setResidentSlotId(sub.slotId);
-            if (sub.vehicleType === 'motorcycle') setResidentRowId(residentAvailability.rows[0]?.id ?? null);
+      // Step 2: Has linked resident in hint? → ONLY THEN check active subscription.
+      // If no linkedResident, skip entirely → visitor / walk-in path.
+      if (lookup.hint.linkedResident) {
+        try {
+          const subResult = await checkActiveSubscription(lookup.licensePlate);
+          if (!cancelled && subResult.active && subResult.subscription) {
+            const sub = subResult.subscription;
+            const residentAvailability = await getAvailabilityByFloorType(sub.vehicleType, 'resident');
+            if (!cancelled) {
+              setScenario({
+                kind: 'resident',
+                lookup,
+                subscription: sub,
+                availableSlots: residentAvailability.slots,
+                availableRows: residentAvailability.rows,
+                floors: residentAvailability.floors,
+              });
+              if (sub.slotId) setResidentSlotId(sub.slotId);
+              if (sub.vehicleType === 'motorcycle') setResidentRowId(residentAvailability.rows[0]?.id ?? null);
+            }
+            return;
           }
-          return;
+          // Resident exists but subscription expired → treat as expired resident
+          if (!cancelled && !subResult.active) {
+            isExpiredResident = true;
+          }
+        } catch {
+          // Subscription check failed → still allow walkin, don't crash
+          isExpiredResident = false;
         }
-        if (!cancelled && lookup.hint.linkedResident && !subResult.active) {
-          isExpiredResident = true;
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setScenario({
-            kind: 'error',
-            message: err instanceof Error ? err.message : 'Không kiểm tra được gói cư dân của biển số này.',
-          });
-        }
-        return;
       }
 
-      // Step 3: Pending booking?
+      // Step 3: Pending booking? (for visitors who pre-booked)
       try {
         const bookingResult = await searchPendingBookings(lookup.licensePlate);
         if (!cancelled && bookingResult.data.length > 0) {
@@ -311,30 +310,33 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
           if (!cancelled) setScenario({ kind: 'booking', lookup, booking, availableSlots: visitorAvailability.slots });
           return;
         }
+      } catch {
+        // Booking check failed → fall through to walk-in
+      }
+
+      // Step 4: Walk-in visitor — load visitor floor slots/rows
+      try {
+        const [carVisitor, motorcycleVisitor] = await Promise.all([
+          getAvailabilityByFloorType('car', 'visitor'),
+          getAvailabilityByFloorType('motorcycle', 'visitor'),
+        ]);
+        if (!cancelled) {
+          setScenario({
+            kind: 'walkin',
+            lookup,
+            availableSlots: carVisitor.slots,
+            availableRows: motorcycleVisitor.rows,
+            isExpiredResident,
+          });
+          setSelectedRowId(motorcycleVisitor.rows[0]?.id ?? null);
+        }
       } catch (err) {
         if (!cancelled) {
           setScenario({
             kind: 'error',
-            message: err instanceof Error ? err.message : 'Không kiểm tra được gói cư dân của biển số này.',
+            message: err instanceof Error ? err.message : 'Không tải được danh sách chỗ trống. Vui lòng thử lại.',
           });
         }
-        return;
-      }
-
-      // Step 4: Walk-in
-      const [carVisitor, motorcycleVisitor] = await Promise.all([
-        getAvailabilityByFloorType('car', 'visitor'),
-        getAvailabilityByFloorType('motorcycle', 'visitor'),
-      ]);
-      if (!cancelled) {
-        setScenario({
-          kind: 'walkin',
-          lookup,
-          availableSlots: carVisitor.slots,
-          availableRows: motorcycleVisitor.rows,
-          isExpiredResident,
-        });
-        setSelectedRowId(motorcycleVisitor.rows[0]?.id ?? null);
       }
     }
 
@@ -523,9 +525,9 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
         </div>
 
         <div className="space-y-2 mb-5">
-          <InfoRow icon={BadgeCheck}    label="Gói dịch vụ"  value={sub.package.name} />
-          <InfoRow icon={Phone}         label="Điện thoại"   value={sub.user.phone} />
-          <InfoRow icon={Calendar}      label="Hết hạn"      value={formatDateOnly(sub.endDate)} />
+          <InfoRow icon={BadgeCheck} label="Gói dịch vụ" value={sub.package.name} />
+          <InfoRow icon={Phone} label="Điện thoại" value={sub.user.phone} />
+          <InfoRow icon={Calendar} label="Hết hạn" value={formatDateOnly(sub.endDate)} />
           {fixedCarSlot ? (
             <InfoRow icon={SquareParking} label="Ô đỗ cố định" value={fixedCarSlot} />
           ) : (
@@ -603,8 +605,8 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
         </div>
 
         <div className="space-y-2 mb-5">
-          <InfoRow icon={User}      label="Tên khách"  value={booking.customerName} />
-          <InfoRow icon={Phone}     label="Điện thoại" value={booking.customerPhone} />
+          <InfoRow icon={User} label="Tên khách" value={booking.customerName} />
+          <InfoRow icon={Phone} label="Điện thoại" value={booking.customerPhone} />
           <InfoRow
             icon={MapPin}
             label="Tầng"
@@ -623,7 +625,7 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
             selectedSlotId={selectedSlotId}
             selectedRowId={null}
             onSelectSlot={setSelectedSlotId}
-            onSelectRow={() => {}}
+            onSelectRow={() => { }}
           />
         </div>
 
