@@ -10,8 +10,9 @@ const Booking = sequelize.define(
     floorId: { type: DataTypes.INTEGER, allowNull: false },
     slotId: { type: DataTypes.INTEGER, allowNull: true },
     userId: { type: DataTypes.INTEGER, allowNull: true },
-    customerName: { type: DataTypes.STRING(100), allowNull: false },
-    customerPhone: { type: DataTypes.STRING(20), allowNull: false },
+    customerName: { type: DataTypes.STRING(100), allowNull: true },
+    customerPhone: { type: DataTypes.STRING(20), allowNull: true },
+    customerEmail: { type: DataTypes.STRING(255), allowNull: false },
     licensePlate: { type: DataTypes.STRING(20), allowNull: false },
     vehicleType: { type: DataTypes.ENUM('car'), allowNull: false, defaultValue: 'car' },
     startTime: { type: DataTypes.DATE, allowNull: true },
@@ -33,6 +34,7 @@ const Booking = sequelize.define(
       { fields: ['userId'] },
       { fields: ['floorId'] },
       { fields: ['startTime'] },
+      { fields: ['customerEmail'] },
     ],
   }
 );
