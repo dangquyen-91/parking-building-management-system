@@ -18,6 +18,10 @@ const phoneField = Joi.string()
 
 export const createBookingSchema = Joi.object({
   licensePlate: licensePlateField,
+  customerEmail: Joi.string().trim().lowercase().email().required().messages({
+    'string.email': 'Email không hợp lệ',
+    'any.required': 'Email là bắt buộc để nhận xác nhận booking',
+  }),
   startTime: Joi.date().iso().required(),
   endTime: Joi.date().iso().greater(Joi.ref('startTime')).required(),
   customerName: Joi.string().trim().min(2).max(100),

@@ -4021,28 +4021,36 @@ paths:
       summary: Tao booking (guest hoac user dang nhap)
       description: |
         Tao booking + tra ve VNPay paymentUrl.
-        - **Guest** (khong gui Bearer token): chi can `licensePlate` + `startTime` + `endTime`.
-          `customerName`/`customerPhone` optional — BE auto-fill placeholder neu trong.
-        - **User dang nhap**: auto-fill tu profile; body override duoc.
-          PHAI co `customerPhone` (tu body hoac tu `user.phone`); neu ca 2 deu trong → reject 400.
+        - **Guest** (khong gui Bearer token): chi can `customerEmail` + `licensePlate` + `startTime` + `endTime`.
+          `customerName`/`customerPhone` optional.
+        - **User dang nhap**: auto-fill tu profile; body override duoc. `customerEmail` van required.
         - **Cu dan** (user co sub active): chi book duoc plate trong sub cua minh (chong "book ho").
 
         **Business rules:**
           - Chi booking xe ô tô (`vehicleType='car'`, BE auto-set).
           - Tang visitor car: BE auto-pick floor neu khong truyen `floorId`.
-          - Booking nay rat "ao" — KHONG lock slot. Khi check-in BE chon slot trong.
+          - Booking "ao" — khong lock slot cu the, nhung confirmed booking chiem virtual capacity (giam slot trong).
           - `startTime` phai trong vong 24h toi va o tuong lai.
           - Thoi luong toi thieu 1 gio.
-          - 20% rule: bai phai con ≥ 20% slot trong tang visitor car, neu khong se reject.
+          - 20% rule: con ≥ 20% slot trong (da tru confirmed bookings) moi nhan booking.
           - Khong duplicate active booking cho cung plate.
+
+        **Payment outcome:**
+          - Thanh toan thanh cong → booking `confirmed` (co cho) + gui email xac nhan qua Brevo.
+          - Thanh toan that bai → booking `cancelled` (khong co cho).
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [licensePlate, startTime, endTime]
+              required: [customerEmail, licensePlate, startTime, endTime]
               properties:
+                customerEmail:
+                  type: string
+                  format: email
+                  description: Bat buoc. Nhan email xac nhan booking khi thanh toan thanh cong.
+                  example: 'khach@gmail.com'
                 licensePlate:
                   type: string
                   pattern: '^[A-Z0-9\\-]+$'
@@ -4053,20 +4061,20 @@ paths:
                   type: string
                   format: date-time
                   description: ISO 8601. Phai > now va ≤ now+24h.
-                  example: '2026-06-03T10:30:00.000Z'
+                  example: '2026-06-13T10:30:00.000Z'
                 endTime:
                   type: string
                   format: date-time
                   description: ISO 8601. Phai > startTime va ≥ startTime+1h.
-                  example: '2026-06-03T12:30:00.000Z'
+                  example: '2026-06-13T12:30:00.000Z'
                 customerName:
                   type: string
-                  description: Optional. BE auto-fill 'Khach vang lai' neu trong (guest), hoac user.fullName (logged-in).
+                  description: Optional.
                   example: 'Nguyen Van A'
                 customerPhone:
                   type: string
                   pattern: '^\\d{9,15}$'
-                  description: Optional. BE auto-fill '' (guest) hoac user.phone (logged-in).
+                  description: Optional.
                   example: '0901234567'
                 floorId:
                   type: integer

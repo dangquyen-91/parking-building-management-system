@@ -8,6 +8,7 @@ import ResidentSubscription from '../models/resident-subscription.model.js';
 import AppError from '../utils/appError.js';
 import { calculateFee } from './pricing.service.js';
 import { createBookingPayment } from './payment.service.js';
+import { sendBookingConfirmation } from './email.service.js';
 
 const FREE_SLOT_THRESHOLD = 0.20;
 const MAX_ADVANCE_BOOKING_MS = 24 * 3600_000;
@@ -28,19 +29,30 @@ const checkFloorCapacity = async (floorId, t) => {
   const total = await ParkingSlot.count({ where: { floorId }, transaction: t });
   if (total === 0) throw new AppError('Tầng này không có slot nào', 400);
 
-  const empty = await ParkingSlot.count({
+  const emptyPhysical = await ParkingSlot.count({
     where: { floorId, status: 'empty' },
     transaction: t,
   });
 
-  const ratio = empty / total;
+  const heldByBookings = await Booking.count({
+    where: {
+      floorId,
+      status: 'confirmed',
+      sessionId: null,
+      endTime: { [Op.gt]: new Date() },
+    },
+    transaction: t,
+  });
+
+  const available = Math.max(0, emptyPhysical - heldByBookings);
+  const ratio = available / total;
   if (ratio < FREE_SLOT_THRESHOLD) {
     throw new AppError(
       `Bãi đang quá tải (còn ${Math.round(ratio * 100)}% trống, cần ≥ ${FREE_SLOT_THRESHOLD * 100}%). Tạm thời không nhận booking.`,
       409
     );
   }
-  return { total, empty, ratio };
+  return { total, emptyPhysical, heldByBookings, available, ratio };
 };
 
 const validateTimeWindow = (startTime, endTime) => {
@@ -60,33 +72,26 @@ const validateTimeWindow = (startTime, endTime) => {
   }
 };
 
-const GUEST_DEFAULT_NAME = 'Khách vãng lai';
-const GUEST_DEFAULT_PHONE = '';
-
 const resolveCustomer = async (body, requester, t) => {
+  const email = (body.customerEmail || '').trim().toLowerCase();
+
   if (!requester) {
     return {
       userId: null,
-      customerName: body.customerName?.trim() || GUEST_DEFAULT_NAME,
-      customerPhone: body.customerPhone?.trim() || GUEST_DEFAULT_PHONE,
+      customerName: body.customerName?.trim() || null,
+      customerPhone: body.customerPhone?.trim() || null,
+      customerEmail: email,
     };
   }
 
   const user = await User.findByPk(requester.id, { transaction: t });
   if (!user) throw new AppError('User not found', 404);
 
-  const resolvedPhone = body.customerPhone?.trim() || user.phone;
-  if (!resolvedPhone) {
-    throw new AppError(
-      'Vui lòng cập nhật số điện thoại trong profile (hoặc truyền customerPhone trong request) trước khi booking.',
-      400
-    );
-  }
-
   return {
     userId: user.id,
     customerName: body.customerName?.trim() || user.fullName,
-    customerPhone: resolvedPhone,
+    customerPhone: body.customerPhone?.trim() || user.phone || null,
+    customerEmail: email || user.email,
   };
 };
 
@@ -148,6 +153,7 @@ export const createBooking = async ({ body, requester, ipAddr }) => {
           userId: customer.userId,
           customerName: customer.customerName,
           customerPhone: customer.customerPhone,
+          customerEmail: customer.customerEmail,
           licensePlate: plate,
           vehicleType: 'car',
           startTime: body.startTime,
@@ -191,6 +197,20 @@ export const handleBookingPaymentSuccess = async (bookingId, t) => {
   const booking = await Booking.findByPk(bookingId, { transaction: t, lock: t.LOCK.UPDATE });
   if (!booking || booking.status !== 'pending') return;
   await booking.update({ status: 'confirmed' }, { transaction: t });
+
+  const snapshot = {
+    id: booking.id,
+    licensePlate: booking.licensePlate,
+    customerEmail: booking.customerEmail,
+    customerName: booking.customerName,
+    startTime: booking.startTime,
+    endTime: booking.endTime,
+    prepaidHours: booking.prepaidHours,
+    amount: booking.amount,
+  };
+  sendBookingConfirmation(snapshot).catch((err) =>
+    console.error(`[email] booking #${snapshot.id} confirmation failed:`, err.message)
+  );
 };
 
 export const handleBookingPaymentFailure = async (bookingId, t) => {
