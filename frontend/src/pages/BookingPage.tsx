@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -18,6 +18,7 @@ import { useAuth } from '../hooks/useAuth';
 import { bookingService } from '../services/booking.service';
 
 const platePattern = /^[A-Z0-9-]{4,20}$/;
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const formatCurrency = (value: string | number) =>
   Number(value).toLocaleString('vi-VN', {
@@ -60,6 +61,7 @@ export default function BookingPage() {
   const [licensePlate, setLicensePlate] = useState('');
   const [customerName, setCustomerName] = useState(user?.fullName ?? '');
   const [customerPhone, setCustomerPhone] = useState(user?.phone ?? '');
+  const [customerEmail, setCustomerEmail] = useState(user?.email ?? '');
   const [startTime, setStartTime] = useState(defaultWindow.startTime);
   const [endTime, setEndTime] = useState(defaultWindow.endTime);
   const [note, setNote] = useState('');
@@ -70,12 +72,20 @@ export default function BookingPage() {
 
   const plate = normalizePlate(licensePlate);
   const plateValid = platePattern.test(plate);
+  const emailValid = emailPattern.test(customerEmail.trim());
   const phoneValid = !customerPhone.trim() || /^\d{9,15}$/.test(customerPhone.trim());
   const start = new Date(startTime);
   const end = new Date(endTime);
   const durationMinutes = Math.max(0, Math.round((end.getTime() - start.getTime()) / 60000));
   const durationHours = Math.max(0, Math.ceil(durationMinutes / 60));
-  const ready = plateValid && phoneValid && durationMinutes >= 60 && !submitting;
+  const ready = plateValid && emailValid && phoneValid && durationMinutes >= 60 && !submitting;
+
+  useEffect(() => {
+    if (!user) return;
+    setCustomerName((current) => current || user.fullName || '');
+    setCustomerPhone((current) => current || user.phone || '');
+    setCustomerEmail((current) => current || user.email || '');
+  }, [user]);
 
   const handleSubmit = async () => {
     if (!plateValid) {
@@ -84,6 +94,10 @@ export default function BookingPage() {
     }
     if (!phoneValid) {
       setSubmitError('Số điện thoại phải có 9-15 chữ số.');
+      return;
+    }
+    if (!emailValid) {
+      setSubmitError('Email không hợp lệ. Vui lòng nhập email cá nhân để nhận xác nhận booking.');
       return;
     }
     if (durationMinutes < 60) {
@@ -96,6 +110,7 @@ export default function BookingPage() {
     try {
       const result = await bookingService.createBooking({
         licensePlate: plate,
+        customerEmail: customerEmail.trim().toLowerCase(),
         startTime: toIsoFromInput(startTime),
         endTime: toIsoFromInput(endTime),
         customerName: customerName.trim() || undefined,
@@ -182,6 +197,26 @@ export default function BookingPage() {
                     customerPhone && !phoneValid ? 'border-red-300 focus:border-red-400' : 'border-slate-200 focus:border-blue-500'
                   )}
                 />
+              </label>
+
+              <label className="block md:col-span-2">
+                <span className="text-sm font-bold text-slate-700">Email nhận xác nhận booking</span>
+                <input
+                  type="email"
+                  value={customerEmail}
+                  onChange={(event) => {
+                    setCustomerEmail(event.target.value);
+                    setSubmitError(null);
+                  }}
+                  placeholder="VD: ban@example.com"
+                  className={cn(
+                    'mt-2 h-12 w-full rounded-2xl border bg-slate-50 px-4 text-sm font-semibold text-slate-950 outline-none transition placeholder:text-slate-400 focus:bg-white',
+                    customerEmail && !emailValid ? 'border-red-300 focus:border-red-400' : 'border-slate-200 focus:border-blue-500'
+                  )}
+                />
+                <p className="mt-2 text-xs font-medium text-slate-500">
+                  Sau khi thanh toán thành công, hệ thống sẽ gửi mã booking và thời gian đã trả trước về email này.
+                </p>
               </label>
 
               <label className="block">
@@ -280,6 +315,10 @@ export default function BookingPage() {
                     <span className="text-xl font-black text-blue-600">
                       {previewAmount ? formatCurrency(previewAmount) : 'Tính khi tạo'}
                     </span>
+                  </div>
+                  <div className="mt-4 border-t border-slate-200 pt-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Email xác nhận</p>
+                    <p className="mt-1 break-all text-sm font-bold text-slate-950">{customerEmail.trim() || '--'}</p>
                   </div>
                 </div>
               </div>

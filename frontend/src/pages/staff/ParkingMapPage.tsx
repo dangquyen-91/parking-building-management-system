@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Building2,
   Car,
-  CheckCircle2,
   ChevronDown,
   Layers3,
   Loader2,

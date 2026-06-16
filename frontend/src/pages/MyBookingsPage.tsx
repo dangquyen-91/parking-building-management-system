@@ -7,6 +7,7 @@ import {
   Car,
   Clock3,
   Loader2,
+  Mail,
   Plus,
   ReceiptText,
   RefreshCw,
@@ -231,6 +232,12 @@ export default function MyBookingsPage() {
                       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Số tiền</p>
                       <p className="mt-1 text-sm font-bold text-slate-950">{formatCurrency(booking.amount)}</p>
                     </div>
+                  </div>
+
+                  <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <Mail className="mb-2 h-5 w-5 text-blue-600" />
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Email xác nhận</p>
+                    <p className="mt-1 break-all text-sm font-bold text-slate-950">{booking.customerEmail || '--'}</p>
                   </div>
                 </motion.article>
               ))}
