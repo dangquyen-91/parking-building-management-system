@@ -4,6 +4,7 @@ export type BookingStatus = 'pending' | 'confirmed' | 'cancelled' | 'expired';
 
 export interface BookingCreatePayload {
   licensePlate: string;
+  customerEmail: string;
   startTime: string;
   endTime: string;
   customerName?: string;
@@ -38,6 +39,7 @@ export interface Booking {
   userId: number | null;
   customerName: string;
   customerPhone: string;
+  customerEmail: string;
   licensePlate: string;
   vehicleType: 'car';
   startTime: string;

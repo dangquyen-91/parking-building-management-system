@@ -33,6 +33,8 @@ export default function PaymentReturnPage() {
   const optimisticSuccess = returnStatus === 'success';
   const resolvedSuccess = payment?.status === 'success';
   const isSuccess = resolvedSuccess || (optimisticSuccess && !payment);
+  const paymentType = payment?.paymentType ?? (orderId.startsWith('BOOK-') ? 'booking' : orderId.startsWith('SUB-') ? 'subscription' : orderId.startsWith('SES-') ? 'session' : '');
+  const isBookingPayment = paymentType === 'booking';
 
   const title = useMemo(() => {
     if (!orderId) return 'Thiếu mã thanh toán';
@@ -90,15 +92,22 @@ export default function PaymentReturnPage() {
               <h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-950">{title}</h1>
               <p className="mt-2 text-sm leading-6 text-slate-600">
                 {!isAuthenticated
-                  ? 'Thanh toán đã được VNPay chuyển về hệ thống. Vì bạn đã đăng xuất, trang này chỉ hiển thị kết quả cơ bản và mã đơn hàng.'
-                  : 'Backend redirect về trang này kèm orderId. Nếu IPN từ VNPay đã xử lý, trạng thái payment và gói cư dân sẽ được cập nhật tự động.'}
+                  ? isBookingPayment
+                    ? 'Thanh toán booking đã được VNPay chuyển về hệ thống. Nếu giao dịch thành công, email xác nhận sẽ được gửi về địa chỉ bạn đã nhập khi đặt chỗ.'
+                    : 'Thanh toán đã được VNPay chuyển về hệ thống. Vì bạn chưa đăng nhập, trang này chỉ hiển thị kết quả cơ bản và mã đơn hàng.'
+                  : isBookingPayment
+                    ? 'Nếu VNPay xác nhận thành công, booking sẽ được chuyển sang trạng thái đã xác nhận và email xác nhận sẽ được gửi cho khách.'
+                    : 'Backend redirect về trang này kèm orderId. Nếu IPN từ VNPay đã xử lý, trạng thái payment sẽ được cập nhật tự động.'}
               </p>
             </div>
           </div>
 
           {!isAuthenticated && (
             <div className="mb-5 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-900">
-              Bạn cần đăng nhập lại để xem chi tiết thanh toán và tiếp tục thao tác với gói cư dân. Mã đơn hàng: <span className="font-bold">{orderId || '--'}</span>
+              {isBookingPayment
+                ? 'Bạn có thể dùng mã đơn hàng để đối chiếu khi cần hỗ trợ. Vé booking chi tiết sẽ được gửi qua email sau khi thanh toán thành công.'
+                : 'Bạn cần đăng nhập lại để xem chi tiết thanh toán và tiếp tục thao tác với tài khoản.'}
+              {' '}Mã đơn hàng: <span className="font-bold">{orderId || '--'}</span>
             </div>
           )}
 
@@ -133,7 +142,7 @@ export default function PaymentReturnPage() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Loại thanh toán</p>
-                  <p className="mt-1 font-bold text-slate-950">{typeLabels[payment.paymentType ?? ''] ?? payment.paymentType ?? '--'}</p>
+                  <p className="mt-1 font-bold text-slate-950">{typeLabels[paymentType] ?? paymentType ?? '--'}</p>
                 </div>
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Số tiền</p>
@@ -144,8 +153,12 @@ export default function PaymentReturnPage() {
                   <p className="mt-1 font-bold text-slate-950">{payment.orderInfo || '--'}</p>
                 </div>
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Subscription</p>
-                  <p className="mt-1 font-bold text-slate-950">{payment.subscription?.status ?? '--'}</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+                    {isBookingPayment ? 'Booking' : 'Subscription'}
+                  </p>
+                  <p className="mt-1 font-bold text-slate-950">
+                    {isBookingPayment ? `#${payment.bookingId ?? '--'}` : payment.subscription?.status ?? '--'}
+                  </p>
                 </div>
               </div>
             </div>
@@ -155,10 +168,10 @@ export default function PaymentReturnPage() {
             {!isAuthenticated ? (
               <>
                 <Link
-                  to="/login"
+                  to={isBookingPayment ? '/booking' : '/login'}
                   className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 text-sm font-bold text-white transition hover:bg-blue-500"
                 >
-                  Đăng nhập lại
+                  {isBookingPayment ? 'Đặt booking khác' : 'Đăng nhập lại'}
                   <ArrowRight className="h-4 w-4" />
                 </Link>
                 <Link
@@ -171,10 +184,10 @@ export default function PaymentReturnPage() {
             ) : (
               <>
                 <Link
-                  to="/membership"
+                  to={isBookingPayment ? '/my-bookings' : '/membership'}
                   className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 text-sm font-bold text-white transition hover:bg-blue-500"
                 >
-                  Quay lại mua gói
+                  {isBookingPayment ? 'Xem booking của tôi' : 'Quay lại mua gói'}
                   <ArrowRight className="h-4 w-4" />
                 </Link>
                 <Link
