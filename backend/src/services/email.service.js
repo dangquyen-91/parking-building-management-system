@@ -40,7 +40,7 @@ export const sendBookingConfirmation = async (booking) => {
       <h2 style="color: #2e7d32;">✅ Đặt chỗ thành công</h2>
       <p>Cảm ơn bạn đã đặt chỗ gửi xe. Chi tiết booking:</p>
       <table style="width:100%; border-collapse: collapse;">
-        <tr><td style="padding:8px; border-bottom:1px solid #eee;"><b>Mã booking</b></td><td style="padding:8px; border-bottom:1px solid #eee;">#${booking.id}</td></tr>
+        <tr><td style="padding:8px; border-bottom:1px solid #eee;"><b>Mã đặt chỗ</b></td><td style="padding:8px; border-bottom:1px solid #eee;">${booking.orderId || '#' + booking.id}</td></tr>
         <tr><td style="padding:8px; border-bottom:1px solid #eee;"><b>Biển số xe</b></td><td style="padding:8px; border-bottom:1px solid #eee;">${booking.licensePlate}</td></tr>
         <tr><td style="padding:8px; border-bottom:1px solid #eee;"><b>Loại xe</b></td><td style="padding:8px; border-bottom:1px solid #eee;">Ô tô</td></tr>
         <tr><td style="padding:8px; border-bottom:1px solid #eee;"><b>Giờ bắt đầu</b></td><td style="padding:8px; border-bottom:1px solid #eee;">${fmtTime(booking.startTime)}</td></tr>
@@ -58,7 +58,7 @@ export const sendBookingConfirmation = async (booking) => {
   return sendEmail({
     to: booking.customerEmail,
     toName: booking.customerName || booking.customerEmail,
-    subject: `Xác nhận đặt chỗ #${booking.id} — ${booking.licensePlate}`,
+    subject: `Xác nhận đặt chỗ ${booking.orderId || '#' + booking.id} — ${booking.licensePlate}`,
     htmlContent: html,
   });
 };

@@ -30,6 +30,9 @@ ParkingSession.belongsTo(ParkingSlot, { foreignKey: 'slotId', as: 'slot' });
 ParkingRow.hasMany(ParkingSession, { foreignKey: 'rowId', as: 'sessions' });
 ParkingSession.belongsTo(ParkingRow, { foreignKey: 'rowId', as: 'row' });
 
+Floor.hasMany(ParkingSession, { foreignKey: 'floorId', as: 'sessions' });
+ParkingSession.belongsTo(Floor, { foreignKey: 'floorId', as: 'floor' });
+
 User.hasMany(ParkingSession, { foreignKey: 'staffId', as: 'staffedSessions' });
 ParkingSession.belongsTo(User, { foreignKey: 'staffId', as: 'staff' });
 

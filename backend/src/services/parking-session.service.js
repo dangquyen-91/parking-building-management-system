@@ -48,7 +48,23 @@ const rowInclude = (rowWhere, floorWhere) => ({
   ],
 });
 
-const checkIn = async ({ slotId, rowId, licensePlate, vehicleType, userId, note }, staffId) => {
+const findActiveBooking = async (licensePlate, t) => {
+  const { findActiveBookingByPlate } = await import('./booking.service.js');
+  const found = await findActiveBookingByPlate(licensePlate, t);
+  if (!found) return null;
+  const Booking = (await import('../models/booking.model.js')).default;
+  const booking = await Booking.findByPk(found.id, { transaction: t, lock: t.LOCK.UPDATE });
+  if (!booking || booking.sessionId) return null;
+  return booking;
+};
+
+const buildFloorOut = (floor) => ({
+  id: floor.id,
+  floorNumber: floor.floorNumber,
+  building: floor.building ? { id: floor.building.id, name: floor.building.name } : null,
+});
+
+const checkIn = async ({ floorId, rowId, licensePlate, vehicleType, userId, note }, staffId) => {
   return sequelize.transaction(async (t) => {
     const activeSession = await ParkingSession.findOne({
       where: { licensePlate, status: 'active' },
@@ -59,109 +75,110 @@ const checkIn = async ({ slotId, rowId, licensePlate, vehicleType, userId, note 
     }
 
     const activeSub = await ResidentSubscription.findOne({
-      where: {
-        licensePlate,
-        vehicleType,
-        status: 'active',
-        endDate: { [Op.gt]: new Date() },
-      },
+      where: { licensePlate, vehicleType, status: 'active', endDate: { [Op.gt]: new Date() } },
       order: [['endDate', 'DESC']],
       transaction: t,
     });
 
-    if (vehicleType === 'car') {
-      const slot = await ParkingSlot.findOne({
-        where: { id: slotId },
-        include: [
-          {
-            model: Floor,
-            as: 'floor',
-            attributes: ['id', 'floorNumber', 'vehicleType', 'floorType', 'isActive', 'buildingId'],
-            include: [{ model: Building, as: 'building', attributes: ['id', 'name', 'isActive'] }],
-          },
-        ],
-        lock: t.LOCK.UPDATE,
-        transaction: t,
-      });
+    // Lock the floor row so the visitor-car counter and motorcycle row picks
+    // are serialized across concurrent check-ins on the same floor.
+    const floor = await Floor.findByPk(floorId, {
+      include: [{ model: Building, as: 'building', attributes: ['id', 'name', 'isActive'] }],
+      lock: t.LOCK.UPDATE,
+      transaction: t,
+    });
+    if (!floor) throw new AppError('Floor not found', 404);
+    if (!floor.isActive) throw new AppError('Floor is inactive', 400);
+    if (!floor.building.isActive) throw new AppError('Building is inactive', 400);
+    if (floor.vehicleType !== vehicleType) {
+      throw new AppError(`Tầng này chỉ nhận ${floor.vehicleType}, không phải ${vehicleType}`, 400);
+    }
 
-      if (!slot) throw new AppError('Parking slot not found', 404);
-      if (slot.status !== 'empty') {
-        const ownReservation =
-          slot.status === 'reserved' && activeSub?.slotId === slotId ? activeSub : null;
-        if (!ownReservation) {
-          throw new AppError(`Slot is not available (current status: ${slot.status})`, 409);
-        }
-      }
-      if (!slot.floor.isActive) throw new AppError('Floor is inactive', 400);
-      if (!slot.floor.building.isActive) throw new AppError('Building is inactive', 400);
-      if (slot.floor.vehicleType !== 'car') throw new AppError('This slot only accepts car', 400);
-
-      if (slot.floor.floorType === 'resident') {
-        if (!activeSub) {
-          throw new AppError(
-            'Tầng cư dân yêu cầu plate có gói (subscription) đang hoạt động. Vui lòng chọn tầng vãng lai.',
-            403
-          );
-        }
-        if (activeSub.slotId && activeSub.slotId !== slotId) {
-          throw new AppError(
-            `Plate này có gói gắn slot khác (slotId=${activeSub.slotId}). Vui lòng vào đúng slot đó.`,
-            403
-          );
-        }
-      } else if (slot.floor.floorType === 'visitor' && activeSub) {
+    // Floor-type gate (sub-aware), áp dụng cho cả car + motorcycle.
+    if (floor.floorType === 'resident') {
+      if (!activeSub) {
         throw new AppError(
-          `Plate này có gói cư dân (sub #${activeSub.id}) đang hoạt động. Vui lòng vào tầng cư dân, không được sử dụng tầng vãng lai.`,
+          'Tầng cư dân yêu cầu plate có gói (subscription) đang hoạt động. Vui lòng chọn tầng vãng lai.',
           403
         );
       }
+    } else if (floor.floorType === 'visitor' && activeSub) {
+      throw new AppError(
+        `Plate này có gói cư dân (sub #${activeSub.id}) đang hoạt động. Vui lòng vào tầng cư dân, không được dùng tầng vãng lai.`,
+        403
+      );
+    }
 
-      let activeBooking = null;
-      if (slot.floor.floorType === 'visitor') {
-        const { findActiveBookingByPlate } = await import('./booking.service.js');
-        const found = await findActiveBookingByPlate(licensePlate, t);
-        if (found) {
-          const Booking = (await import('../models/booking.model.js')).default;
-          activeBooking = await Booking.findByPk(found.id, {
-            transaction: t,
-            lock: t.LOCK.UPDATE,
-          });
-          if (!activeBooking || activeBooking.sessionId) activeBooking = null;
+    const baseSession = {
+      licensePlate,
+      vehicleType,
+      floorId: floor.id,
+      entryTime: new Date(),
+      staffId,
+      status: 'active',
+      note: note || null,
+    };
+
+    // ── CAR ──────────────────────────────────────────────
+    if (vehicleType === 'car') {
+      // Resident car: vào đúng slot cố định của gói.
+      if (floor.floorType === 'resident') {
+        if (!activeSub.slotId) {
+          throw new AppError('Gói cư dân ô tô chưa gắn slot. Liên hệ admin.', 409);
         }
+        const slot = await ParkingSlot.findByPk(activeSub.slotId, { transaction: t, lock: t.LOCK.UPDATE });
+        if (!slot || slot.floorId !== floor.id) {
+          throw new AppError(`Slot của gói (slotId=${activeSub.slotId}) không thuộc tầng này.`, 400);
+        }
+        const effectiveUserId = activeSub.userId || userId || null;
+        const session = await ParkingSession.create(
+          { ...baseSession, slotId: slot.id, rowId: null, userId: effectiveUserId },
+          { transaction: t }
+        );
+        await slot.update({ status: 'occupied' }, { transaction: t });
+        return {
+          id: session.id,
+          licensePlate: session.licensePlate,
+          vehicleType: session.vehicleType,
+          entryTime: session.entryTime,
+          status: session.status,
+          note: session.note,
+          slot: { id: slot.id, slotCode: slot.slotCode },
+          row: null,
+          floor: buildFloorOut(floor),
+          staffId: session.staffId,
+          userId: session.userId,
+          paymentStatus: 'unpaid',
+        };
       }
 
-      const effectiveUserId =
-        activeBooking?.userId || activeSub?.userId || userId || null;
+      // Visitor car: counter theo tầng (không lock slot vật lý).
+      const activeCount = await ParkingSession.count({
+        where: { floorId: floor.id, status: 'active' },
+        transaction: t,
+      });
+      if (activeCount >= floor.totalSlots) {
+        throw new AppError(`Tầng đã đầy (${activeCount}/${floor.totalSlots}).`, 409);
+      }
+
+      const activeBooking = await findActiveBooking(licensePlate, t);
+      const effectiveUserId = activeBooking?.userId || userId || null;
       if (effectiveUserId) {
         const user = await User.findByPk(effectiveUserId, { transaction: t });
         if (!user) throw new AppError('User not found', 404);
       }
 
-      const sessionPayload = {
-        slotId,
-        rowId: null,
-        licensePlate,
-        vehicleType,
-        entryTime: new Date(),
-        staffId,
-        userId: effectiveUserId,
-        status: 'active',
-        note: note || null,
-      };
+      const payload = { ...baseSession, slotId: null, rowId: null, userId: effectiveUserId };
       if (activeBooking) {
-        sessionPayload.bookingId = activeBooking.id;
-        sessionPayload.prepaidHours = activeBooking.prepaidHours;
-        sessionPayload.prepaidAmount = activeBooking.amount;
-        sessionPayload.paymentStatus = 'paid';
+        payload.bookingId = activeBooking.id;
+        payload.prepaidHours = activeBooking.prepaidHours;
+        payload.prepaidAmount = activeBooking.amount;
+        payload.paymentStatus = 'paid';
       }
-
-      const session = await ParkingSession.create(sessionPayload, { transaction: t });
-
+      const session = await ParkingSession.create(payload, { transaction: t });
       if (activeBooking) {
         await activeBooking.update({ sessionId: session.id }, { transaction: t });
       }
-
-      await slot.update({ status: 'occupied' }, { transaction: t });
 
       return {
         id: session.id,
@@ -170,16 +187,10 @@ const checkIn = async ({ slotId, rowId, licensePlate, vehicleType, userId, note 
         entryTime: session.entryTime,
         status: session.status,
         note: session.note,
-        slot: {
-          id: slot.id,
-          slotCode: slot.slotCode,
-          floor: {
-            id: slot.floor.id,
-            floorNumber: slot.floor.floorNumber,
-            building: { id: slot.floor.building.id, name: slot.floor.building.name },
-          },
-        },
+        slot: null,
         row: null,
+        floor: buildFloorOut(floor),
+        occupancy: { used: activeCount + 1, total: floor.totalSlots },
         staffId: session.staffId,
         userId: session.userId,
         bookingId: session.bookingId || null,
@@ -189,39 +200,28 @@ const checkIn = async ({ slotId, rowId, licensePlate, vehicleType, userId, note 
       };
     }
 
-    const row = await ParkingRow.findOne({
-      where: { id: rowId },
-      include: [
-        {
-          model: Floor,
-          as: 'floor',
-          attributes: ['id', 'floorNumber', 'vehicleType', 'floorType', 'isActive', 'buildingId'],
-          include: [{ model: Building, as: 'building', attributes: ['id', 'name', 'isActive'] }],
-        },
-      ],
-      lock: t.LOCK.UPDATE,
-      transaction: t,
-    });
-
-    if (!row) throw new AppError('Parking row not found', 404);
-    if (row.status === 'maintenance') throw new AppError('Row is under maintenance', 409);
-    if (row.occupiedCount >= row.capacity) throw new AppError(`Row is full (${row.capacity}/${row.capacity})`, 409);
-    if (!row.floor.isActive) throw new AppError('Floor is inactive', 400);
-    if (!row.floor.building.isActive) throw new AppError('Building is inactive', 400);
-    if (row.floor.vehicleType !== 'motorcycle') throw new AppError('This row only accepts motorcycle', 400);
-
-    if (row.floor.floorType === 'resident') {
-      if (!activeSub) {
-        throw new AppError(
-          'Tầng cư dân yêu cầu plate có gói (subscription) đang hoạt động. Vui lòng chọn tầng vãng lai.',
-          403
-        );
+    // ── MOTORCYCLE ───────────────────────────────────────
+    // rowId optional: nếu truyền thì dùng, không thì auto-pick row còn chỗ.
+    let row;
+    if (rowId) {
+      row = await ParkingRow.findByPk(rowId, { transaction: t, lock: t.LOCK.UPDATE });
+      if (!row || row.floorId !== floor.id) {
+        throw new AppError('Row không thuộc tầng này', 400);
       }
-    } else if (row.floor.floorType === 'visitor' && activeSub) {
-      throw new AppError(
-        `Plate này có gói cư dân (sub #${activeSub.id}) đang hoạt động. Vui lòng vào tầng cư dân, không được sử dụng tầng vãng lai.`,
-        403
-      );
+      if (row.status === 'maintenance') throw new AppError('Row đang bảo trì', 409);
+      if (row.occupiedCount >= row.capacity) throw new AppError(`Row đã đầy (${row.capacity}/${row.capacity})`, 409);
+    } else {
+      row = await ParkingRow.findOne({
+        where: {
+          floorId: floor.id,
+          status: 'available',
+          occupiedCount: { [Op.lt]: sequelize.col('capacity') },
+        },
+        order: [['id', 'ASC']],
+        transaction: t,
+        lock: t.LOCK.UPDATE,
+      });
+      if (!row) throw new AppError('Tầng đã đầy, không còn hàng trống', 409);
     }
 
     const effectiveUserId = activeSub?.userId || userId || null;
@@ -231,26 +231,13 @@ const checkIn = async ({ slotId, rowId, licensePlate, vehicleType, userId, note 
     }
 
     const session = await ParkingSession.create(
-      {
-        slotId: null,
-        rowId,
-        licensePlate,
-        vehicleType,
-        entryTime: new Date(),
-        staffId,
-        userId: effectiveUserId,
-        status: 'active',
-        note: note || null,
-      },
+      { ...baseSession, slotId: null, rowId: row.id, userId: effectiveUserId },
       { transaction: t }
     );
 
     const newOccupied = row.occupiedCount + 1;
     await row.update(
-      {
-        occupiedCount: newOccupied,
-        status: newOccupied >= row.capacity ? 'full' : 'available',
-      },
+      { occupiedCount: newOccupied, status: newOccupied >= row.capacity ? 'full' : 'available' },
       { transaction: t }
     );
 
@@ -262,19 +249,11 @@ const checkIn = async ({ slotId, rowId, licensePlate, vehicleType, userId, note 
       status: session.status,
       note: session.note,
       slot: null,
-      row: {
-        id: row.id,
-        rowCode: row.rowCode,
-        capacity: row.capacity,
-        occupiedCount: newOccupied,
-        floor: {
-          id: row.floor.id,
-          floorNumber: row.floor.floorNumber,
-          building: { id: row.floor.building.id, name: row.floor.building.name },
-        },
-      },
+      row: { id: row.id, rowCode: row.rowCode, capacity: row.capacity, occupiedCount: newOccupied },
+      floor: buildFloorOut(floor),
       staffId: session.staffId,
       userId: session.userId,
+      paymentStatus: session.paymentStatus,
     };
   });
 };
@@ -447,6 +426,14 @@ const findActiveSubByPlate = (licensePlate, t) =>
   });
 
 const loadFloorType = async (session, t) => {
+  if (session.floorId) {
+    const floor = await Floor.findByPk(session.floorId, {
+      attributes: ['id', 'floorType'],
+      transaction: t,
+    });
+    if (floor) return floor.floorType;
+  }
+  // Fallback for legacy sessions created before floorId existed.
   if (session.slotId) {
     const slot = await ParkingSlot.findByPk(session.slotId, {
       include: [{ model: Floor, as: 'floor', attributes: ['id', 'floorType'] }],

@@ -3414,31 +3414,24 @@ paths:
       tags: [Parking Sessions]
       summary: Vehicle check-in (admin, manager, staff)
       description: |
-        Tao parking session va cap nhat trang thai o/day.
-        Chay trong database transaction voi row-level lock (tranh race condition).
+        Tao parking session. Input chinh la `floorId` (tang xe vao). Chay trong
+        transaction voi row-level lock tren floor de serialize counter.
 
-        **Phan nhanh theo vehicleType:**
-        - `car` → phai co `slotId`, `rowId` bi cam (forbidden)
-        - `motorcycle` → phai co `rowId`, `slotId` bi cam (forbidden)
+        **Input:** `vehicleType` + `licensePlate` + `floorId` (required).
+        `rowId` optional (chi motorcycle — auto-pick row con cho neu bo trong).
+        KHONG con gui `slotId` — resident car derive slot tu subscription.
 
-        **Validations chung:**
-        - Bien so chua co active session
-        - userId (neu co) phai ton tai
+        **Phan nhanh (theo floorType cua floorId + vehicleType):**
+        - **Vang lai o to**: counter theo tang. Dem session active vs `floor.totalSlots`. Day → 409. Khong lock slot vat ly.
+        - **Vang lai xe may**: `rowId` optional → BE auto-pick row con cho.
+        - **Cu dan o to**: dung slot co dinh tu subscription (phai khop floorId).
+        - **Cu dan xe may**: `rowId` optional → auto-pick row tren tang.
 
-        **Validations xe hoi:**
-        - Slot phai ton tai va `status = "empty"`
-        - Tang va toa nha phai active
-        - floor.vehicleType phai la "car"
+        **Floor-type gate (sub-aware):**
+        - Tang `resident` → plate phai co subscription active (else 403).
+        - Tang `visitor` → plate co sub cu dan → 403 (cu dan khong duoc dung tang vang lai).
 
-        **Validations xe may:**
-        - Row phai ton tai va `status != "maintenance"`
-        - `occupiedCount < capacity`
-        - Tang va toa nha phai active
-        - floor.vehicleType phai la "motorcycle"
-
-        **Validations floorType (cư dân / vãng lai):**
-        - Tầng `resident` → `userId` **bắt buộc** (lỗi 403 nếu không có)
-        - Tầng `visitor`  → `userId` **không được có** (lỗi 403 nếu truyền lên)
+        **Booking:** neu plate co confirmed booking trong khung gio → session lien ket booking, paymentStatus='paid'.
       security:
         - bearerAuth: []
       requestBody:
@@ -3446,85 +3439,69 @@ paths:
         content:
           application/json:
             schema:
-              oneOf:
-                - title: Check-in xe hoi
-                  type: object
-                  required: [vehicleType, licensePlate, slotId]
-                  properties:
-                    vehicleType:
-                      type: string
-                      enum: [car]
-                      example: car
-                    licensePlate:
-                      type: string
-                      minLength: 4
-                      maxLength: 20
-                      example: 51A-12345
-                      description: Chi chu cai, chu so va go ngang. Tu dong uppercase.
-                    slotId:
-                      type: integer
-                      example: 5
-                      description: ID o do xe (phai status = empty)
-                    userId:
-                      type: integer
-                      nullable: true
-                      example: 12
-                    note:
-                      type: string
-                      maxLength: 500
-                      nullable: true
-                - title: Check-in xe may
-                  type: object
-                  required: [vehicleType, licensePlate, rowId]
-                  properties:
-                    vehicleType:
-                      type: string
-                      enum: [motorcycle]
-                      example: motorcycle
-                    licensePlate:
-                      type: string
-                      minLength: 4
-                      maxLength: 20
-                      example: 59B-67890
-                    rowId:
-                      type: integer
-                      example: 3
-                      description: ID day do xe (phai status != maintenance va chua day)
-                    userId:
-                      type: integer
-                      nullable: true
-                      example: null
-                    note:
-                      type: string
-                      maxLength: 500
-                      nullable: true
+              type: object
+              required: [vehicleType, licensePlate, floorId]
+              properties:
+                vehicleType:
+                  type: string
+                  enum: [car, motorcycle]
+                  example: car
+                licensePlate:
+                  type: string
+                  minLength: 4
+                  maxLength: 20
+                  example: 51A-12345
+                  description: Chi chu cai, chu so, gach ngang. Tu dong uppercase.
+                floorId:
+                  type: integer
+                  example: 9
+                  description: ID tang xe vao (required cho moi loai).
+                rowId:
+                  type: integer
+                  nullable: true
+                  example: 3
+                  description: Optional, chi motorcycle. Bo trong → BE auto-pick row con cho. Car khong duoc gui.
+                userId:
+                  type: integer
+                  nullable: true
+                  example: 12
+                  description: Optional. Resident derive tu sub; booking derive tu booking.userId.
+                note:
+                  type: string
+                  maxLength: 500
+                  nullable: true
             examples:
-              checkInCarResident:
-                summary: Check-in xe hơi - tầng cư dân (userId bắt buộc)
-                value:
-                  vehicleType: car
-                  licensePlate: 51A-12345
-                  slotId: 5
-                  userId: 12
-              checkInCarVisitor:
-                summary: Check-in xe hơi - tầng vãng lai (không có userId)
+              visitorCar:
+                summary: Vãng lai ô tô (counter theo tầng)
                 value:
                   vehicleType: car
                   licensePlate: 51B-99999
-                  slotId: 20
-              checkInMotorcycleResident:
-                summary: Check-in xe máy - tầng cư dân (userId bắt buộc)
-                value:
-                  vehicleType: motorcycle
-                  licensePlate: 59B-67890
-                  rowId: 3
-                  userId: 7
-              checkInMotorcycleVisitor:
-                summary: Check-in xe máy - tầng vãng lai (không có userId)
+                  floorId: 9
+              visitorMotorcycleAuto:
+                summary: Vãng lai xe máy (auto-pick row)
                 value:
                   vehicleType: motorcycle
                   licensePlate: 60C-11111
+                  floorId: 3
+              visitorMotorcycleManualRow:
+                summary: Vãng lai xe máy (chọn row cụ thể)
+                value:
+                  vehicleType: motorcycle
+                  licensePlate: 60C-22222
+                  floorId: 3
                   rowId: 8
+              residentCar:
+                summary: Cư dân ô tô (slot từ gói, chỉ cần floorId)
+                value:
+                  vehicleType: car
+                  licensePlate: 51A-12345
+                  floorId: 2
+              residentMotorcycle:
+                summary: Cư dân xe máy (auto-pick row trên tầng)
+                value:
+                  vehicleType: motorcycle
+                  licensePlate: 59B-67890
+                  floorId: 1
       responses:
         '201':
           description: Check-in thanh cong
