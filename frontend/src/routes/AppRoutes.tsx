@@ -5,6 +5,7 @@ import Membership from '../pages/Membership';
 import PaymentReturnPage from '../pages/PaymentReturnPage';
 import BookingPage from '../pages/BookingPage';
 import MyBookingsPage from '../pages/MyBookingsPage';
+import ProfilePage from '../pages/ProfilePage';
 import About from '../pages/About';
 import Contact from '../pages/Contact';
 import { Login } from '../pages/auth/Login';
@@ -112,6 +113,7 @@ export default function AppRoutes() {
       <Route path="/about" element={<About />} />
       <Route path="/contact" element={<Contact />} />
       <Route path="/payment" element={<PaymentReturnPage />} />
+      <Route path="/profile" element={<ProfilePage />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/signin" element={<Navigate to="/login" replace />} />
