@@ -15,16 +15,11 @@ const licensePlateField = Joi.string()
 export const checkInSchema = Joi.object({
   vehicleType: Joi.string().valid(...VEHICLE_TYPES).required(),
   licensePlate: licensePlateField,
-
-  slotId: Joi.number().integer().positive().when('vehicleType', {
-    is: 'car',
-    then: Joi.required(),
-    otherwise: Joi.forbidden(),
-  }),
+  floorId: Joi.number().integer().positive().required(),
 
   rowId: Joi.number().integer().positive().when('vehicleType', {
     is: 'motorcycle',
-    then: Joi.required(),
+    then: Joi.optional(),
     otherwise: Joi.forbidden(),
   }),
 

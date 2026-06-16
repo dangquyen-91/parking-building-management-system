@@ -193,13 +193,14 @@ export const createBooking = async ({ body, requester, ipAddr }) => {
     });
 };
 
-export const handleBookingPaymentSuccess = async (bookingId, t) => {
+export const handleBookingPaymentSuccess = async (bookingId, t, orderId = null) => {
   const booking = await Booking.findByPk(bookingId, { transaction: t, lock: t.LOCK.UPDATE });
   if (!booking || booking.status !== 'pending') return;
   await booking.update({ status: 'confirmed' }, { transaction: t });
 
   const snapshot = {
     id: booking.id,
+    orderId,
     licensePlate: booking.licensePlate,
     customerEmail: booking.customerEmail,
     customerName: booking.customerName,

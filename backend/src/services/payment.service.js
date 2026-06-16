@@ -82,7 +82,7 @@ const handleBookingOutcome = async (payment, success, t) => {
     ? bookingService.handleBookingPaymentSuccess
     : bookingService.handleBookingPaymentFailure;
   if (typeof fn !== 'function') return;
-  await fn(payment.bookingId, t);
+  await fn(payment.bookingId, t, payment.orderId);
 };
 
 const OUTCOME_HANDLERS = {
