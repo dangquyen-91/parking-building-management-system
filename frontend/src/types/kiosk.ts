@@ -104,13 +104,14 @@ export interface SubscriptionApiResponse {
 }
 
 // ─── Booking API Response ─────────────────────────────────────────────────────
-// GET /parking-bookings
+// GET /bookings
 export interface BookingFloor {
   id: number;
   floorNumber: number;
-  floorType: FloorType;
-  vehicleType: VehicleType;
-  building: { id: number; name: string };
+  buildingId?: number;
+  floorType?: FloorType;
+  vehicleType?: VehicleType;
+  building?: { id: number; name: string };
 }
 
 export interface BookingSlot {
@@ -125,13 +126,16 @@ export interface BookingApiItem {
   floorId: number;
   slotId: number | null;
   userId: number | null;
-  customerName: string;
-  customerPhone: string;
+  customerName: string | null;
+  customerPhone: string | null;
+  customerEmail: string;
   licensePlate: string;
   vehicleType: VehicleType;
   startTime: string | null;
   endTime: string | null;
-  status: 'pending' | 'confirmed' | 'cancelled' | 'rejected';
+  amount: string | number;
+  prepaidHours: number;
+  status: 'pending' | 'confirmed' | 'cancelled' | 'expired';
   note: string | null;
   staffNote: string | null;
   handledBy: number | null;
@@ -140,7 +144,7 @@ export interface BookingApiItem {
   createdAt: string;
   floor: BookingFloor;
   slot: BookingSlot | null;
-  // Nested session object returned by GET /parking-bookings and POST /{id}/confirm
+  // Nested session object may be present when a booking has been checked in.
   session: { id: number; entryTime: string; status: string } | null;
 }
 
@@ -185,15 +189,18 @@ export interface ParkingRowApiItem {
 export interface CheckInCarPayload {
   vehicleType: 'car';
   licensePlate: string;
-  slotId: number;
+  floorId: number;
   userId?: number;
+  note?: string;
 }
 
 export interface CheckInMotoPayload {
   vehicleType: 'motorcycle';
   licensePlate: string;
+  floorId: number;
   rowId: number;
   userId?: number;
+  note?: string;
 }
 
 export type CheckInPayload = CheckInCarPayload | CheckInMotoPayload;
@@ -217,9 +224,12 @@ export interface CheckInApiResponse {
   } | null;
   staffId: number;
   userId: number | null;
+  bookingId?: number | null;
+  prepaidHours?: number | null;
+  prepaidAmount?: number | null;
+  paymentStatus?: string;
 }
 
-// POST /parking-bookings/{id}/confirm
 export interface ConfirmBookingPayload {
   slotId?: number;
   staffNote?: string;
