@@ -6,7 +6,6 @@ import type {
   ParkingRowApiItem,
   CheckInPayload,
   CheckInApiResponse,
-  ConfirmBookingPayload,
   ActiveSessionApiItem,
   PaginatedResponse,
   CheckoutPreviewApiResponse,
@@ -76,38 +75,21 @@ export async function checkActiveSubscription(
 }
 
 // ─── Bookings ─────────────────────────────────────────────────────────────────
-// GET /parking-bookings?search=XXX&page=1&limit=5&status=pending
-export async function searchPendingBookings(
+// GET /bookings?licensePlate=XXX&page=1&limit=10
+export async function searchBookingsByPlate(
   licensePlate: string
 ): Promise<PaginatedResponse<BookingApiItem>> {
-  const plate = licensePlate.toUpperCase().trim();
+  const plate = licensePlate.toUpperCase().replace(/\s/g, '').trim();
   const params = new URLSearchParams({
-    search: plate,
+    licensePlate: plate,
     page: '1',
-    limit: '5',
-    status: 'pending',
+    limit: '10',
   });
   const response = await fetch(
-    `${API_BASE_URL}/parking-bookings?${params.toString()}`,
+    `${API_BASE_URL}/bookings?${params.toString()}`,
     { headers: getAuthHeaders() }
   );
   return handleResponse<PaginatedResponse<BookingApiItem>>(response);
-}
-
-// POST /parking-bookings/{id}/confirm
-export async function confirmBooking(
-  bookingId: number,
-  payload: ConfirmBookingPayload
-): Promise<BookingApiItem> {
-  const response = await fetch(
-    `${API_BASE_URL}/parking-bookings/${bookingId}/confirm`,
-    {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(payload),
-    }
-  );
-  return handleResponse<BookingApiItem>(response);
 }
 
 // ─── Slots & Rows (for walk-in picker) ───────────────────────────────────────

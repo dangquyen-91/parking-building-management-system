@@ -27,11 +27,10 @@ import type {
 } from '../../types/kiosk';
 import {
   checkActiveSubscription,
-  searchPendingBookings,
+  searchBookingsByPlate,
   getAvailableSlots,
   getAvailableRows,
   checkIn,
-  confirmBooking,
 } from '../../services/kiosk.service';
 import { floorService, type Floor } from '../../services/floor.service';
 
@@ -41,7 +40,7 @@ type CheckInScenario =
   | { kind: 'error'; message: string }
   | { kind: 'already_in'; lookup: LookupApiResponse }
   | { kind: 'resident'; lookup: LookupApiResponse; subscription: ActiveSubscription; availableSlots: ParkingSlotApiItem[]; availableRows: ParkingRowApiItem[]; floors: Floor[] }
-  | { kind: 'booking'; lookup: LookupApiResponse; booking: BookingApiItem; availableSlots: ParkingSlotApiItem[] }
+  | { kind: 'booking'; lookup: LookupApiResponse; booking: BookingApiItem }
   | { kind: 'walkin'; lookup: LookupApiResponse; availableSlots: ParkingSlotApiItem[]; availableRows: ParkingRowApiItem[]; isExpiredResident?: boolean };
 
 interface LookupResultPanelProps {
@@ -68,6 +67,34 @@ function formatFixedCarSlot(sub: ActiveSubscription, floors: Floor[]) {
   if (!floor) return slotCode;
 
   return `${slotCode} · Tầng ${floor.floorNumber}${floor.building?.name ? ` · ${floor.building.name}` : ''}`;
+}
+
+function getBookingCheckInState(booking: BookingApiItem) {
+  const now = Date.now();
+  const start = booking.startTime ? new Date(booking.startTime).getTime() : Number.NaN;
+  const end = booking.endTime ? new Date(booking.endTime).getTime() : Number.NaN;
+
+  if (booking.sessionId) return { canCheckIn: false, label: 'Đã check-in', tone: 'slate' as const };
+  if (booking.status === 'pending') return { canCheckIn: false, label: 'Chờ thanh toán', tone: 'amber' as const };
+  if (booking.status !== 'confirmed') return { canCheckIn: false, label: 'Không còn hiệu lực', tone: 'red' as const };
+  if (Number.isNaN(start) || Number.isNaN(end)) return { canCheckIn: false, label: 'Thiếu thời gian', tone: 'red' as const };
+  if (end < now) return { canCheckIn: false, label: 'Đã hết giờ', tone: 'red' as const };
+  if (start > now) return { canCheckIn: true, label: 'Tới sớm', tone: 'amber' as const };
+
+  return { canCheckIn: true, label: 'Sẵn sàng check-in', tone: 'green' as const };
+}
+
+function findDisplayBooking(bookings: BookingApiItem[]) {
+  const now = Date.now();
+  return bookings
+    .filter((booking) => ['pending', 'confirmed'].includes(booking.status) && !booking.sessionId)
+    .filter((booking) => !booking.endTime || new Date(booking.endTime).getTime() >= now)
+    .sort((a, b) => {
+      const aReady = getBookingCheckInState(a).canCheckIn ? 0 : 1;
+      const bReady = getBookingCheckInState(b).canCheckIn ? 0 : 1;
+      if (aReady !== bReady) return aReady - bReady;
+      return new Date(a.startTime ?? 0).getTime() - new Date(b.startTime ?? 0).getTime();
+    })[0] ?? null;
 }
 
 async function getAvailabilityByFloorType(vehicleType: VehicleType, floorType: 'resident' | 'visitor') {
@@ -301,14 +328,15 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
         }
       }
 
-      // Step 3: Pending booking? (for visitors who pre-booked)
+      // Step 3: Any active booking? Show it even if it is not check-in ready yet.
       try {
-        const bookingResult = await searchPendingBookings(lookup.licensePlate);
+        const bookingResult = await searchBookingsByPlate(lookup.licensePlate);
         if (!cancelled && bookingResult.data.length > 0) {
-          const booking = bookingResult.data[0];
-          const visitorAvailability = await getAvailabilityByFloorType('car', 'visitor');
-          if (!cancelled) setScenario({ kind: 'booking', lookup, booking, availableSlots: visitorAvailability.slots });
-          return;
+          const booking = findDisplayBooking(bookingResult.data);
+          if (booking) {
+            if (!cancelled) setScenario({ kind: 'booking', lookup, booking });
+            return;
+          }
         }
       } catch {
         // Booking check failed → fall through to walk-in
@@ -352,20 +380,22 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
       const residentScenario = scenario.kind === 'resident' ? scenario : null;
       let payload: Parameters<typeof checkIn>[0];
       if (sub.vehicleType === 'car') {
-        const slotId = sub.slotId ?? residentSlotId;
-        if (!slotId) { setSubmitError('Vui lòng chọn ô đỗ xe.'); return; }
-        if (!sub.slotId && !residentScenario?.availableSlots.some((slot) => slot.id === slotId)) {
+        const selectedSlot = residentScenario?.availableSlots.find((slot) => slot.id === residentSlotId);
+        const floorId = sub.slot?.floorId ?? selectedSlot?.floorId ?? null;
+        if (!floorId) { setSubmitError('Không xác định được tầng check-in cho ô tô cư dân.'); return; }
+        if (!sub.slotId && !residentSlotId) { setSubmitError('Vui lòng chọn ô đỗ xe.'); return; }
+        if (!sub.slotId && !selectedSlot) {
           setSubmitError('Vui lòng chọn ô thuộc tầng cư dân.');
           return;
         }
-        payload = { vehicleType: 'car', licensePlate: lookup.licensePlate, slotId, userId: sub.userId };
+        payload = { vehicleType: 'car', licensePlate: lookup.licensePlate, floorId, userId: sub.userId };
       } else {
-        if (!residentRowId) { setSubmitError('Vui lòng chọn hàng xe máy.'); return; }
-        if (!residentScenario?.availableRows.some((row) => row.id === residentRowId)) {
+        const selectedRow = residentScenario?.availableRows.find((row) => row.id === residentRowId);
+        if (!selectedRow) {
           setSubmitError('Vui lòng chọn hàng xe máy thuộc tầng cư dân.');
           return;
         }
-        payload = { vehicleType: 'motorcycle', licensePlate: lookup.licensePlate, rowId: residentRowId, userId: sub.userId };
+        payload = { vehicleType: 'motorcycle', licensePlate: lookup.licensePlate, floorId: selectedRow.floorId, rowId: selectedRow.id, userId: sub.userId };
       }
       const res = await checkIn(payload);
       onSuccess(res.id, res.licensePlate, res.slot?.slotCode ?? res.row?.rowCode ?? '—', res.entryTime);
@@ -380,16 +410,21 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
     setIsSubmitting(true);
     setSubmitError(null);
     try {
-      const res = await confirmBooking(booking.id, {
-        slotId: selectedSlotId ?? undefined,
-        staffNote: 'Xác nhận tại cổng',
+      const bookingState = getBookingCheckInState(booking);
+      if (!bookingState.canCheckIn) {
+        setSubmitError(`Booking ${bookingState.label.toLowerCase()}, chưa thể check-in.`);
+        return;
+      }
+      const res = await checkIn({
+        vehicleType: 'car',
+        licensePlate: lookup.licensePlate,
+        floorId: booking.floorId,
+        userId: booking.userId ?? undefined,
+        note: `Booking #${booking.id}`,
       });
-      const sessionId = res.session?.id ?? 0;
-      const slotCode = res.slot?.slotCode ?? '—';
-      const entryTime = res.session?.entryTime ?? new Date().toISOString();
-      onSuccess(sessionId, res.licensePlate, slotCode, entryTime);
+      onSuccess(res.id, res.licensePlate, res.slot?.slotCode ?? res.row?.rowCode ?? 'Booking', res.entryTime);
     } catch (err: unknown) {
-      setSubmitError(err instanceof Error ? err.message : 'Lỗi xác nhận đặt chỗ.');
+      setSubmitError(err instanceof Error ? err.message : 'Lỗi check-in booking.');
     } finally {
       setIsSubmitting(false);
     }
@@ -403,18 +438,19 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
       let payload: Parameters<typeof checkIn>[0];
       if (walkinVehicleType === 'car') {
         if (!selectedSlotId) { setSubmitError('Vui lòng chọn ô đỗ xe.'); return; }
-        if (!walkinScenario?.availableSlots.some((slot) => slot.id === selectedSlotId)) {
+        const selectedSlot = walkinScenario?.availableSlots.find((slot) => slot.id === selectedSlotId);
+        if (!selectedSlot) {
           setSubmitError('Vui lòng chọn ô thuộc tầng vãng lai.');
           return;
         }
-        payload = { vehicleType: 'car', licensePlate: lookup.licensePlate, slotId: selectedSlotId };
+        payload = { vehicleType: 'car', licensePlate: lookup.licensePlate, floorId: selectedSlot.floorId };
       } else {
-        if (!selectedRowId) { setSubmitError('Vui lòng chọn hàng xe máy.'); return; }
-        if (!walkinScenario?.availableRows.some((row) => row.id === selectedRowId)) {
+        const selectedRow = walkinScenario?.availableRows.find((row) => row.id === selectedRowId);
+        if (!selectedRow) {
           setSubmitError('Vui lòng chọn hàng xe máy thuộc tầng vãng lai.');
           return;
         }
-        payload = { vehicleType: 'motorcycle', licensePlate: lookup.licensePlate, rowId: selectedRowId };
+        payload = { vehicleType: 'motorcycle', licensePlate: lookup.licensePlate, floorId: selectedRow.floorId, rowId: selectedRow.id };
       }
       const res = await checkIn(payload);
       onSuccess(res.id, res.licensePlate, res.slot?.slotCode ?? res.row?.rowCode ?? '—', res.entryTime);
@@ -581,7 +617,8 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
   }
 
   if (scenario.kind === 'booking') {
-    const { booking, availableSlots } = scenario;
+    const { booking } = scenario;
+    const bookingState = getBookingCheckInState(booking);
     return (
       <motion.div
         initial={{ opacity: 0, y: 12 }}
@@ -597,44 +634,53 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
               <div className="flex items-center gap-2">
                 <h3 className="font-bold text-white">Khách Đặt Trước</h3>
                 <Badge label="Có Booking" tone="blue" />
+                <Badge label={bookingState.label} tone={bookingState.tone} />
               </div>
-              <p className="mt-0.5 text-sm text-slate-400">{booking.customerName}</p>
+              <p className="mt-0.5 text-sm text-slate-400">{booking.customerName || booking.customerEmail}</p>
             </div>
           </div>
           <Badge label="Ô Tô" tone="blue" />
         </div>
 
         <div className="space-y-2 mb-5">
-          <InfoRow icon={User} label="Tên khách" value={booking.customerName} />
-          <InfoRow icon={Phone} label="Điện thoại" value={booking.customerPhone} />
+          <InfoRow icon={User} label="Tên khách" value={booking.customerName || 'Khách vãng lai'} />
+          <InfoRow icon={Phone} label="Điện thoại" value={booking.customerPhone || '—'} />
           <InfoRow
             icon={MapPin}
             label="Tầng"
-            value={`Tầng ${booking.floor?.floorNumber ?? '—'} · ${booking.floor?.building?.name ?? ''}`}
+            value={`Tầng ${booking.floor?.floorNumber ?? booking.floorId}${booking.floor?.building?.name ? ` · ${booking.floor.building.name}` : ''}`}
           />
           {booking.startTime && (
             <InfoRow icon={Clock} label="Giờ hẹn" value={formatDate(booking.startTime)} />
           )}
-        </div>
-
-        <div className="mb-5">
-          <SlotPicker
-            vehicleType="car"
-            slots={availableSlots}
-            rows={[]}
-            selectedSlotId={selectedSlotId}
-            selectedRowId={null}
-            onSelectSlot={setSelectedSlotId}
-            onSelectRow={() => { }}
+          {booking.endTime && (
+            <InfoRow icon={Calendar} label="Hết hạn" value={formatDate(booking.endTime)} />
+          )}
+          <InfoRow
+            icon={BadgeCheck}
+            label="Đã trả trước"
+            value={`${booking.prepaidHours} giờ · ${Number(booking.amount).toLocaleString('vi-VN')} VNĐ`}
           />
         </div>
 
         {submitError && <ErrorAlert message={submitError} />}
 
+        {bookingState.canCheckIn && bookingState.label === 'Tới sớm' && (
+          <div className="mb-3 rounded-xl border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-xs leading-5 text-amber-300">
+            Khách đến sớm hơn giờ booking. Nếu bãi còn chỗ, nhân viên có thể cho check-in như xe vãng lai theo tầng đã đặt.
+          </div>
+        )}
+
+        {!bookingState.canCheckIn && (
+          <div className="mb-3 rounded-xl border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-xs leading-5 text-amber-300">
+            Biển số này đã có booking trong hệ thống, nhưng chỉ có thể check-in khi booking đã thanh toán thành công và chưa hết hạn.
+          </div>
+        )}
+
         <motion.button
           whileHover={{ scale: 1.01 }}
           whileTap={{ scale: 0.98 }}
-          disabled={isSubmitting}
+          disabled={isSubmitting || !bookingState.canCheckIn}
           onClick={() => handleBookingCheckIn(booking)}
           className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 py-3.5 font-semibold text-white shadow-[0_4px_20px_rgba(37,99,235,0.25)] transition-all hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
