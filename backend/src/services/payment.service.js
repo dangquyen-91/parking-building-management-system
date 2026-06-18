@@ -26,41 +26,48 @@ const resolveByOrderId = (orderId) => {
   return null;
 };
 
-const computePeriod = async (subscription, durationDays, t) => {
-  const now = new Date();
-  const existing = await ResidentSubscription.findOne({
-    where: {
-      licensePlate: subscription.licensePlate,
-      vehicleType: subscription.vehicleType,
-      status: 'active',
-      endDate: { [Op.gt]: now },
-      id: { [Op.ne]: subscription.id },
-    },
-    order: [['endDate', 'DESC']],
-    transaction: t,
-  });
-
-  const startDate = existing ? new Date(existing.endDate) : now;
-  const endDate = new Date(startDate);
-  endDate.setDate(endDate.getDate() + durationDays);
-  return { startDate, endDate };
-};
-
 const handleSubscriptionOutcome = async (payment, success, t) => {
-  const subscription = await ResidentSubscription.findByPk(payment.subscriptionId, {
+  const sub = await ResidentSubscription.findByPk(payment.subscriptionId, {
     transaction: t,
     lock: t.LOCK.UPDATE,
   });
-  if (!subscription || subscription.status !== 'pending') return;
+  if (!sub || sub.status !== 'pending') return;
 
-  if (success) {
-    const pkg = await ParkingPackage.findByPk(subscription.packageId, { transaction: t });
-    const durationDays = pkg ? pkg.durationDays : 30;
-    const { startDate, endDate } = await computePeriod(subscription, durationDays, t);
-    await subscription.update({ status: 'active', startDate, endDate }, { transaction: t });
+  if (!success) {
+    await sub.update({ status: 'cancelled' }, { transaction: t });
+    await freeSlotIfUnused(sub.slotId, sub.id, t);
+    return;
+  }
+
+  const pkg = await ParkingPackage.findByPk(sub.packageId, { transaction: t });
+  const durationDays = pkg ? pkg.durationDays : 30;
+  const now = new Date();
+
+  // Renewal: nếu plate đã có active sub khác → cộng dồn endDate vào sub đó,
+  // huỷ pending sub này (không giữ 2 active row cho cùng biển số).
+  const activeSub = await ResidentSubscription.findOne({
+    where: {
+      licensePlate: sub.licensePlate,
+      vehicleType: sub.vehicleType,
+      status: 'active',
+      endDate: { [Op.gt]: now },
+      id: { [Op.ne]: sub.id },
+    },
+    order: [['endDate', 'DESC']],
+    lock: t.LOCK.UPDATE,
+    transaction: t,
+  });
+
+  if (activeSub) {
+    const base = new Date(activeSub.endDate) > now ? new Date(activeSub.endDate) : now;
+    const endDate = new Date(base);
+    endDate.setDate(endDate.getDate() + durationDays);
+    await activeSub.update({ endDate }, { transaction: t });
+    await sub.update({ status: 'cancelled', note: `Gia hạn cho sub #${activeSub.id}` }, { transaction: t });
   } else {
-    await subscription.update({ status: 'cancelled' }, { transaction: t });
-    await freeSlotIfUnused(subscription.slotId, subscription.id, t);
+    const endDate = new Date(now);
+    endDate.setDate(endDate.getDate() + durationDays);
+    await sub.update({ status: 'active', startDate: now, endDate }, { transaction: t });
   }
 };
 
