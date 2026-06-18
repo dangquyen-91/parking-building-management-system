@@ -290,34 +290,37 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
 
       let isExpiredResident = false;
 
-      // Step 2: Has linked resident in hint? → ONLY THEN check active subscription.
-      // If no linkedResident, skip entirely → visitor / walk-in path.
-      if (lookup.hint.linkedResident) {
-        try {
-          const subResult = await checkActiveSubscription(lookup.licensePlate);
-          if (!cancelled && subResult.active && subResult.subscription) {
-            const sub = subResult.subscription;
-            const residentAvailability = await getAvailabilityByFloorType(sub.vehicleType, 'resident');
-            if (!cancelled) {
-              setScenario({
-                kind: 'resident',
-                lookup,
-                subscription: sub,
-                availableSlots: residentAvailability.slots,
-                availableRows: residentAvailability.rows,
-                floors: residentAvailability.floors,
-              });
-            }
-            return;
+      // Step 2: Check active resident subscription directly from the plate.
+      // lookup.hint.linkedResident comes from past sessions, so new subscribers
+      // may not have that hint yet.
+      try {
+        const subResult = await checkActiveSubscription(lookup.licensePlate);
+        if (!cancelled && subResult.active && subResult.subscription) {
+          const sub = subResult.subscription;
+          const residentAvailability = await getAvailabilityByFloorType(sub.vehicleType, 'resident');
+          if (!cancelled) {
+            setScenario({
+              kind: 'resident',
+              lookup,
+              subscription: sub,
+              availableSlots: residentAvailability.slots,
+              availableRows: residentAvailability.rows,
+              floors: residentAvailability.floors,
+            });
           }
-          // Resident exists but subscription expired → treat as expired resident
-          if (!cancelled && !subResult.active) {
-            isExpiredResident = true;
-          }
-        } catch {
-          // Subscription check failed → still allow walkin, don't crash
-          isExpiredResident = false;
+          return;
         }
+        if (!cancelled && lookup.hint.linkedResident && !subResult.active) {
+          isExpiredResident = true;
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setScenario({
+            kind: 'error',
+            message: err instanceof Error ? err.message : 'Không kiểm tra được gói cư dân cho biển số này.',
+          });
+        }
+        return;
       }
 
       // Step 3: Any active booking? Show it even if it is not check-in ready yet.

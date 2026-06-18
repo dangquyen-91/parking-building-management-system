@@ -41,6 +41,7 @@ const SUB_STATUS: Record<string, { label: string; cls: string }> = {
   pending:   { label: 'Chờ xử lý',    cls: 'bg-amber-100  text-amber-700  border-amber-200'  },
   expired:   { label: 'Hết hạn',       cls: 'bg-slate-100  text-slate-500  border-slate-200'  },
   cancelled: { label: 'Đã hủy',        cls: 'bg-red-100    text-red-600    border-red-200'    },
+  renewed:   { label: 'Đã cộng dồn',   cls: 'bg-blue-100   text-blue-700   border-blue-200'   },
 };
 
 const TABS = [
@@ -65,8 +66,21 @@ function InfoField({ icon: Icon, label, value }: { icon: React.ElementType; labe
   );
 }
 
-function SubscriptionCard({ sub }: { sub: MySubscription }) {
-  const status = SUB_STATUS[sub.status] ?? { label: sub.status, cls: 'bg-slate-100 text-slate-500 border-slate-200' };
+function SubscriptionCard({
+  sub,
+  activeSubscriptions = [],
+}: {
+  sub: MySubscription;
+  activeSubscriptions?: MySubscription[];
+}) {
+  const renewedInto = sub.status === 'cancelled'
+    ? activeSubscriptions.find((activeSub) =>
+        activeSub.id !== sub.id &&
+        activeSub.licensePlate === sub.licensePlate &&
+        activeSub.vehicleType === sub.vehicleType
+      )
+    : null;
+  const displayStatus = renewedInto ? SUB_STATUS.renewed : SUB_STATUS[sub.status] ?? { label: sub.status, cls: 'bg-slate-100 text-slate-500 border-slate-200' };
   const isActive = sub.status === 'active';
   const VehicleIcon = sub.vehicleType === 'car' ? Car : Motorbike;
 
@@ -90,14 +104,19 @@ function SubscriptionCard({ sub }: { sub: MySubscription }) {
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-xl font-black tracking-widest text-slate-950">{sub.licensePlate}</h3>
-              <span className={cn('rounded-full border px-3 py-0.5 text-xs font-bold', status.cls)}>
-                {status.label}
+              <span className={cn('rounded-full border px-3 py-0.5 text-xs font-bold', displayStatus.cls)}>
+                {displayStatus.label}
               </span>
             </div>
             <p className="mt-1 text-sm text-slate-500">
               {sub.package?.name ?? `Gói #${sub.packageId}`}
               {sub.slot ? ` · Ô ${sub.slot.slotCode}` : ''}
             </p>
+            {renewedInto && (
+              <p className="mt-1 text-xs font-semibold text-blue-600">
+                Giao dịch này đã được cộng vào gói đang hiệu lực, hạn mới {formatDate(renewedInto.endDate)}.
+              </p>
+            )}
           </div>
         </div>
         <div className="flex flex-col items-end gap-1 text-right">
@@ -108,8 +127,8 @@ function SubscriptionCard({ sub }: { sub: MySubscription }) {
 
       <div className="mt-5 grid gap-3 sm:grid-cols-3">
         {[
-          { icon: Calendar, label: 'Bắt đầu',  value: formatDate(sub.startDate) },
-          { icon: Clock,    label: 'Kết thúc', value: formatDate(sub.endDate) },
+          { icon: Calendar, label: 'Bắt đầu',  value: renewedInto ? formatDate(renewedInto.startDate) : formatDate(sub.startDate) },
+          { icon: Clock,    label: 'Kết thúc', value: renewedInto ? formatDate(renewedInto.endDate) : formatDate(sub.endDate) },
           { icon: SquareParking, label: 'Ô đỗ xe', value: sub.slot?.slotCode ?? 'Chưa cấp' },
         ].map(({ icon: Icon, label, value }) => (
           <div key={label} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -269,7 +288,12 @@ export default function ProfilePage() {
     }
   }, [isAuthenticated]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void load();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [load]);
 
   if (authLoading || !isAuthenticated) {
     return (
@@ -450,7 +474,9 @@ export default function ProfilePage() {
                           <p className="text-lg font-bold text-slate-700">Chưa có lịch sử gói nào</p>
                         </div>
                       ) : (
-                        allSubscriptions.map(sub => <SubscriptionCard key={sub.id} sub={sub} />)
+                        allSubscriptions.map(sub => (
+                          <SubscriptionCard key={sub.id} sub={sub} activeSubscriptions={activeSubscriptions} />
+                        ))
                       )}
                     </motion.div>
                   )}

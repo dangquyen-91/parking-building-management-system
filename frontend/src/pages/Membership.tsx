@@ -37,6 +37,10 @@ const formatCurrency = (value: string | number) =>
 
 const normalizePlate = (value: string) => value.toUpperCase().replace(/\s/g, '').trim();
 const platePattern = /^[A-Z0-9-]{4,20}$/;
+const isStillActive = (sub: ResidentSubscription) =>
+  sub.status === 'active' && (!sub.endDate || new Date(sub.endDate).getTime() > Date.now());
+const formatDateOnly = (iso: string | null) =>
+  iso ? new Date(iso).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '--';
 
 const vehicleLabels: Record<VehicleTab, string> = {
   car: 'Ô tô',
@@ -98,7 +102,18 @@ export default function Membership() {
 
   const plate = normalizePlate(licensePlate);
   const plateValid = platePattern.test(plate);
-  const needsSlot = selectedPackage?.vehicleType === 'car';
+  const plateSubscriptions = useMemo(
+    () => (plate ? mySubscriptions.filter((sub) => normalizePlate(sub.licensePlate) === plate) : []),
+    [mySubscriptions, plate]
+  );
+  const pendingPlateSub = plateValid ? plateSubscriptions.find((sub) => sub.status === 'pending') ?? null : null;
+  const activePlateSub = plateValid ? plateSubscriptions.find(isStillActive) ?? null : null;
+  const activeSameVehicleSub =
+    selectedPackage && activePlateSub?.vehicleType === selectedPackage.vehicleType ? activePlateSub : null;
+  const activeOtherVehicleSub =
+    selectedPackage && activePlateSub && activePlateSub.vehicleType !== selectedPackage.vehicleType ? activePlateSub : null;
+  const isRenewal = Boolean(activeSameVehicleSub);
+  const needsSlot = selectedPackage?.vehicleType === 'car' && !isRenewal;
   const selectedSlot = residentSlots.find((slot) => slot.id === selectedSlotId) ?? null;
   const filteredSlots = useMemo(() => {
     const keyword = slotSearch.trim().toUpperCase();
@@ -110,7 +125,13 @@ export default function Membership() {
       return slotCode.includes(keyword) || floorNumber.includes(keyword) || buildingName.includes(keyword);
     });
   }, [residentSlots, slotSearch]);
-  const readyForPayment = Boolean(selectedPackage && plateValid && (!needsSlot || selectedSlotId));
+  const readyForPayment = Boolean(
+    selectedPackage &&
+    plateValid &&
+    !pendingPlateSub &&
+    !activeOtherVehicleSub &&
+    (!needsSlot || selectedSlotId)
+  );
   const activeSubCount = mySubscriptions.filter((sub) => sub.status === 'active').length;
 
   useEffect(() => {
@@ -164,7 +185,7 @@ export default function Membership() {
     let cancelled = false;
 
     async function loadResidentSlots() {
-      if (selectedPackage?.vehicleType !== 'car' || !isAuthenticated) {
+      if (!needsSlot || !isAuthenticated) {
         setResidentSlots([]);
         setSelectedSlotId(null);
         setSlotModalOpen(false);
@@ -199,7 +220,7 @@ export default function Membership() {
     return () => {
       cancelled = true;
     };
-  }, [selectedPackage?.vehicleType, isAuthenticated]);
+  }, [needsSlot, isAuthenticated]);
 
   useEffect(() => {
     if (!slotModalOpen) return;
@@ -248,6 +269,14 @@ export default function Membership() {
       setSubmitError('Biển số chỉ gồm chữ, số, dấu gạch ngang và dài 4-20 ký tự.');
       return;
     }
+    if (pendingPlateSub) {
+      setSubmitError('Biển số này đang có giao dịch chờ thanh toán. Vui lòng hoàn tất giao dịch trước khi mua gói khác.');
+      return;
+    }
+    if (activeOtherVehicleSub) {
+      setSubmitError(`Biển số này đang có gói ${vehicleLabels[activeOtherVehicleSub.vehicleType].toLowerCase()} còn hạn, không thể mua gói ${vehicleLabels[selectedPackage.vehicleType].toLowerCase()}.`);
+      return;
+    }
     if (needsSlot && !selectedSlotId) {
       setSubmitError('Gói ô tô cần chọn một ô cư dân còn trống.');
       return;
@@ -259,7 +288,7 @@ export default function Membership() {
       const result = await subscriptionService.buyPackage({
         packageId: selectedPackage.id,
         licensePlate: plate,
-        slotId: selectedSlotId ?? undefined,
+        slotId: needsSlot ? selectedSlotId ?? undefined : undefined,
       });
       window.location.href = result.paymentUrl;
     } catch (err) {
@@ -272,7 +301,7 @@ export default function Membership() {
   const steps = [
     { label: 'Chọn gói', done: Boolean(selectedPackage) },
     { label: 'Biển số', done: plateValid },
-    { label: needsSlot ? 'Chọn ô' : 'Thanh toán', done: !needsSlot || Boolean(selectedSlotId) },
+    { label: isRenewal ? 'Gia hạn' : needsSlot ? 'Chọn ô' : 'Thanh toán', done: !needsSlot || Boolean(selectedSlotId) },
   ];
 
   return (
@@ -473,7 +502,7 @@ export default function Membership() {
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-600">Thanh toán</p>
-                      <h3 className="mt-1 text-lg font-black text-slate-950">Hoàn tất đăng ký</h3>
+                      <h3 className="mt-1 text-lg font-black text-slate-950">{isRenewal ? 'Hoàn tất gia hạn' : 'Hoàn tất đăng ký'}</h3>
                     </div>
                     <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
                       <ReceiptText className="h-5 w-5" />
@@ -529,6 +558,55 @@ export default function Membership() {
                         Gồm chữ, số và dấu gạch ngang, dài 4–20 ký tự.
                       </span>
                     </label>
+
+                    {plateValid && pendingPlateSub && (
+                      <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                        <div className="flex gap-2">
+                          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                          <div>
+                            <p className="font-bold">Biển số này đang có giao dịch chờ thanh toán.</p>
+                            <p className="mt-1 leading-5">
+                              Hãy hoàn tất giao dịch hiện tại trước khi mua gói khác. Gói đang chờ:
+                              {' '}
+                              <span className="font-bold">{pendingPlateSub.package?.name ?? `#${pendingPlateSub.packageId}`}</span>.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {plateValid && activeOtherVehicleSub && selectedPackage && (
+                      <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                        <div className="flex gap-2">
+                          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                          <div>
+                            <p className="font-bold">Không thể mua gói khác loại xe cho cùng biển số.</p>
+                            <p className="mt-1 leading-5">
+                              Biển số này đang có gói {vehicleLabels[activeOtherVehicleSub.vehicleType].toLowerCase()} còn hạn đến
+                              {' '}
+                              <span className="font-bold">{formatDateOnly(activeOtherVehicleSub.endDate)}</span>.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {plateValid && activeSameVehicleSub && selectedPackage && !pendingPlateSub && (
+                      <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                        <div className="flex gap-2">
+                          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+                          <div>
+                            <p className="font-bold">Gia hạn gói hiện tại</p>
+                            <p className="mt-1 leading-5">
+                              Sau khi thanh toán, {selectedPackage.durationDays} ngày sẽ được cộng vào hạn hiện tại
+                              {' '}
+                              <span className="font-bold">{formatDateOnly(activeSameVehicleSub.endDate)}</span>.
+                              {activeSameVehicleSub.slot ? ` Ô ${activeSameVehicleSub.slot.slotCode} sẽ được giữ nguyên.` : ''}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     {needsSlot && (
                       <div>
@@ -599,6 +677,12 @@ export default function Membership() {
                           <span className="font-bold text-emerald-600">{selectedSlot.slotCode}</span>
                         </div>
                       )}
+                      {!selectedSlot && activeSameVehicleSub?.slot && (
+                        <div className="flex justify-between gap-3">
+                          <span className="text-slate-500">Ô hiện tại</span>
+                          <span className="font-bold text-emerald-600">{activeSameVehicleSub.slot.slotCode}</span>
+                        </div>
+                      )}
                     </div>
 
                     <div className="mt-2 flex items-end justify-between gap-3 border-t border-slate-200 pt-2">
@@ -627,7 +711,7 @@ export default function Membership() {
                     className="mt-3 inline-flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}
-                    {submitting ? 'Đang tạo giao dịch VNPay...' : 'Thanh toán qua VNPay'}
+                    {submitting ? 'Đang tạo giao dịch VNPay...' : isRenewal ? 'Thanh toán gia hạn qua VNPay' : 'Thanh toán qua VNPay'}
                   </button>
                 </div>
               </aside>
