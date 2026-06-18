@@ -2,7 +2,8 @@ import { Op } from 'sequelize';
 import { sequelize } from '../config/database.js';
 import Booking from '../models/booking.model.js';
 import Floor from '../models/floor.model.js';
-import ParkingSlot from '../models/parking-slot.model.js';
+import ParkingSession from '../models/parking-session.model.js';
+import BookingPayment from '../models/booking-payment.model.js';
 import User from '../models/user.model.js';
 import ResidentSubscription from '../models/resident-subscription.model.js';
 import AppError from '../utils/appError.js';
@@ -10,10 +11,33 @@ import { calculateFee } from './pricing.service.js';
 import { createBookingPayment } from './payment.service.js';
 import { sendBookingConfirmation } from './email.service.js';
 
-const FREE_SLOT_THRESHOLD = 0.20;
+const MIN_FREE_FOR_BOOKING = 10;
 const MAX_ADVANCE_BOOKING_MS = 24 * 3600_000;
 const MIN_DURATION_MS = 60 * 60_000;
 const EARLY_GRACE_MS = 30 * 60_000;
+const PENDING_TTL_MS = 15 * 60 * 1000;
+
+const cancelStalePendings = async (plate, t) => {
+  const stale = await Booking.findAll({
+    where: {
+      licensePlate: plate,
+      status: 'pending',
+      createdAt: { [Op.lt]: new Date(Date.now() - PENDING_TTL_MS) },
+    },
+    attributes: ['id'],
+    transaction: t,
+  });
+  if (!stale.length) return;
+  const ids = stale.map((b) => b.id);
+  await Booking.update(
+    { status: 'cancelled', staffNote: 'Auto-cancel: hết hạn thanh toán 15 phút' },
+    { where: { id: ids }, transaction: t }
+  );
+  await BookingPayment.update(
+    { status: 'cancelled' },
+    { where: { bookingId: ids, status: 'pending' }, transaction: t }
+  );
+};
 
 const normalizePlate = (plate) => plate.toUpperCase().replace(/\s/g, '');
 
@@ -25,18 +49,20 @@ const findVisitorCarFloor = async (floorId, t) => {
   return floor;
 };
 
-const checkFloorCapacity = async (floorId, t) => {
-  const total = await ParkingSlot.count({ where: { floorId }, transaction: t });
-  if (total === 0) throw new AppError('Tầng này không có slot nào', 400);
+const checkFloorCapacity = async (floor, t) => {
+  const total = floor.totalSlots;
+  if (!total || total <= 0) throw new AppError('Tầng không có sức chứa', 400);
 
-  const emptyPhysical = await ParkingSlot.count({
-    where: { floorId, status: 'empty' },
+  // Đếm GIỐNG check-in counter: xe đang trong bãi (active sessions).
+  const activeSessions = await ParkingSession.count({
+    where: { floorId: floor.id, status: 'active' },
     transaction: t,
   });
 
+  // Booking đã confirmed nhưng chưa check-in → giữ chỗ ảo.
   const heldByBookings = await Booking.count({
     where: {
-      floorId,
+      floorId: floor.id,
       status: 'confirmed',
       sessionId: null,
       endTime: { [Op.gt]: new Date() },
@@ -44,15 +70,14 @@ const checkFloorCapacity = async (floorId, t) => {
     transaction: t,
   });
 
-  const available = Math.max(0, emptyPhysical - heldByBookings);
-  const ratio = available / total;
-  if (ratio < FREE_SLOT_THRESHOLD) {
+  const available = Math.max(0, total - activeSessions - heldByBookings);
+  if (available < MIN_FREE_FOR_BOOKING) {
     throw new AppError(
-      `Bãi đang quá tải (còn ${Math.round(ratio * 100)}% trống, cần ≥ ${FREE_SLOT_THRESHOLD * 100}%). Tạm thời không nhận booking.`,
+      `Bãi chỉ còn ${available} chỗ trống (cần ≥ ${MIN_FREE_FOR_BOOKING} để nhận booking). Vui lòng đến bãi và check-in trực tiếp.`,
       409
     );
   }
-  return { total, emptyPhysical, heldByBookings, available, ratio };
+  return { total, activeSessions, heldByBookings, available };
 };
 
 const validateTimeWindow = (startTime, endTime) => {
@@ -126,7 +151,10 @@ export const createBooking = async ({ body, requester, ipAddr }) => {
       await ensureResidentBooksOwnPlate(requester, plate, t);
 
       const floor = await findVisitorCarFloor(body.floorId, t);
-      await checkFloorCapacity(floor.id, t);
+      await checkFloorCapacity(floor, t);
+
+      // Self-heal: huỷ pending đã quá hạn thanh toán cho plate này (khách đặt lại).
+      await cancelStalePendings(plate, t);
 
       const existing = await Booking.findOne({
         where: {
@@ -137,7 +165,11 @@ export const createBooking = async ({ body, requester, ipAddr }) => {
         transaction: t,
       });
       if (existing) {
-        throw new AppError(`Biển số ${plate} đã có booking đang hoạt động (#${existing.id})`, 409);
+        const msg =
+          existing.status === 'pending'
+            ? `Biển số ${plate} đang có giao dịch chờ thanh toán (#${existing.id}). Vui lòng hoàn tất hoặc đợi hết 15 phút.`
+            : `Biển số ${plate} đã có booking đã xác nhận (#${existing.id}).`;
+        throw new AppError(msg, 409);
       }
 
       const fee = calculateFee(body.startTime, body.endTime, 'car');
@@ -312,15 +344,42 @@ export const cancelBooking = async (id, requester) => {
 
 export const expireBookings = async () => {
   const now = new Date();
-  const [count] = await Booking.update(
-    { status: 'expired' },
-    {
-      where: {
-        status: { [Op.in]: ['pending', 'confirmed'] },
-        endTime: { [Op.lt]: now },
-        sessionId: null,
-      },
+  return sequelize.transaction(async (t) => {
+    const stalePendingIds = (
+      await Booking.findAll({
+        where: {
+          status: 'pending',
+          createdAt: { [Op.lt]: new Date(now.getTime() - PENDING_TTL_MS) },
+        },
+        attributes: ['id'],
+        transaction: t,
+      })
+    ).map((b) => b.id);
+
+    let pendingCancelled = 0;
+    if (stalePendingIds.length) {
+      [pendingCancelled] = await Booking.update(
+        { status: 'cancelled', staffNote: 'Auto-cancel: hết hạn thanh toán 15 phút' },
+        { where: { id: stalePendingIds }, transaction: t }
+      );
+      await BookingPayment.update(
+        { status: 'cancelled' },
+        { where: { bookingId: stalePendingIds, status: 'pending' }, transaction: t }
+      );
     }
-  );
-  return { expired: count };
+
+    const [expired] = await Booking.update(
+      { status: 'expired' },
+      {
+        where: {
+          status: { [Op.in]: ['pending', 'confirmed'] },
+          endTime: { [Op.lt]: now },
+          sessionId: null,
+        },
+        transaction: t,
+      }
+    );
+
+    return { pendingCancelled, expired };
+  });
 };
