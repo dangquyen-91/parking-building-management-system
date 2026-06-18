@@ -198,7 +198,7 @@ export interface CheckInMotoPayload {
   vehicleType: 'motorcycle';
   licensePlate: string;
   floorId: number;
-  rowId: number;
+  rowId?: number;
   userId?: number;
   note?: string;
 }

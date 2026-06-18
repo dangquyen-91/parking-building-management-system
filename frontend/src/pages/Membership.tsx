@@ -3,7 +3,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   AlertCircle,
-  CalendarDays,
   Car,
   Check,
   CheckCircle2,
@@ -28,11 +27,13 @@ import { subscriptionService, type ResidentSubscription } from '../services/subs
 type VehicleTab = 'motorcycle' | 'car';
 
 const formatCurrency = (value: string | number) =>
-  Number(value).toLocaleString('vi-VN', {
-    style: 'currency',
-    currency: 'VND',
-    maximumFractionDigits: 0,
-  });
+  Number(value)
+    .toLocaleString('vi-VN', {
+      style: 'currency',
+      currency: 'VND',
+      maximumFractionDigits: 0,
+    })
+    .replace(/\s/g, '');
 
 const normalizePlate = (value: string) => value.toUpperCase().replace(/\s/g, '').trim();
 const platePattern = /^[A-Z0-9-]{4,20}$/;
@@ -41,16 +42,6 @@ const vehicleLabels: Record<VehicleTab, string> = {
   car: 'Ô tô',
   motorcycle: 'Xe máy',
 };
-
-function statusLabel(status: string) {
-  const labels: Record<string, string> = {
-    pending: 'Chờ thanh toán',
-    active: 'Đang hoạt động',
-    expired: 'Đã hết hạn',
-    cancelled: 'Đã hủy',
-  };
-  return labels[status] ?? status;
-}
 
 function packageFeatures(pkg: ParkingPackage) {
   if (pkg.vehicleType === 'car') {
@@ -79,7 +70,7 @@ function getSavings(pkg: ParkingPackage, packages: ParkingPackage[]) {
 
 export default function Membership() {
   const navigate = useNavigate();
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [packages, setPackages] = useState<ParkingPackage[]>([]);
   const [residentSlots, setResidentSlots] = useState<ParkingSlotApiItem[]>([]);
   const [mySubscriptions, setMySubscriptions] = useState<ResidentSubscription[]>([]);
@@ -120,6 +111,7 @@ export default function Membership() {
     });
   }, [residentSlots, slotSearch]);
   const readyForPayment = Boolean(selectedPackage && plateValid && (!needsSlot || selectedSlotId));
+  const activeSubCount = mySubscriptions.filter((sub) => sub.status === 'active').length;
 
   useEffect(() => {
     let cancelled = false;
@@ -209,6 +201,15 @@ export default function Membership() {
     };
   }, [selectedPackage?.vehicleType, isAuthenticated]);
 
+  useEffect(() => {
+    if (!slotModalOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSlotModalOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [slotModalOpen]);
+
   const handleVehicleChange = (vehicle: VehicleTab) => {
     setSelectedVehicle(vehicle);
     setSubmitError(null);
@@ -271,7 +272,7 @@ export default function Membership() {
   const steps = [
     { label: 'Chọn gói', done: Boolean(selectedPackage) },
     { label: 'Biển số', done: plateValid },
-    { label: needsSlot ? 'Chọn slot' : 'Thanh toán', done: !needsSlot || Boolean(selectedSlotId) },
+    { label: needsSlot ? 'Chọn ô' : 'Thanh toán', done: !needsSlot || Boolean(selectedSlotId) },
   ];
 
   return (
@@ -295,8 +296,23 @@ export default function Membership() {
 
         {!isAuthenticated && (
           <div className="mx-auto mt-10 max-w-3xl rounded-[26px] border border-blue-200 bg-blue-50 px-6 py-5 text-center text-sm text-blue-900">
-            Bạn cần đăng nhập trước khi xem và mua gói từ backend.
+            Bạn cần đăng nhập để xem và mua gói thành viên.
             <Link to="/login" className="ml-2 font-bold underline">Đăng nhập</Link>
+          </div>
+        )}
+
+        {isAuthenticated && activeSubCount > 0 && (
+          <div className="mx-auto mt-8 flex max-w-6xl flex-col items-start justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 sm:flex-row sm:items-center">
+            <p className="flex items-center gap-2 text-sm font-medium text-emerald-800">
+              <CheckCircle2 className="h-4 w-4 shrink-0" />
+              Bạn đang có <span className="font-bold">{activeSubCount} gói</span> đang hiệu lực.
+            </p>
+            <Link
+              to="/profile"
+              className="inline-flex shrink-0 items-center gap-1 text-sm font-bold text-emerald-700 underline-offset-2 hover:underline"
+            >
+              Xem trong Hồ sơ →
+            </Link>
           </div>
         )}
 
@@ -306,9 +322,8 @@ export default function Membership() {
             Đang tải gói thành viên
           </div>
         ) : isAuthenticated ? (
-          <section className="mx-auto mt-12 grid max-w-6xl gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
-            <div>
-              <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <>
+            <div className="mx-auto mb-5 mt-12 flex max-w-6xl flex-col gap-3 sm:flex-row sm:items-center">
                 <div className="inline-flex w-full rounded-3xl border border-slate-200 bg-white p-1.5 shadow-sm sm:w-auto">
                   {([
                     { value: 'motorcycle' as const, label: 'Xe máy', icon: Motorbike },
@@ -342,9 +357,22 @@ export default function Membership() {
                 <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500 shadow-sm">
                   Đang hiển thị <span className="font-bold text-slate-950">{visiblePackages.length}</span> gói {vehicleLabels[selectedVehicle].toLowerCase()}
                 </div>
-              </div>
+            </div>
 
-              <div className="grid gap-5 md:grid-cols-2">
+            <section className="mx-auto grid max-w-6xl items-start gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+              <div>
+              {visiblePackages.length === 0 ? (
+                <div className="rounded-[26px] border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
+                  <SquareParking className="mx-auto mb-4 h-10 w-10 text-slate-300" />
+                  <h2 className="text-lg font-bold text-slate-700">
+                    Chưa có gói cho {vehicleLabels[selectedVehicle].toLowerCase()}
+                  </h2>
+                  <p className="mx-auto mt-2 max-w-sm text-sm text-slate-500">
+                    Hiện chưa có gói nào cho loại xe này. Vui lòng chọn loại xe khác hoặc quay lại sau.
+                  </p>
+                </div>
+              ) : (
+              <div className="grid justify-center gap-5 [grid-template-columns:repeat(auto-fit,minmax(260px,340px))]">
                 {visiblePackages.map((pkg, index) => {
                   const selected = pkg.id === selectedPackageId;
                   const savings = getSavings(pkg, packages);
@@ -398,10 +426,13 @@ export default function Membership() {
 
                       <div className="mt-5 flex items-end gap-2">
                         <span className="text-3xl font-black tracking-tight text-slate-950">
-                          {formatCurrency(pkg.price).replace(/\s/g, '')}
+                          {formatCurrency(pkg.price)}
                         </span>
                         <span className="mb-2 text-sm font-light text-slate-500">/{pkg.durationDays} ngày</span>
                       </div>
+                      <p className="mt-1 text-xs font-medium text-slate-400">
+                        ≈ {formatCurrency(Math.round(Number(pkg.price) / pkg.durationDays))}/ngày
+                      </p>
 
                       <div className="mt-5 grid gap-2.5">
                         {packageFeatures(pkg).map((feature) => (
@@ -433,6 +464,7 @@ export default function Membership() {
                   );
                 })}
               </div>
+              )}
             </div>
 
             {selectedPackage && (
@@ -490,6 +522,12 @@ export default function Membership() {
                           licensePlate && !plateValid ? 'border-red-300 focus:border-red-400' : 'border-slate-200 focus:border-blue-500'
                         )}
                       />
+                      <span className={cn(
+                        'mt-1.5 block text-xs',
+                        licensePlate && !plateValid ? 'text-red-500' : 'text-slate-400'
+                      )}>
+                        Gồm chữ, số và dấu gạch ngang, dài 4–20 ký tự.
+                      </span>
                     </label>
 
                     {needsSlot && (
@@ -557,7 +595,7 @@ export default function Membership() {
                       </div>
                       {selectedSlot && (
                         <div className="flex justify-between gap-3">
-                          <span className="text-slate-500">Slot</span>
+                          <span className="text-slate-500">Ô đỗ</span>
                           <span className="font-bold text-emerald-600">{selectedSlot.slotCode}</span>
                         </div>
                       )}
@@ -595,41 +633,20 @@ export default function Membership() {
               </aside>
             )}
           </section>
+          </>
         ) : null}
 
-        {isAuthenticated && mySubscriptions.length > 0 && (
-          <section className="mx-auto mt-8 max-w-6xl rounded-[26px] border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="mb-4 flex items-center gap-2">
-              <CalendarDays className="h-5 w-5 text-blue-600" />
-              <h3 className="text-lg font-bold text-slate-950">Gói của {user?.fullName ?? 'bạn'}</h3>
-            </div>
-            <div className="grid gap-3 lg:grid-cols-2">
-              {mySubscriptions.slice(0, 4).map((sub) => (
-                <div key={sub.id} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="font-bold tracking-widest text-slate-950">{sub.licensePlate}</p>
-                    <span className={cn(
-                      'rounded-full px-3 py-1 text-xs font-bold',
-                      sub.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'
-                    )}>
-                      {statusLabel(sub.status)}
-                    </span>
-                  </div>
-                  <p className="mt-2 text-sm text-slate-500">
-                    {vehicleLabels[sub.vehicleType]} · hết hạn {sub.endDate ? new Date(sub.endDate).toLocaleDateString('vi-VN') : '--'}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
       </main>
 
       {slotModalOpen && needsSlot && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-4 py-8 backdrop-blur-sm">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-4 py-8 backdrop-blur-sm"
+          onClick={() => setSlotModalOpen(false)}
+        >
           <motion.div
             initial={{ opacity: 0, scale: 0.96, y: 18 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
+            onClick={(event) => event.stopPropagation()}
             className="flex max-h-[86vh] w-full max-w-4xl flex-col overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-2xl"
           >
             <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
