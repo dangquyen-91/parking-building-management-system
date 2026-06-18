@@ -54,65 +54,93 @@ const reserveCarSlot = async (slotId, plate, t) => {
 export const buyPackage = async ({ userId, packageId, licensePlate, slotId, ipAddr }) => {
   const plate = normalizePlate(licensePlate);
 
-  return sequelize.transaction(async (t) => {
-    const pkg = await ParkingPackage.findByPk(packageId, { transaction: t });
-    if (!pkg || !pkg.isActive) throw new AppError('Package not found or inactive', 404);
+  return sequelize
+    .transaction(async (t) => {
+      const pkg = await ParkingPackage.findByPk(packageId, { transaction: t });
+      if (!pkg || !pkg.isActive) throw new AppError('Package not found or inactive', 404);
 
-    const existingPending = await ResidentSubscription.findOne({
-      where: { licensePlate: plate, packageId, status: 'pending' },
-      transaction: t,
-    });
-    if (existingPending) {
-      throw new AppError('A pending purchase already exists for this plate and package', 409);
-    }
+      // 1 biển số = 1 sub: chặn nếu plate đang có giao dịch pending (bất kỳ package).
+      const existingPending = await ResidentSubscription.findOne({
+        where: { licensePlate: plate, status: 'pending' },
+        transaction: t,
+      });
+      if (existingPending) {
+        throw new AppError('Biển số này đang có giao dịch chờ thanh toán. Vui lòng hoàn tất hoặc huỷ trước.', 409);
+      }
 
-    let reservedSlotId = null;
-    if (pkg.vehicleType === 'car') {
-      const slot = await reserveCarSlot(slotId, plate, t);
-      reservedSlotId = slot.id;
-    }
+      // Renewal: plate đã có sub active → gia hạn (cộng dồn endDate lúc thanh toán),
+      // dùng lại slot cũ, KHÔNG tạo active row thừa.
+      const activeSub = await ResidentSubscription.findOne({
+        where: { licensePlate: plate, status: 'active', endDate: { [Op.gt]: new Date() } },
+        order: [['endDate', 'DESC']],
+        transaction: t,
+      });
+      if (activeSub && activeSub.vehicleType !== pkg.vehicleType) {
+        throw new AppError(
+          `Biển số đang có gói ${activeSub.vehicleType} active, không thể mua gói ${pkg.vehicleType}.`,
+          409
+        );
+      }
+      const isRenewal = !!activeSub;
 
-    const subscription = await ResidentSubscription.create(
-      {
-        userId,
-        packageId,
-        slotId: reservedSlotId,
-        licensePlate: plate,
-        vehicleType: pkg.vehicleType,
-        amount: pkg.price,
-        status: 'pending',
-      },
-      { transaction: t }
-    );
+      let reservedSlotId = null;
+      if (pkg.vehicleType === 'car') {
+        if (isRenewal) {
+          reservedSlotId = activeSub.slotId;
+        } else {
+          const slot = await reserveCarSlot(slotId, plate, t);
+          reservedSlotId = slot.id;
+        }
+      }
 
-    const orderId = generateOrderId();
-    const orderInfo = `Goi ${pkg.vehicleType} ${plate}`.replace(/[^\x20-\x7E]/g, '');
+      const subscription = await ResidentSubscription.create(
+        {
+          userId,
+          packageId,
+          slotId: reservedSlotId,
+          licensePlate: plate,
+          vehicleType: pkg.vehicleType,
+          amount: pkg.price,
+          status: 'pending',
+        },
+        { transaction: t }
+      );
 
-    const { paymentUrl, createDate } = vnpayService.createPaymentUrl({ amount: pkg.price, orderId, orderInfo, ipAddr });
+      const orderId = generateOrderId();
+      const orderInfo = `Goi ${pkg.vehicleType} ${plate}`.replace(/[^\x20-\x7E]/g, '');
 
-    await SubscriptionPayment.create(
-      {
+      const { paymentUrl, createDate } = vnpayService.createPaymentUrl({ amount: pkg.price, orderId, orderInfo, ipAddr });
+
+      await SubscriptionPayment.create(
+        {
+          orderId,
+          provider: 'vnpay',
+          paymentMethod: 'vnpay',
+          amount: pkg.price,
+          orderInfo,
+          subscriptionId: subscription.id,
+          ipAddress: ipAddr || null,
+          vnpCreateDate: createDate,
+          status: 'pending',
+        },
+        { transaction: t }
+      );
+
+      return {
+        paymentUrl,
         orderId,
-        provider: 'vnpay',
-        paymentMethod: 'vnpay',
-        amount: pkg.price,
-        orderInfo,
         subscriptionId: subscription.id,
-        ipAddress: ipAddr || null,
-        vnpCreateDate: createDate,
-        status: 'pending',
-      },
-      { transaction: t }
-    );
-
-    return {
-      paymentUrl,
-      orderId,
-      subscriptionId: subscription.id,
-      slotId: reservedSlotId,
-      amount: Number(pkg.price),
-    };
-  });
+        slotId: reservedSlotId,
+        amount: Number(pkg.price),
+        isRenewal,
+      };
+    })
+    .catch((err) => {
+      if (err?.name === 'SequelizeUniqueConstraintError') {
+        throw new AppError('Biển số này đang có giao dịch chờ thanh toán. Vui lòng kiểm tra lại.', 409);
+      }
+      throw err;
+    });
 };
 
 const baseInclude = [
