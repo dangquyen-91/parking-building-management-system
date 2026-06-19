@@ -11,15 +11,9 @@ interface PlateSearchBarProps {
   isLoading?: boolean;
   disabled?: boolean;
   placeholder?: string;
-  autoFocusTrigger?: number; // increment to re-focus programmatically
+  autoFocusTrigger?: number;
 }
 
-/**
- * Oversized license-plate input for gate staff.
- * - Auto-focuses on mount and whenever `autoFocusTrigger` changes.
- * - Uppercases input automatically.
- * - Enter key triggers search.
- */
 export function PlateSearchBar({
   value,
   onChange,
@@ -32,7 +26,6 @@ export function PlateSearchBar({
 }: PlateSearchBarProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Auto-focus on mount and whenever trigger changes (e.g. after success)
   useEffect(() => {
     inputRef.current?.focus();
   }, [autoFocusTrigger]);
@@ -51,7 +44,6 @@ export function PlateSearchBar({
   return (
     <div className="w-full">
       <div className="relative">
-        {/* Search icon or spinner */}
         <div className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2">
           {isLoading ? (
             <div className="h-6 w-6 rounded-full border-2 border-blue-400/30 border-t-blue-400 animate-spin" />
@@ -79,7 +71,6 @@ export function PlateSearchBar({
           )}
         />
 
-        {/* Clear button */}
         {value && !isLoading && (
           <button
             type="button"
@@ -90,7 +81,6 @@ export function PlateSearchBar({
           </button>
         )}
 
-        {/* Search / Enter hint */}
         {!value && (
           <div className="pointer-events-none absolute right-5 top-1/2 -translate-y-1/2 hidden sm:flex items-center gap-1">
             <kbd className="rounded-md border border-white/10 bg-white/[0.05] px-2 py-1 text-[11px] font-mono text-slate-600">
@@ -101,7 +91,6 @@ export function PlateSearchBar({
         )}
       </div>
 
-      {/* Search button */}
       <motion.button
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.98 }}

@@ -1,28 +1,28 @@
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { Cpu, Zap, Server, ShieldAlert } from 'lucide-react';
+import { Building2, LayoutGrid, CalendarClock, Wallet } from 'lucide-react';
 
 export default function AboutSection() {
   const cards = [
     {
-      icon: <Cpu className="w-7 h-7 text-blue-600" />,
-      title: "Hệ thống Quản lý Tòa nhà Gửi xe",
-      desc: "Điều phối thông minh dòng xe ra vào, tự động kiểm soát lưu lượng xe giúp giảm tắc nghẽn tối đa tại các cổng tòa nhà."
+      icon: <Building2 className="w-7 h-7 text-blue-600" />,
+      title: "Quản lý bãi đỗ tòa nhà",
+      desc: "Theo dõi và kiểm soát toàn bộ lượt xe ra vào, gói cư dân và phí gửi xe trong một hệ thống tập trung."
     },
     {
-      icon: <Zap className="w-7 h-7 text-blue-600" />,
-      title: "Phân bổ Slot bằng AI",
-      desc: "Thuật toán tối ưu hóa vị trí đỗ xe tự động dựa trên loại xe, thời gian lưu trú dự kiến và tần suất của từng chủ xe."
+      icon: <LayoutGrid className="w-7 h-7 text-blue-600" />,
+      title: "Tự động xếp chỗ theo tầng",
+      desc: "Hệ thống tự gán hàng/ô còn trống theo loại xe và phân tầng cư dân hoặc khách vãng lai khi check-in."
     },
     {
-      icon: <Server className="w-7 h-7 text-blue-600" />,
-      title: "Đặt chỗ Trước Trực tuyến",
-      desc: "Cho phép lái xe tìm kiếm và giữ chỗ trước khi tới, tạo thói quen đỗ xe văn minh, hiện đại và tiết kiệm thời gian."
+      icon: <CalendarClock className="w-7 h-7 text-blue-600" />,
+      title: "Đặt chỗ trước trực tuyến",
+      desc: "Cho phép giữ chỗ trước tối đa 24 giờ và thanh toán online, chủ động hơn vào giờ cao điểm."
     },
     {
-      icon: <ShieldAlert className="w-7 h-7 text-blue-600" />,
-      title: "Tối ưu hóa Đô thị Thông minh",
-      desc: "Giảm thiểu khí thải do xe chạy vòng quanh tìm chỗ và xây dựng hạ tầng số hóa đồng bộ cho các tòa nhà thông minh."
+      icon: <Wallet className="w-7 h-7 text-blue-600" />,
+      title: "Thanh toán & gói linh hoạt",
+      desc: "Gói cư dân theo tháng/quý qua VNPay, phí khách vãng lai tính theo giờ, thanh toán online hoặc tiền mặt."
     }
   ];
 

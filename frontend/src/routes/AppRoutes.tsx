@@ -33,7 +33,6 @@ import ParkingMapPage from '../pages/staff/ParkingMapPage';
 import { useAuth } from '../hooks/useAuth';
 import type { ReactNode } from 'react';
 
-// ─── Admin guard (admin only) ─────────────────────────────────────────────────
 function AdminRoute({ children }: { children: ReactNode }) {
   const { user, loading, isAuthenticated } = useAuth();
 
@@ -79,7 +78,6 @@ function ManagerRoute({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-// ─── Staff guard (staff, manager, admin all allowed) ─────────────────────────
 function StaffRoute({ children }: { children: ReactNode }) {
   const { user, loading, isAuthenticated } = useAuth();
 
@@ -104,7 +102,6 @@ function StaffRoute({ children }: { children: ReactNode }) {
 export default function AppRoutes() {
   return (
     <Routes>
-      {/* ── Public ── */}
       <Route path="/" element={<Home />} />
       <Route path="/features" element={<Features />} />
       <Route path="/membership" element={<Membership />} />
@@ -119,7 +116,6 @@ export default function AppRoutes() {
       <Route path="/signin" element={<Navigate to="/login" replace />} />
       <Route path="/signup" element={<Navigate to="/register" replace />} />
 
-      {/* ── Admin ── */}
       <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
       <Route path="/admin/dashboard" element={<AdminRoute><AdminDashboardPage /></AdminRoute>} />
       <Route path="/admin/buildings" element={<AdminRoute><AdminBuildingsPage /></AdminRoute>} />
@@ -129,7 +125,6 @@ export default function AppRoutes() {
       <Route path="/admin/packages" element={<AdminRoute><AdminPackagesPage /></AdminRoute>} />
       <Route path="/admin/users" element={<AdminRoute><AdminUsersPage /></AdminRoute>} />
 
-      {/* ── Manager ── */}
       <Route path="/manager" element={<Navigate to="/manager/dashboard" replace />} />
       <Route path="/manager/dashboard" element={<ManagerRoute><ManagerDashboardPage /></ManagerRoute>} />
       <Route path="/manager/buildings" element={<ManagerRoute><ManagerBuildingsPage /></ManagerRoute>} />
@@ -140,10 +135,8 @@ export default function AppRoutes() {
       <Route path="/manager/users" element={<ManagerRoute><ManagerUsersPage /></ManagerRoute>} />
       <Route path="/manager/staff" element={<ManagerRoute><ManagerStaffPage /></ManagerRoute>} />
 
-      {/* ── Staff Kiosk ── */}
       <Route path="/staff" element={<Navigate to="/staff/check-in" replace />} />
       <Route path="/staff/check-in" element={<StaffRoute><CheckInPage /></StaffRoute>} />
-      {/* Placeholder routes — pages will be added iteratively */}
       <Route path="/staff/check-out" element={<StaffRoute><CheckOutPage /></StaffRoute>} />
       <Route path="/staff/sessions" element={<StaffRoute><ActiveSessionsPage /></StaffRoute>} />
       <Route path="/staff/map" element={<StaffRoute><ParkingMapPage /></StaffRoute>} />

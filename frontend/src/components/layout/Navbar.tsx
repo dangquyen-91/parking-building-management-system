@@ -52,7 +52,6 @@ export default function Navbar() {
       }`}
     >
       <div className="container mx-auto px-6 md:px-12 flex items-center justify-between">
-        {/* Logo */}
         <Link to="/" className="flex items-center gap-2">
           <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-500">
             <Car size={24} className="stroke-[2.5]" />
@@ -62,7 +61,6 @@ export default function Navbar() {
           </span>
         </Link>
 
-        {/* Desktop nav links */}
         <div className="hidden md:flex items-center gap-6">
           {navLinks.map((link, idx) => (
             <NavLink
@@ -94,11 +92,9 @@ export default function Navbar() {
           ))}
         </div>
 
-        {/* Desktop right actions */}
         <div className="hidden md:flex items-center gap-4">
           {isAuthenticated && user ? (
             <div ref={dropdownRef} className="relative">
-              {/* Avatar pill button */}
               <button
                 onClick={() => setDropdownOpen(prev => !prev)}
                 className={`flex items-center gap-2.5 rounded-full border px-3 py-1.5 transition-all ${
@@ -120,7 +116,6 @@ export default function Navbar() {
                 />
               </button>
 
-              {/* Dropdown menu */}
               <AnimatePresence>
                 {dropdownOpen && (
                   <motion.div
@@ -187,7 +182,6 @@ export default function Navbar() {
           </Link>
         </div>
 
-        {/* Mobile hamburger */}
         <button
           className={`md:hidden p-2 rounded-lg ${isLight ? 'text-slate-900' : 'text-white'}`}
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -196,7 +190,6 @@ export default function Navbar() {
         </button>
       </div>
 
-      {/* Mobile menu */}
       <AnimatePresence>
         {mobileMenuOpen && (
           <motion.div

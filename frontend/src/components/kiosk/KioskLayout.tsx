@@ -38,7 +38,6 @@ export function KioskLayout({
 
   return (
     <div className="min-h-screen bg-[#070B14] text-white">
-      {/* Background glows */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute left-[14%] top-[-18%] h-[420px] w-[420px] rounded-full bg-blue-500/20 blur-[120px]" />
         <div className="absolute right-[8%] top-[16%] h-[380px] w-[380px] rounded-full bg-purple-500/18 blur-[120px]" />
@@ -49,7 +48,6 @@ export function KioskLayout({
       <StaffSidebar />
 
       <div className="relative lg:pl-[280px]">
-        {/* Sticky top header */}
         <header className="sticky top-0 z-30 border-b border-white/10 bg-[#070B14]/75 backdrop-blur-2xl">
           <div className="flex min-h-20 items-center gap-4 px-4 sm:px-6 xl:px-8">
             <div className="flex-1">
@@ -66,10 +64,8 @@ export function KioskLayout({
 
             {headerRight && <div className="flex items-center">{headerRight}</div>}
 
-            {/* Khối Actions đã được sửa lỗi căn chỉnh */}
             <div className="ml-auto flex items-center gap-3">
 
-              {/* Nút Bell */}
               <motion.button
                 whileHover={{ scale: 1.04 }}
                 whileTap={{ scale: 0.97 }}
@@ -78,7 +74,6 @@ export function KioskLayout({
                 <Bell className="h-5 w-5" />
               </motion.button>
 
-              {/* User chip */}
               <div className="flex h-12 items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] pl-2 pr-4">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-purple-500 text-sm font-bold text-white shadow-[0_0_22px_rgba(139,92,246,0.38)]">
                   {user?.fullName ? initials : <UserRound className="h-4 w-4" />}
@@ -93,7 +88,6 @@ export function KioskLayout({
                 </div>
               </div>
 
-              {/* Nút LogOut */}
               <motion.button
                 whileHover={{ scale: 1.04 }}
                 whileTap={{ scale: 0.97 }}

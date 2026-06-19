@@ -3,7 +3,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   AlertCircle,
-  CalendarDays,
   Car,
   Check,
   CheckCircle2,
@@ -28,29 +27,32 @@ import { subscriptionService, type ResidentSubscription } from '../services/subs
 type VehicleTab = 'motorcycle' | 'car';
 
 const formatCurrency = (value: string | number) =>
-  Number(value).toLocaleString('vi-VN', {
-    style: 'currency',
-    currency: 'VND',
-    maximumFractionDigits: 0,
-  });
+  Number(value)
+    .toLocaleString('vi-VN', {
+      style: 'currency',
+      currency: 'VND',
+      maximumFractionDigits: 0,
+    })
+    .replace(/\s/g, '');
 
 const normalizePlate = (value: string) => value.toUpperCase().replace(/\s/g, '').trim();
 const platePattern = /^[A-Z0-9-]{4,20}$/;
+const pendingTtlMs = 15 * 60 * 1000;
+const isStillActive = (sub: ResidentSubscription) =>
+  sub.status === 'active' && (!sub.endDate || new Date(sub.endDate).getTime() > Date.now());
+const formatDateOnly = (iso: string | null) =>
+  iso ? new Date(iso).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '--';
+const formatRemaining = (ms: number) => {
+  const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+};
 
 const vehicleLabels: Record<VehicleTab, string> = {
   car: 'Ô tô',
   motorcycle: 'Xe máy',
 };
-
-function statusLabel(status: string) {
-  const labels: Record<string, string> = {
-    pending: 'Chờ thanh toán',
-    active: 'Đang hoạt động',
-    expired: 'Đã hết hạn',
-    cancelled: 'Đã hủy',
-  };
-  return labels[status] ?? status;
-}
 
 function packageFeatures(pkg: ParkingPackage) {
   if (pkg.vehicleType === 'car') {
@@ -79,7 +81,7 @@ function getSavings(pkg: ParkingPackage, packages: ParkingPackage[]) {
 
 export default function Membership() {
   const navigate = useNavigate();
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [packages, setPackages] = useState<ParkingPackage[]>([]);
   const [residentSlots, setResidentSlots] = useState<ParkingSlotApiItem[]>([]);
   const [mySubscriptions, setMySubscriptions] = useState<ResidentSubscription[]>([]);
@@ -92,6 +94,8 @@ export default function Membership() {
   const [loading, setLoading] = useState(true);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [refreshingPending, setRefreshingPending] = useState(false);
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const [error, setError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -107,7 +111,23 @@ export default function Membership() {
 
   const plate = normalizePlate(licensePlate);
   const plateValid = platePattern.test(plate);
-  const needsSlot = selectedPackage?.vehicleType === 'car';
+  const plateSubscriptions = useMemo(
+    () => (plate ? mySubscriptions.filter((sub) => normalizePlate(sub.licensePlate) === plate) : []),
+    [mySubscriptions, plate]
+  );
+  const pendingPlateSub = plateValid ? plateSubscriptions.find((sub) => sub.status === 'pending') ?? null : null;
+  const pendingSubId = pendingPlateSub?.id ?? null;
+  const pendingCreatedMs = pendingPlateSub?.createdAt ? new Date(pendingPlateSub.createdAt).getTime() : null;
+  const pendingExpiresAtMs = pendingCreatedMs && Number.isFinite(pendingCreatedMs) ? pendingCreatedMs + pendingTtlMs : null;
+  const pendingRemainingMs = pendingExpiresAtMs ? Math.max(0, pendingExpiresAtMs - nowMs) : null;
+  const pendingExpired = Boolean(pendingPlateSub && pendingRemainingMs === 0);
+  const activePlateSub = plateValid ? plateSubscriptions.find(isStillActive) ?? null : null;
+  const activeSameVehicleSub =
+    selectedPackage && activePlateSub?.vehicleType === selectedPackage.vehicleType ? activePlateSub : null;
+  const activeOtherVehicleSub =
+    selectedPackage && activePlateSub && activePlateSub.vehicleType !== selectedPackage.vehicleType ? activePlateSub : null;
+  const isRenewal = Boolean(activeSameVehicleSub);
+  const needsSlot = selectedPackage?.vehicleType === 'car' && !isRenewal;
   const selectedSlot = residentSlots.find((slot) => slot.id === selectedSlotId) ?? null;
   const filteredSlots = useMemo(() => {
     const keyword = slotSearch.trim().toUpperCase();
@@ -119,7 +139,34 @@ export default function Membership() {
       return slotCode.includes(keyword) || floorNumber.includes(keyword) || buildingName.includes(keyword);
     });
   }, [residentSlots, slotSearch]);
-  const readyForPayment = Boolean(selectedPackage && plateValid && (!needsSlot || selectedSlotId));
+  const readyForPayment = Boolean(
+    selectedPackage &&
+    plateValid &&
+    !pendingPlateSub &&
+    !activeOtherVehicleSub &&
+    (!needsSlot || selectedSlotId)
+  );
+  const activeSubCount = mySubscriptions.filter((sub) => sub.status === 'active').length;
+
+  useEffect(() => {
+    if (!pendingSubId) return;
+    const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [pendingSubId]);
+
+  const refreshSubscriptions = async () => {
+    if (!isAuthenticated) return;
+    setRefreshingPending(true);
+    setSubmitError(null);
+    try {
+      const mine = await subscriptionService.getMine();
+      setMySubscriptions(mine);
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Không kiểm tra lại được trạng thái giao dịch.');
+    } finally {
+      setRefreshingPending(false);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -172,7 +219,7 @@ export default function Membership() {
     let cancelled = false;
 
     async function loadResidentSlots() {
-      if (selectedPackage?.vehicleType !== 'car' || !isAuthenticated) {
+      if (!needsSlot || !isAuthenticated) {
         setResidentSlots([]);
         setSelectedSlotId(null);
         setSlotModalOpen(false);
@@ -207,7 +254,16 @@ export default function Membership() {
     return () => {
       cancelled = true;
     };
-  }, [selectedPackage?.vehicleType, isAuthenticated]);
+  }, [needsSlot, isAuthenticated]);
+
+  useEffect(() => {
+    if (!slotModalOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSlotModalOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [slotModalOpen]);
 
   const handleVehicleChange = (vehicle: VehicleTab) => {
     setSelectedVehicle(vehicle);
@@ -247,6 +303,14 @@ export default function Membership() {
       setSubmitError('Biển số chỉ gồm chữ, số, dấu gạch ngang và dài 4-20 ký tự.');
       return;
     }
+    if (pendingPlateSub) {
+      setSubmitError('Biển số này đang có giao dịch chờ thanh toán. Vui lòng hoàn tất giao dịch trước khi mua gói khác.');
+      return;
+    }
+    if (activeOtherVehicleSub) {
+      setSubmitError(`Biển số này đang có gói ${vehicleLabels[activeOtherVehicleSub.vehicleType].toLowerCase()} còn hạn, không thể mua gói ${vehicleLabels[selectedPackage.vehicleType].toLowerCase()}.`);
+      return;
+    }
     if (needsSlot && !selectedSlotId) {
       setSubmitError('Gói ô tô cần chọn một ô cư dân còn trống.');
       return;
@@ -258,7 +322,7 @@ export default function Membership() {
       const result = await subscriptionService.buyPackage({
         packageId: selectedPackage.id,
         licensePlate: plate,
-        slotId: selectedSlotId ?? undefined,
+        slotId: needsSlot ? selectedSlotId ?? undefined : undefined,
       });
       window.location.href = result.paymentUrl;
     } catch (err) {
@@ -271,7 +335,7 @@ export default function Membership() {
   const steps = [
     { label: 'Chọn gói', done: Boolean(selectedPackage) },
     { label: 'Biển số', done: plateValid },
-    { label: needsSlot ? 'Chọn slot' : 'Thanh toán', done: !needsSlot || Boolean(selectedSlotId) },
+    { label: isRenewal ? 'Gia hạn' : needsSlot ? 'Chọn ô' : 'Thanh toán', done: !needsSlot || Boolean(selectedSlotId) },
   ];
 
   return (
@@ -295,8 +359,23 @@ export default function Membership() {
 
         {!isAuthenticated && (
           <div className="mx-auto mt-10 max-w-3xl rounded-[26px] border border-blue-200 bg-blue-50 px-6 py-5 text-center text-sm text-blue-900">
-            Bạn cần đăng nhập trước khi xem và mua gói từ backend.
+            Bạn cần đăng nhập để xem và mua gói thành viên.
             <Link to="/login" className="ml-2 font-bold underline">Đăng nhập</Link>
+          </div>
+        )}
+
+        {isAuthenticated && activeSubCount > 0 && (
+          <div className="mx-auto mt-8 flex max-w-6xl flex-col items-start justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 sm:flex-row sm:items-center">
+            <p className="flex items-center gap-2 text-sm font-medium text-emerald-800">
+              <CheckCircle2 className="h-4 w-4 shrink-0" />
+              Bạn đang có <span className="font-bold">{activeSubCount} gói</span> đang hiệu lực.
+            </p>
+            <Link
+              to="/profile"
+              className="inline-flex shrink-0 items-center gap-1 text-sm font-bold text-emerald-700 underline-offset-2 hover:underline"
+            >
+              Xem trong Hồ sơ →
+            </Link>
           </div>
         )}
 
@@ -306,9 +385,8 @@ export default function Membership() {
             Đang tải gói thành viên
           </div>
         ) : isAuthenticated ? (
-          <section className="mx-auto mt-12 grid max-w-6xl gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
-            <div>
-              <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <>
+            <div className="mx-auto mb-5 mt-12 flex max-w-6xl flex-col gap-3 sm:flex-row sm:items-center">
                 <div className="inline-flex w-full rounded-3xl border border-slate-200 bg-white p-1.5 shadow-sm sm:w-auto">
                   {([
                     { value: 'motorcycle' as const, label: 'Xe máy', icon: Motorbike },
@@ -342,9 +420,22 @@ export default function Membership() {
                 <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500 shadow-sm">
                   Đang hiển thị <span className="font-bold text-slate-950">{visiblePackages.length}</span> gói {vehicleLabels[selectedVehicle].toLowerCase()}
                 </div>
-              </div>
+            </div>
 
-              <div className="grid gap-5 md:grid-cols-2">
+            <section className="mx-auto grid max-w-6xl items-start gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+              <div>
+              {visiblePackages.length === 0 ? (
+                <div className="rounded-[26px] border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
+                  <SquareParking className="mx-auto mb-4 h-10 w-10 text-slate-300" />
+                  <h2 className="text-lg font-bold text-slate-700">
+                    Chưa có gói cho {vehicleLabels[selectedVehicle].toLowerCase()}
+                  </h2>
+                  <p className="mx-auto mt-2 max-w-sm text-sm text-slate-500">
+                    Hiện chưa có gói nào cho loại xe này. Vui lòng chọn loại xe khác hoặc quay lại sau.
+                  </p>
+                </div>
+              ) : (
+              <div className="grid justify-center gap-5 [grid-template-columns:repeat(auto-fit,minmax(260px,340px))]">
                 {visiblePackages.map((pkg, index) => {
                   const selected = pkg.id === selectedPackageId;
                   const savings = getSavings(pkg, packages);
@@ -398,10 +489,13 @@ export default function Membership() {
 
                       <div className="mt-5 flex items-end gap-2">
                         <span className="text-3xl font-black tracking-tight text-slate-950">
-                          {formatCurrency(pkg.price).replace(/\s/g, '')}
+                          {formatCurrency(pkg.price)}
                         </span>
                         <span className="mb-2 text-sm font-light text-slate-500">/{pkg.durationDays} ngày</span>
                       </div>
+                      <p className="mt-1 text-xs font-medium text-slate-400">
+                        ≈ {formatCurrency(Math.round(Number(pkg.price) / pkg.durationDays))}/ngày
+                      </p>
 
                       <div className="mt-5 grid gap-2.5">
                         {packageFeatures(pkg).map((feature) => (
@@ -433,6 +527,7 @@ export default function Membership() {
                   );
                 })}
               </div>
+              )}
             </div>
 
             {selectedPackage && (
@@ -441,7 +536,7 @@ export default function Membership() {
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-600">Thanh toán</p>
-                      <h3 className="mt-1 text-lg font-black text-slate-950">Hoàn tất đăng ký</h3>
+                      <h3 className="mt-1 text-lg font-black text-slate-950">{isRenewal ? 'Hoàn tất gia hạn' : 'Hoàn tất đăng ký'}</h3>
                     </div>
                     <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
                       <ReceiptText className="h-5 w-5" />
@@ -490,7 +585,85 @@ export default function Membership() {
                           licensePlate && !plateValid ? 'border-red-300 focus:border-red-400' : 'border-slate-200 focus:border-blue-500'
                         )}
                       />
+                      <span className={cn(
+                        'mt-1.5 block text-xs',
+                        licensePlate && !plateValid ? 'text-red-500' : 'text-slate-400'
+                      )}>
+                        Gồm chữ, số và dấu gạch ngang, dài 4–20 ký tự.
+                      </span>
                     </label>
+
+                    {plateValid && pendingPlateSub && (
+                      <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                        <div className="flex gap-2">
+                          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            <p className="font-bold">Biển số này đang có giao dịch chờ thanh toán.</p>
+                            <p className="mt-1 leading-5">
+                              Hãy hoàn tất giao dịch hiện tại trước khi mua gói khác. Gói đang chờ:
+                              {' '}
+                              <span className="font-bold">{pendingPlateSub.package?.name ?? `#${pendingPlateSub.packageId}`}</span>.
+                            </p>
+                            <div className="mt-3 flex flex-wrap items-center gap-2">
+                              <span className="rounded-full border border-amber-300 bg-white px-3 py-1 text-xs font-black text-amber-800">
+                                {pendingRemainingMs === null
+                                  ? 'Tự hủy sau khoảng 15 phút'
+                                  : pendingExpired
+                                    ? 'Đã hết 15 phút'
+                                    : `Còn ${formatRemaining(pendingRemainingMs)}`}
+                              </span>
+                              <span className="text-xs font-semibold text-amber-700">
+                                Sau 15 phút backend sẽ tự hủy, có thể cần thêm vài phút để job dọn chạy.
+                              </span>
+                            </div>
+                            {(pendingExpired || pendingRemainingMs === null) && (
+                              <button
+                                type="button"
+                                onClick={refreshSubscriptions}
+                                disabled={refreshingPending}
+                                className="mt-3 inline-flex h-9 items-center gap-2 rounded-xl border border-amber-300 bg-white px-3 text-xs font-bold text-amber-800 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {refreshingPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                                Kiểm tra lại
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {plateValid && activeOtherVehicleSub && selectedPackage && (
+                      <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                        <div className="flex gap-2">
+                          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                          <div>
+                            <p className="font-bold">Không thể mua gói khác loại xe cho cùng biển số.</p>
+                            <p className="mt-1 leading-5">
+                              Biển số này đang có gói {vehicleLabels[activeOtherVehicleSub.vehicleType].toLowerCase()} còn hạn đến
+                              {' '}
+                              <span className="font-bold">{formatDateOnly(activeOtherVehicleSub.endDate)}</span>.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {plateValid && activeSameVehicleSub && selectedPackage && !pendingPlateSub && (
+                      <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                        <div className="flex gap-2">
+                          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+                          <div>
+                            <p className="font-bold">Gia hạn gói hiện tại</p>
+                            <p className="mt-1 leading-5">
+                              Sau khi thanh toán, {selectedPackage.durationDays} ngày sẽ được cộng vào hạn hiện tại
+                              {' '}
+                              <span className="font-bold">{formatDateOnly(activeSameVehicleSub.endDate)}</span>.
+                              {activeSameVehicleSub.slot ? ` Ô ${activeSameVehicleSub.slot.slotCode} sẽ được giữ nguyên.` : ''}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     {needsSlot && (
                       <div>
@@ -557,8 +730,14 @@ export default function Membership() {
                       </div>
                       {selectedSlot && (
                         <div className="flex justify-between gap-3">
-                          <span className="text-slate-500">Slot</span>
+                          <span className="text-slate-500">Ô đỗ</span>
                           <span className="font-bold text-emerald-600">{selectedSlot.slotCode}</span>
+                        </div>
+                      )}
+                      {!selectedSlot && activeSameVehicleSub?.slot && (
+                        <div className="flex justify-between gap-3">
+                          <span className="text-slate-500">Ô hiện tại</span>
+                          <span className="font-bold text-emerald-600">{activeSameVehicleSub.slot.slotCode}</span>
                         </div>
                       )}
                     </div>
@@ -589,47 +768,26 @@ export default function Membership() {
                     className="mt-3 inline-flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}
-                    {submitting ? 'Đang tạo giao dịch VNPay...' : 'Thanh toán qua VNPay'}
+                    {submitting ? 'Đang tạo giao dịch VNPay...' : isRenewal ? 'Thanh toán gia hạn qua VNPay' : 'Thanh toán qua VNPay'}
                   </button>
                 </div>
               </aside>
             )}
           </section>
+          </>
         ) : null}
 
-        {isAuthenticated && mySubscriptions.length > 0 && (
-          <section className="mx-auto mt-8 max-w-6xl rounded-[26px] border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="mb-4 flex items-center gap-2">
-              <CalendarDays className="h-5 w-5 text-blue-600" />
-              <h3 className="text-lg font-bold text-slate-950">Gói của {user?.fullName ?? 'bạn'}</h3>
-            </div>
-            <div className="grid gap-3 lg:grid-cols-2">
-              {mySubscriptions.slice(0, 4).map((sub) => (
-                <div key={sub.id} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="font-bold tracking-widest text-slate-950">{sub.licensePlate}</p>
-                    <span className={cn(
-                      'rounded-full px-3 py-1 text-xs font-bold',
-                      sub.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'
-                    )}>
-                      {statusLabel(sub.status)}
-                    </span>
-                  </div>
-                  <p className="mt-2 text-sm text-slate-500">
-                    {vehicleLabels[sub.vehicleType]} · hết hạn {sub.endDate ? new Date(sub.endDate).toLocaleDateString('vi-VN') : '--'}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
       </main>
 
       {slotModalOpen && needsSlot && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-4 py-8 backdrop-blur-sm">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-4 py-8 backdrop-blur-sm"
+          onClick={() => setSlotModalOpen(false)}
+        >
           <motion.div
             initial={{ opacity: 0, scale: 0.96, y: 18 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
+            onClick={(event) => event.stopPropagation()}
             className="flex max-h-[86vh] w-full max-w-4xl flex-col overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-2xl"
           >
             <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">

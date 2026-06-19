@@ -22,11 +22,9 @@ const menuItems = [
 export function StaffSidebar() {
   return (
     <aside className="fixed inset-y-0 left-0 z-40 hidden w-[280px] border-r border-white/10 bg-[#070B14]/85 backdrop-blur-2xl lg:block">
-      {/* Edge gradient rule */}
       <div className="absolute inset-y-0 right-0 w-px bg-gradient-to-b from-transparent via-blue-500/70 to-transparent" />
 
       <div className="flex h-full flex-col px-5 py-6">
-        {/* Brand */}
         <div className="mb-8 flex items-center gap-3 px-2">
           <div className="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-blue-400/30 bg-gradient-to-br from-blue-500/25 to-purple-500/25 text-blue-200 shadow-[0_0_35px_rgba(59,130,246,0.35)]">
             <Zap className="h-5 w-5" />
@@ -39,7 +37,6 @@ export function StaffSidebar() {
           </div>
         </div>
 
-        {/* Shortcut hint */}
         <p className="mb-3 px-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-600">
           Điều hướng
         </p>
@@ -82,7 +79,6 @@ export function StaffSidebar() {
           ))}
         </nav>
 
-        {/* Footer: car slots indicator */}
         <div className="mt-auto rounded-2xl border border-white/10 bg-white/[0.03] p-4">
           <div className="flex items-center gap-3">
             <Car className="h-4 w-4 text-slate-500" />

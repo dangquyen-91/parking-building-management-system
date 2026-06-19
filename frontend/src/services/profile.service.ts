@@ -3,7 +3,6 @@ import type { ResidentSubscription } from './subscription.service';
 
 const API_BASE_URL = 'http://localhost:5000/api/v1';
 
-// ─── Full subscription item returned by /subscriptions/me ────────────────────
 export interface MySubscription extends ResidentSubscription {
   package: {
     id: number;
@@ -58,13 +57,11 @@ async function parseResponse<T>(response: Response): Promise<T> {
 }
 
 export const profileService = {
-  /** GET /users/me */
   async getMe(): Promise<UserProfile> {
     const res = await fetch(`${API_BASE_URL}/users/me`, { headers: authHeaders() });
     return parseResponse<UserProfile>(res);
   },
 
-  /** PATCH /users/me — only fullName and phone */
   async updateMe(payload: UpdateProfilePayload): Promise<UserProfile> {
     const res = await fetch(`${API_BASE_URL}/users/me`, {
       method: 'PATCH',
@@ -74,7 +71,6 @@ export const profileService = {
     return parseResponse<UserProfile>(res);
   },
 
-  /** GET /subscriptions/me?status=X */
   async getMySubscriptions(status?: string): Promise<MySubscription[]> {
     const params = new URLSearchParams();
     if (status) params.set('status', status);

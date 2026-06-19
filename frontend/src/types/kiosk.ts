@@ -1,4 +1,3 @@
-// ─── Primitives ──────────────────────────────────────────────────────────────
 export type VehicleType = 'car' | 'motorcycle';
 export type SlotStatus = 'empty' | 'occupied' | 'reserved' | 'maintenance';
 export type RowStatus = 'available' | 'full' | 'maintenance';
@@ -6,8 +5,6 @@ export type SessionStatus = 'active' | 'completed' | 'cancelled';
 export type PaymentMethod = 'cash' | 'vnpay';
 export type FloorType = 'resident' | 'visitor';
 
-// ─── Lookup API Response ─────────────────────────────────────────────────────
-// GET /parking-sessions/lookup
 export interface LookupLinkedResident {
   id: number;
   fullName: string;
@@ -65,8 +62,6 @@ export interface LookupApiResponse {
   };
 }
 
-// ─── Subscription API Response ───────────────────────────────────────────────
-// GET /subscriptions/active
 export interface ActiveSubscriptionPackage {
   id: number;
   name: string;
@@ -103,8 +98,6 @@ export interface SubscriptionApiResponse {
   subscription: ActiveSubscription | null;
 }
 
-// ─── Booking API Response ─────────────────────────────────────────────────────
-// GET /bookings
 export interface BookingFloor {
   id: number;
   floorNumber: number;
@@ -144,12 +137,9 @@ export interface BookingApiItem {
   createdAt: string;
   floor: BookingFloor;
   slot: BookingSlot | null;
-  // Nested session object may be present when a booking has been checked in.
   session: { id: number; entryTime: string; status: string } | null;
 }
 
-// ─── Parking Slots / Rows ─────────────────────────────────────────────────────
-// GET /parking-slots?status=empty&vehicleType=car
 export interface ParkingSlotApiItem {
   id: number;
   floorId: number;
@@ -166,7 +156,6 @@ export interface ParkingSlotApiItem {
   };
 }
 
-// GET /parking-rows?status=available&vehicleType=motorcycle
 export interface ParkingRowApiItem {
   id: number;
   floorId: number;
@@ -184,8 +173,6 @@ export interface ParkingRowApiItem {
   };
 }
 
-// ─── Check-In Payloads & Responses ───────────────────────────────────────────
-// POST /parking-sessions/check-in
 export interface CheckInCarPayload {
   vehicleType: 'car';
   licensePlate: string;
@@ -198,7 +185,7 @@ export interface CheckInMotoPayload {
   vehicleType: 'motorcycle';
   licensePlate: string;
   floorId: number;
-  rowId: number;
+  rowId?: number;
   userId?: number;
   note?: string;
 }
@@ -235,8 +222,6 @@ export interface ConfirmBookingPayload {
   staffNote?: string;
 }
 
-// ─── Active Sessions ──────────────────────────────────────────────────────────
-// GET /parking-sessions
 export interface ActiveSessionApiItem {
   id: number;
   licensePlate: string;
@@ -265,8 +250,6 @@ export interface PaginatedResponse<T> {
   };
 }
 
-// ─── Checkout ─────────────────────────────────────────────────────────────────
-// GET /parking-sessions/{id}/checkout-preview
 export interface CheckoutPreviewApiResponse {
   sessionId: number;
   licensePlate: string;
@@ -291,7 +274,6 @@ export interface CheckoutPreviewApiResponse {
   suggestedPaymentMethod: 'package' | 'cash_or_vnpay';
 }
 
-// POST /parking-sessions/{id}/check-out
 export interface CheckOutPayload {
   paymentMethod: PaymentMethod;
 }
@@ -313,8 +295,6 @@ export interface CheckOutApiResponse {
   breakdown: CheckoutPreviewApiResponse['breakdown'];
 }
 
-// ─── Parking Map ──────────────────────────────────────────────────────────────
-// GET /floors
 export interface FloorApiItem {
   id: number;
   buildingId: number;

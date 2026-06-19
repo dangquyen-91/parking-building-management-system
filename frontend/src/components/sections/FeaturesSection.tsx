@@ -1,38 +1,38 @@
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { Clock, Smartphone, Layers, Camera, CreditCard, Cpu } from 'lucide-react';
+import { Clock, CalendarCheck, Layers, ScanLine, CreditCard, Users } from 'lucide-react';
 
 export default function FeaturesSection() {
   const features = [
     {
       icon: <Clock className="w-6 h-6" />,
-      title: "Theo dõi slot còn trống",
-      desc: "Trực quan hóa sơ đồ bãi đỗ với cập nhật tình trạng trống theo thời gian thực tại từng tầng."
+      title: "Theo dõi chỗ còn trống",
+      desc: "Sơ đồ tầng cập nhật tình trạng chỗ trống theo thời gian thực cho từng tầng, từng hàng xe."
     },
     {
-      icon: <Smartphone className="w-6 h-6" />,
+      icon: <CalendarCheck className="w-6 h-6" />,
       title: "Đặt chỗ trước",
-      desc: "Giữ chỗ mong muốn trước khi xe lăn bánh đến tòa nhà, tránh tình trạng hết chỗ giờ cao điểm."
+      desc: "Giữ chỗ trước tối đa 24 giờ và thanh toán online, tránh hết chỗ vào giờ cao điểm."
     },
     {
       icon: <Layers className="w-6 h-6" />,
-      title: "Quản lý nhiều tầng xe",
-      desc: "Hệ thống hỗ trợ phân tầng, phân khu đa dạng cho xe máy, ô tô, xe điện và các khu VIP chuyên biệt."
+      title: "Phân tầng cư dân & khách",
+      desc: "Phân tầng cho cư dân (ô cố định) và khách vãng lai, phân hàng riêng cho xe máy và ô tô."
     },
     {
-      icon: <Camera className="w-6 h-6" />,
-      title: "Quét biển số xe",
-      desc: "Công nghệ ANPR nhận diện biển số tự động trong 0.5s để mở rào chắn mà không cần dừng xe quẹt thẻ."
+      icon: <ScanLine className="w-6 h-6" />,
+      title: "Check-in bằng biển số",
+      desc: "Nhân viên nhập biển số tại quầy, hệ thống tự tra cứu gói cư dân hoặc lượt đặt chỗ và xếp chỗ ngay."
     },
     {
       icon: <CreditCard className="w-6 h-6" />,
-      title: "Thanh toán thông minh",
-      desc: "Thanh toán không chạm đa phương thức qua ví điện tử, ngân hàng, hoặc trừ thẻ tự động khi qua cổng."
+      title: "Thanh toán VNPay & tiền mặt",
+      desc: "Thanh toán gói và phí gửi xe qua VNPay (thẻ, ngân hàng, QR) hoặc tiền mặt tại quầy."
     },
     {
-      icon: <Cpu className="w-6 h-6" />,
-      title: "AI hỗ trợ phân bổ slot",
-      desc: "Trí tuệ nhân tạo điều phối vị trí đỗ tối ưu nhất dựa trên kích thước xe và lịch sử gửi của người dùng."
+      icon: <Users className="w-6 h-6" />,
+      title: "Phân quyền theo vai trò",
+      desc: "Phân quyền cho Quản trị, Quản lý, Nhân viên và Người dùng với chức năng phù hợp từng vai trò."
     }
   ];
 

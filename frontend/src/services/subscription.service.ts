@@ -15,6 +15,22 @@ export interface BuyPackageResult {
   subscriptionId: number;
   slotId: number | null;
   amount: number;
+  isRenewal: boolean;
+}
+
+export interface ResidentSubscriptionPackage {
+  id: number;
+  name: string;
+  vehicleType: 'car' | 'motorcycle';
+  durationDays: number;
+  price: string;
+}
+
+export interface ResidentSubscriptionSlot {
+  id: number;
+  slotCode: string;
+  floorId: number;
+  status: string;
 }
 
 export interface ResidentSubscription {
@@ -28,6 +44,10 @@ export interface ResidentSubscription {
   startDate: string | null;
   endDate: string | null;
   status: SubscriptionStatus;
+  createdAt?: string;
+  updatedAt?: string;
+  package?: ResidentSubscriptionPackage;
+  slot?: ResidentSubscriptionSlot | null;
 }
 
 async function parseResponse<T>(response: Response): Promise<T> {
