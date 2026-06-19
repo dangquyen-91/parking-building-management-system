@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion';
+import { Link } from 'react-router-dom';
 import { ArrowRight, MessageSquare } from 'lucide-react';
 
 export default function CTASection() {
@@ -29,14 +30,14 @@ export default function CTASection() {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 w-full justify-center sm:w-auto">
-            <button className="px-8 py-4 rounded-full bg-blue-600 hover:bg-blue-500 text-white font-medium text-lg transition-all shadow-[0_0_25px_rgba(37,99,235,0.4)] flex items-center justify-center gap-2 group transform hover:-translate-y-0.5">
+            <Link to="/register" className="px-8 py-4 rounded-full bg-blue-600 hover:bg-blue-500 text-white font-medium text-lg transition-all shadow-[0_0_25px_rgba(37,99,235,0.4)] flex items-center justify-center gap-2 group transform hover:-translate-y-0.5">
               Đăng ký ngay
               <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
-            </button>
-            <button className="px-8 py-4 rounded-full glass-panel-dark text-white font-medium text-lg hover:bg-white/10 transition-all flex items-center justify-center gap-2 border-slate-700">
+            </Link>
+            <Link to="/contact" className="px-8 py-4 rounded-full glass-panel-dark text-white font-medium text-lg hover:bg-white/10 transition-all flex items-center justify-center gap-2 border-slate-700">
               <MessageSquare size={18} />
               Liên hệ tư vấn
-            </button>
+            </Link>
           </div>
         </motion.div>
       </div>

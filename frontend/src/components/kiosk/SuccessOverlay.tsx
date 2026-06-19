@@ -60,7 +60,6 @@ export function SuccessOverlay({ data, onDismiss, autoDismissMs = 3500 }: Succes
             onClick={(e) => e.stopPropagation()}
             className="relative w-full max-w-md mx-4 rounded-[32px] border border-white/10 bg-[#0F172A] p-8 shadow-2xl shadow-black/60"
           >
-            {/* Close */}
             <button
               onClick={onDismiss}
               className="absolute right-5 top-5 rounded-xl p-1.5 text-slate-500 hover:bg-white/10 hover:text-white transition"
@@ -68,12 +67,10 @@ export function SuccessOverlay({ data, onDismiss, autoDismissMs = 3500 }: Succes
               <X className="h-4 w-4" />
             </button>
 
-            {/* Icon */}
             <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-[24px] bg-gradient-to-br from-emerald-500/30 to-teal-500/20 shadow-[0_0_40px_rgba(16,185,129,0.3)]">
               <CheckCircle2 className="h-10 w-10 text-emerald-400" />
             </div>
 
-            {/* Title */}
             <h2 className="text-center text-2xl font-bold text-white mb-1">
               {data.type === 'checkin' ? 'Check-In Thành Công!' : 'Check-Out Thành Công!'}
             </h2>
@@ -81,13 +78,11 @@ export function SuccessOverlay({ data, onDismiss, autoDismissMs = 3500 }: Succes
               {data.type === 'checkin' ? 'Xe đã được ghi nhận vào bãi.' : 'Phiên gửi xe đã kết thúc.'}
             </p>
 
-            {/* Plate */}
             <div className="mb-5 rounded-2xl border border-emerald-400/20 bg-emerald-400/5 p-4 text-center">
               <p className="text-xs font-semibold uppercase tracking-widest text-emerald-400/60 mb-1">Biển Số</p>
               <p className="text-3xl font-bold tracking-widest text-emerald-300">{data.licensePlate}</p>
             </div>
 
-            {/* Details grid */}
             <div className="space-y-2.5">
               <div className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3">
                 <MapPin className="h-4 w-4 shrink-0 text-slate-500" />
@@ -126,7 +121,6 @@ export function SuccessOverlay({ data, onDismiss, autoDismissMs = 3500 }: Succes
               )}
             </div>
 
-            {/* Auto-dismiss hint */}
             <p className="mt-6 text-center text-xs text-slate-600">
               Tự động đóng sau {Math.round(autoDismissMs / 1000)}s · Bấm bất kỳ đâu để đóng
             </p>

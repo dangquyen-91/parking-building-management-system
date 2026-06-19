@@ -33,8 +33,10 @@ export default function PaymentReturnPage() {
   const optimisticSuccess = returnStatus === 'success';
   const resolvedSuccess = payment?.status === 'success';
   const isSuccess = resolvedSuccess || (optimisticSuccess && !payment);
-  const paymentType = payment?.paymentType ?? (orderId.startsWith('BOOK-') ? 'booking' : orderId.startsWith('SUB-') ? 'subscription' : orderId.startsWith('SES-') ? 'session' : '');
+  const paymentType = payment?.paymentType ?? (orderId.startsWith('BOOK-') ? 'booking' : orderId.startsWith('SUB-') ? 'subscription' : orderId.startsWith('SESS-') ? 'session' : '');
   const isBookingPayment = paymentType === 'booking';
+  const isSubscriptionPayment = paymentType === 'subscription';
+  const isSessionPayment = paymentType === 'session';
 
   const title = useMemo(() => {
     if (!orderId) return 'Thiếu mã thanh toán';
@@ -97,7 +99,9 @@ export default function PaymentReturnPage() {
                     : 'Thanh toán đã được VNPay chuyển về hệ thống. Vì bạn chưa đăng nhập, trang này chỉ hiển thị kết quả cơ bản và mã đơn hàng.'
                   : isBookingPayment
                     ? 'Nếu VNPay xác nhận thành công, booking sẽ được chuyển sang trạng thái đã xác nhận và email xác nhận sẽ được gửi cho khách.'
-                    : 'Backend redirect về trang này kèm orderId. Nếu IPN từ VNPay đã xử lý, trạng thái payment sẽ được cập nhật tự động.'}
+                    : isSubscriptionPayment
+                      ? 'Nếu thanh toán thành công, gói cư dân sẽ được kích hoạt hoặc cộng dồn vào gói còn hạn của cùng biển số.'
+                      : 'Backend redirect về trang này kèm orderId. Nếu IPN từ VNPay đã xử lý, trạng thái payment sẽ được cập nhật tự động.'}
               </p>
             </div>
           </div>
@@ -154,10 +158,16 @@ export default function PaymentReturnPage() {
                 </div>
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
-                    {isBookingPayment ? 'Booking' : 'Subscription'}
+                    {isBookingPayment ? 'Booking' : isSessionPayment ? 'Phiên checkout' : 'Gói cư dân'}
                   </p>
                   <p className="mt-1 font-bold text-slate-950">
-                    {isBookingPayment ? `#${payment.bookingId ?? '--'}` : payment.subscription?.status ?? '--'}
+                    {isBookingPayment
+                      ? `#${payment.bookingId ?? '--'}`
+                      : isSessionPayment
+                        ? `#${payment.sessionId ?? '--'}`
+                        : payment.status === 'success'
+                          ? 'Đã xử lý'
+                          : payment.subscription?.status ?? '--'}
                   </p>
                 </div>
               </div>

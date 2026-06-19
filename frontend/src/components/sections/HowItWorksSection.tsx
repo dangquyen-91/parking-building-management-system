@@ -1,22 +1,22 @@
 import { motion } from 'framer-motion';
-import { Smartphone, Scan, CreditCard } from 'lucide-react';
+import { CalendarCheck, ScanLine, CreditCard } from 'lucide-react';
 
 export default function HowItWorksSection() {
   const steps = [
     {
-      icon: <Smartphone className="w-8 h-8 text-blue-500" />,
-      title: "1. Đặt Chỗ Trực Tuyến",
-      desc: "Lựa chọn thời gian, tầng đỗ mong muốn và thực hiện đặt trước chỗ đỗ xe ngay trên ứng dụng di động."
+      icon: <CalendarCheck className="w-8 h-8 text-blue-500" />,
+      title: "1. Đặt chỗ hoặc mua gói",
+      desc: "Đặt chỗ trước trực tuyến cho lượt gửi xe, hoặc mua gói cư dân theo tháng/quý và thanh toán qua VNPay."
     },
     {
-      icon: <Scan className="w-8 h-8 text-blue-500" />,
-      title: "2. Quét Biển Số Vào Bãi",
-      desc: "Hệ thống tự động nhận dạng biển số (ANPR) tại cổng, mở barrier trong nháy mắt mà không cần quẹt thẻ."
+      icon: <ScanLine className="w-8 h-8 text-blue-500" />,
+      title: "2. Check-in bằng biển số",
+      desc: "Nhân viên nhập biển số tại quầy, hệ thống tra cứu gói cư dân hoặc lượt đặt chỗ và xếp chỗ đỗ ngay."
     },
     {
       icon: <CreditCard className="w-8 h-8 text-blue-500" />,
-      title: "3. Thanh Toán & Rời Bãi",
-      desc: "Trừ phí trực tiếp qua ví điện tử liên kết khi xe ra khỏi bãi. Không tốn thời gian xếp hàng thanh toán."
+      title: "3. Check-out & thanh toán",
+      desc: "Khi xe ra, hệ thống tính phí theo thời gian gửi và thu qua VNPay hoặc tiền mặt tại quầy."
     }
   ];
 

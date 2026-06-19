@@ -3,25 +3,14 @@ import { useNavigate } from 'react-router-dom';
 
 interface KioskHotkeys {
   onEscape?: () => void;
-  onCtrlL?: () => void; // Clear / refocus plate input
+  onCtrlL?: () => void;
 }
 
-/**
- * Global keyboard shortcuts for the Staff Kiosk Portal.
- *
- * F1  → navigate to Check-In
- * F2  → navigate to Check-Out
- * F3  → navigate to Active Sessions
- * F4  → navigate to Parking Map
- * Esc → call onEscape (e.g. close modal, clear state)
- * Ctrl+L → call onCtrlL (clear & refocus plate input)
- */
 export function useKioskHotkeys(options: KioskHotkeys = {}) {
   const navigate = useNavigate();
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      // Don't fire when user is typing in an input/textarea (except Esc & F-keys)
       const tag = (e.target as HTMLElement).tagName;
       const isTyping = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
 
