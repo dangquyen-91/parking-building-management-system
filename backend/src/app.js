@@ -21,6 +21,8 @@ import bookingRoutes from './routes/booking.routes.js';
 import vehicleRoutes from './routes/vehicle.routes.js';
 import errorHandler from './middlewares/error.middleware.js';
 import { apiLimiter } from './middlewares/rateLimiter.middleware.js';
+import { expireBookings } from './services/booking.service.js';
+import { expireSubscriptions } from './services/subscription.service.js';
 
 const app = express();
 
@@ -71,5 +73,19 @@ app.listen(PORT, () => {
   console.log(`Server running on port ${PORT} in ${process.env.NODE_ENV} mode`);
   console.log(`Swagger UI available at http://localhost:${PORT}/api-docs`);
 });
+
+const SWEEP_INTERVAL_MS = 5 * 60 * 1000;
+const runSweep = async () => {
+  try {
+    const [b, s] = await Promise.all([expireBookings(), expireSubscriptions()]);
+    if (b.pendingCancelled || b.expired || s.pendingCancelled || s.activeExpired) {
+      console.log('[sweep]', { booking: b, subscription: s });
+    }
+  } catch (err) {
+    console.error('[sweep] failed:', err.message);
+  }
+};
+const sweepTimer = setInterval(runSweep, SWEEP_INTERVAL_MS);
+sweepTimer.unref();
 
 export default app;
