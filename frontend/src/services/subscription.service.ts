@@ -44,6 +44,8 @@ export interface ResidentSubscription {
   startDate: string | null;
   endDate: string | null;
   status: SubscriptionStatus;
+  createdAt?: string;
+  updatedAt?: string;
   package?: ResidentSubscriptionPackage;
   slot?: ResidentSubscriptionSlot | null;
 }
