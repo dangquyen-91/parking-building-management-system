@@ -21,14 +21,12 @@ import type {
   LookupApiResponse,
   ActiveSubscription,
   BookingApiItem,
-  ParkingSlotApiItem,
   ParkingRowApiItem,
   VehicleType,
 } from '../../types/kiosk';
 import {
   checkActiveSubscription,
   searchBookingsByPlate,
-  getAvailableSlots,
   getAvailableRows,
   checkIn,
 } from '../../services/kiosk.service';
@@ -39,9 +37,9 @@ type CheckInScenario =
   | { kind: 'resolving' }
   | { kind: 'error'; message: string }
   | { kind: 'already_in'; lookup: LookupApiResponse }
-  | { kind: 'resident'; lookup: LookupApiResponse; subscription: ActiveSubscription; availableSlots: ParkingSlotApiItem[]; availableRows: ParkingRowApiItem[]; floors: Floor[] }
+  | { kind: 'resident'; lookup: LookupApiResponse; subscription: ActiveSubscription; availableRows: ParkingRowApiItem[]; residentFloor: Floor | null; residentFloors: Floor[] }
   | { kind: 'booking'; lookup: LookupApiResponse; booking: BookingApiItem }
-  | { kind: 'walkin'; lookup: LookupApiResponse; availableSlots: ParkingSlotApiItem[]; availableRows: ParkingRowApiItem[]; isExpiredResident?: boolean };
+  | { kind: 'walkin'; lookup: LookupApiResponse; visitorCarFloors: Floor[]; availableRows: ParkingRowApiItem[]; isExpiredResident?: boolean };
 
 interface LookupResultPanelProps {
   lookup: LookupApiResponse;
@@ -57,16 +55,6 @@ function formatDate(iso: string) {
 }
 function formatDateOnly(iso: string) {
   return new Date(iso).toLocaleDateString('vi-VN');
-}
-
-function formatFixedCarSlot(sub: ActiveSubscription, floors: Floor[]) {
-  if (!sub.slot && !sub.slotId) return null;
-
-  const slotCode = sub.slot?.slotCode ?? `Slot #${sub.slotId}`;
-  const floor = sub.slot?.floorId ? floors.find((item) => item.id === sub.slot?.floorId) : null;
-  if (!floor) return slotCode;
-
-  return `${slotCode} · Tầng ${floor.floorNumber}${floor.building?.name ? ` · ${floor.building.name}` : ''}`;
 }
 
 function getBookingCheckInState(booking: BookingApiItem) {
@@ -87,39 +75,14 @@ function getBookingCheckInState(booking: BookingApiItem) {
 function findDisplayBooking(bookings: BookingApiItem[]) {
   const now = Date.now();
   return bookings
-    .filter((booking) => ['pending', 'confirmed'].includes(booking.status) && !booking.sessionId)
-    .filter((booking) => !booking.endTime || new Date(booking.endTime).getTime() >= now)
+    .filter((b) => ['pending', 'confirmed'].includes(b.status) && !b.sessionId)
+    .filter((b) => !b.endTime || new Date(b.endTime).getTime() >= now)
     .sort((a, b) => {
       const aReady = getBookingCheckInState(a).canCheckIn ? 0 : 1;
       const bReady = getBookingCheckInState(b).canCheckIn ? 0 : 1;
       if (aReady !== bReady) return aReady - bReady;
       return new Date(a.startTime ?? 0).getTime() - new Date(b.startTime ?? 0).getTime();
     })[0] ?? null;
-}
-
-async function getAvailabilityByFloorType(vehicleType: VehicleType, floorType: 'resident' | 'visitor') {
-  const floorsRes = await floorService.getFloors({ vehicleType, isActive: true, page: 1, limit: 100 });
-  const floors = floorsRes.floors.filter((floor) => floor.floorType === floorType);
-  const floorIds = new Set(floors.map((floor) => floor.id));
-
-  if (vehicleType === 'car') {
-    const slotResults = await Promise.all(
-      floors.map((floor) => getAvailableSlots('car', { floorId: floor.id, limit: 100 }))
-    );
-
-    return {
-      slots: slotResults.flatMap((result) => result.data),
-      rows: [] as ParkingRowApiItem[],
-      floors,
-    };
-  }
-
-  const spotsRes = await getAvailableRows();
-  return {
-    slots: [] as ParkingSlotApiItem[],
-    rows: (spotsRes.data as ParkingRowApiItem[]).filter((row) => floorIds.has(row.floorId)),
-    floors,
-  };
 }
 
 // ─── Shared sub-components ────────────────────────────────────────────────────
@@ -156,106 +119,133 @@ function ErrorAlert({ message }: { message: string }) {
   );
 }
 
-// ─── Slot / Row Picker ────────────────────────────────────────────────────────
-interface SlotPickerProps {
-  vehicleType: VehicleType;
-  slots: ParkingSlotApiItem[];
-  rows: ParkingRowApiItem[];
-  selectedSlotId: number | null;
-  selectedRowId: number | null;
-  onSelectSlot: (id: number) => void;
-  onSelectRow: (id: number) => void;
-  motorcycleLabel?: string;
+// ─── Floor Picker (for visitor car: counter-based, no slot needed) ────────────
+function FloorPicker({
+  floors,
+  selectedFloorId,
+  onSelect,
+  label = 'Chọn tầng gửi xe',
+}: {
+  floors: Floor[];
+  selectedFloorId: number | null;
+  onSelect: (id: number) => void;
+  label?: string;
+}) {
+  if (!floors.length) {
+    return <p className="text-sm text-slate-500 py-2">Không còn tầng nào có chỗ trống.</p>;
+  }
+  return (
+    <div>
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</p>
+      <div className="grid grid-cols-2 gap-2 max-h-44 overflow-y-auto pr-1">
+        {floors.map((floor) => (
+          <button
+            key={floor.id}
+            type="button"
+            onClick={() => onSelect(floor.id)}
+            className={cn(
+              'rounded-xl border px-3 py-3 text-sm font-bold transition-all text-left',
+              selectedFloorId === floor.id
+                ? 'border-blue-400/60 bg-blue-500/20 text-blue-300 shadow-[0_0_12px_rgba(59,130,246,0.2)]'
+                : 'border-white/10 bg-white/[0.03] text-slate-300 hover:border-blue-400/30 hover:text-white',
+            )}
+          >
+            <div className="flex items-center gap-2">
+              <SquareParking className="h-4 w-4 shrink-0" />
+              <div>
+                <div>Tầng {floor.floorNumber}</div>
+                <div className="text-[10px] font-normal text-slate-500 truncate">
+                  {floor.building?.name}
+                </div>
+              </div>
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 }
 
-function SlotPicker({ vehicleType, slots = [], rows = [], selectedSlotId, selectedRowId, onSelectSlot, onSelectRow, motorcycleLabel = 'Chỗ xe máy còn trống' }: SlotPickerProps) {
-  if (vehicleType === 'car') {
-    if (!slots.length) {
-      return <p className="text-sm text-slate-500 py-2">Không còn chỗ trống cho ô tô.</p>;
-    }
-    return (
-      <div>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Chọn ô đỗ xe</p>
-        <div className="grid grid-cols-3 gap-2 max-h-44 overflow-y-auto pr-1">
-          {slots.map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => onSelectSlot(s.id)}
-              className={cn(
-                'rounded-xl border px-3 py-2.5 text-sm font-bold transition-all text-center',
-                selectedSlotId === s.id
-                  ? 'border-blue-400/60 bg-blue-500/20 text-blue-300 shadow-[0_0_12px_rgba(59,130,246,0.2)]'
-                  : 'border-white/10 bg-white/[0.03] text-slate-300 hover:border-blue-400/30 hover:text-white',
-              )}
-            >
-              <SquareParking className="mx-auto mb-1 h-4 w-4" />
-              {s.slotCode}
-              {s.floor && (
-                <span className="block text-[10px] font-normal text-slate-500">
-                  T{s.floor.floorNumber}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  if (rows.length) {
-    const availableMotorcycleCount = rows.reduce(
-      (total, row) => total + Math.max(0, row.capacity - row.occupiedCount),
-      0
-    );
-
-    return (
-      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/15 text-amber-300">
-              <Motorbike className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">{motorcycleLabel}</p>
-              <p className="mt-0.5 text-sm text-slate-400">Hệ thống tự chọn hàng phù hợp khi check-in.</p>
-            </div>
-          </div>
-          <div className="text-right">
-            <p className="text-3xl font-black text-white">{availableMotorcycleCount}</p>
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">chỗ</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
+// ─── Row Picker (for motorcycle: optional, BE auto-picks if none) ─────────────
+function RowPicker({
+  rows,
+  selectedRowId,
+  onSelect,
+  label = 'Chọn hàng xe (tuỳ chọn)',
+}: {
+  rows: ParkingRowApiItem[];
+  selectedRowId: number | null;
+  onSelect: (id: number | null) => void;
+  label?: string;
+}) {
+  const totalFree = rows.reduce((s, r) => s + Math.max(0, r.capacity - r.occupiedCount), 0);
 
   if (!rows.length) {
     return <p className="text-sm text-slate-500 py-2">Không còn hàng xe máy trống.</p>;
   }
   return (
-    <div>
-      <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Chọn hàng xe máy</p>
-      <div className="grid grid-cols-2 gap-2 max-h-44 overflow-y-auto pr-1">
-        {rows.map((r) => (
-          <button
-            key={r.id}
-            type="button"
-            onClick={() => onSelectRow(r.id)}
-            className={cn(
-              'rounded-xl border px-3 py-2.5 text-sm font-bold transition-all text-left',
-              selectedRowId === r.id
-                ? 'border-blue-400/60 bg-blue-500/20 text-blue-300'
-                : 'border-white/10 bg-white/[0.03] text-slate-300 hover:border-blue-400/30',
-            )}
-          >
-            <div className="font-bold">{r.rowCode}</div>
-            <div className="text-[10px] font-normal text-slate-500">
-              {r.occupiedCount}/{r.capacity} chỗ
-              {r.floor && ` · T${r.floor.floorNumber}`}
-            </div>
-          </button>
-        ))}
+    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+      <div className="flex items-center justify-between gap-4 mb-3">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/15 text-amber-300">
+            <Motorbike className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</p>
+            <p className="mt-0.5 text-xs text-slate-500">
+              Để trống → hệ thống tự chọn hàng phù hợp
+            </p>
+          </div>
+        </div>
+        <div className="text-right">
+          <p className="text-3xl font-black text-white">{totalFree}</p>
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">chỗ</p>
+        </div>
+      </div>
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Chọn hàng cụ thể</p>
+      <div className="grid grid-cols-2 gap-2 max-h-36 overflow-y-auto pr-1">
+        {/* "Auto" option */}
+        <button
+          type="button"
+          onClick={() => onSelect(null)}
+          className={cn(
+            'rounded-xl border px-3 py-2.5 text-sm font-bold transition-all text-left',
+            selectedRowId === null
+              ? 'border-blue-400/60 bg-blue-500/20 text-blue-300'
+              : 'border-white/10 bg-white/[0.03] text-slate-400 hover:border-white/20 hover:text-white',
+          )}
+        >
+          <div className="font-bold">Tự động</div>
+          <div className="text-[10px] font-normal text-slate-500">BE chọn hàng</div>
+        </button>
+
+        {rows.map((r) => {
+          const free = Math.max(0, r.capacity - r.occupiedCount);
+          const isFull = free === 0;
+          return (
+            <button
+              key={r.id}
+              type="button"
+              disabled={isFull}
+              onClick={() => onSelect(r.id)}
+              className={cn(
+                'rounded-xl border px-3 py-2.5 text-sm font-bold transition-all text-left',
+                selectedRowId === r.id
+                  ? 'border-blue-400/60 bg-blue-500/20 text-blue-300'
+                  : isFull
+                    ? 'border-white/10 bg-white/[0.02] text-slate-600 cursor-not-allowed'
+                    : 'border-white/10 bg-white/[0.03] text-slate-300 hover:border-blue-400/30',
+              )}
+            >
+              <div className="font-bold">{r.rowCode}</div>
+              <div className="text-[10px] font-normal text-slate-500">
+                {r.occupiedCount}/{r.capacity} chỗ
+                {r.floor && ` · T${r.floor.floorNumber}`}
+                {isFull && ' · Đầy'}
+              </div>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -269,12 +259,9 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
 
   // Walk-in form state
   const [walkinVehicleType, setWalkinVehicleType] = useState<VehicleType>('car');
-  const [selectedSlotId, setSelectedSlotId] = useState<number | null>(null);
-  const [selectedRowId, setSelectedRowId] = useState<number | null>(null);
-
-  // Resident slot state (when subscription.slotId is null)
-  const [residentSlotId, setResidentSlotId] = useState<number | null>(null);
-  const [residentRowId, setResidentRowId] = useState<number | null>(null);
+  const [selectedFloorId, setSelectedFloorId] = useState<number | null>(null);   // visitor car
+  const [selectedRowId, setSelectedRowId] = useState<number | null>(null);        // motorcycle (optional)
+  const [residentRowId, setResidentRowId] = useState<number | null>(null);        // resident motorcycle (optional)
 
   // ── Resolve scenario on mount ─────────────────────────────────────────────
   useEffect(() => {
@@ -283,9 +270,8 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
     async function resolve() {
       setScenario({ kind: 'resolving' });
       setSubmitError(null);
-      setSelectedSlotId(null);
+      setSelectedFloorId(null);
       setSelectedRowId(null);
-      setResidentSlotId(null);
       setResidentRowId(null);
 
       // Step 1: Already checked in?
@@ -296,39 +282,51 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
 
       let isExpiredResident = false;
 
-      // Step 2: Has linked resident in hint? → ONLY THEN check active subscription.
-      // If no linkedResident, skip entirely → visitor / walk-in path.
-      if (lookup.hint.linkedResident) {
-        try {
-          const subResult = await checkActiveSubscription(lookup.licensePlate);
-          if (!cancelled && subResult.active && subResult.subscription) {
-            const sub = subResult.subscription;
-            const residentAvailability = await getAvailabilityByFloorType(sub.vehicleType, 'resident');
-            if (!cancelled) {
-              setScenario({
-                kind: 'resident',
-                lookup,
-                subscription: sub,
-                availableSlots: residentAvailability.slots,
-                availableRows: residentAvailability.rows,
-                floors: residentAvailability.floors,
-              });
-              if (sub.slotId) setResidentSlotId(sub.slotId);
-              if (sub.vehicleType === 'motorcycle') setResidentRowId(residentAvailability.rows[0]?.id ?? null);
-            }
-            return;
+      // Step 2: Always check active subscription for EVERY plate.
+      // NOTE: lookup.hint.linkedResident is set only if the plate has a prior
+      // completed/cancelled session, so a brand-new subscriber with no session
+      // history would have linkedResident = null and be wrongly sent to walk-in.
+      // Fix: unconditionally check subscription regardless of linkedResident.
+      try {
+        const subResult = await checkActiveSubscription(lookup.licensePlate);
+        if (!cancelled && subResult.active && subResult.subscription) {
+          const sub = subResult.subscription;
+
+          // Fetch resident floors + rows for motorcycle.
+          // We ALWAYS store residentFloors so handleResidentCheckIn can pick
+          // the correct floorId (a resident floor) without relying on row data.
+          let availableRows: ParkingRowApiItem[] = [];
+          let residentFloors: Floor[] = [];
+          if (sub.vehicleType === 'motorcycle') {
+            const floorsRes = await floorService.getFloors({ vehicleType: 'motorcycle', floorType: 'resident', isActive: true, page: 1, limit: 100 });
+            residentFloors = floorsRes.floors;
+            const floorIds = new Set(residentFloors.map((f) => f.id));
+            const rowsRes = await getAvailableRows();
+            availableRows = (rowsRes.data as ParkingRowApiItem[]).filter((r) => floorIds.has(r.floorId));
           }
-          // Resident exists but subscription expired → treat as expired resident
-          if (!cancelled && !subResult.active) {
-            isExpiredResident = true;
+
+          // For resident car: find the floor from subscription slot
+          let residentFloor: Floor | null = null;
+          if (sub.vehicleType === 'car' && sub.slot?.floorId) {
+            const floorsRes = await floorService.getFloors({ vehicleType: 'car', floorType: 'resident', isActive: true, page: 1, limit: 100 });
+            residentFloor = floorsRes.floors.find((f) => f.id === sub.slot?.floorId) ?? null;
           }
-        } catch {
-          // Subscription check failed → still allow walkin, don't crash
-          isExpiredResident = false;
+
+          if (!cancelled) {
+            setScenario({ kind: 'resident', lookup, subscription: sub, availableRows, residentFloor, residentFloors });
+          }
+          return;
         }
+        // Subscription check returned active: false → plate is an expired resident
+        if (!cancelled && subResult.subscription && !subResult.active) {
+          isExpiredResident = true;
+        }
+      } catch {
+        // Subscription API error → treat as walk-in, don't crash the flow
+        isExpiredResident = false;
       }
 
-      // Step 3: Any active booking? Show it even if it is not check-in ready yet.
+      // Step 3: Any active booking?
       try {
         const bookingResult = await searchBookingsByPlate(lookup.licensePlate);
         if (!cancelled && bookingResult.data.length > 0) {
@@ -342,27 +340,35 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
         // Booking check failed → fall through to walk-in
       }
 
-      // Step 4: Walk-in visitor — load visitor floor slots/rows
+      // Step 4: Walk-in visitor
       try {
-        const [carVisitor, motorcycleVisitor] = await Promise.all([
-          getAvailabilityByFloorType('car', 'visitor'),
-          getAvailabilityByFloorType('motorcycle', 'visitor'),
+        // For visitor car: we only need floors (counter-based, no slot grid needed)
+        const [carFloorsRes, motorcycleRowsRes] = await Promise.all([
+          floorService.getFloors({ vehicleType: 'car', floorType: 'visitor', isActive: true, page: 1, limit: 100 }),
+          (async () => {
+            const mFloorsRes = await floorService.getFloors({ vehicleType: 'motorcycle', floorType: 'visitor', isActive: true, page: 1, limit: 100 });
+            const floorIds = new Set(mFloorsRes.floors.map((f) => f.id));
+            const rowsRes = await getAvailableRows();
+            return (rowsRes.data as ParkingRowApiItem[]).filter((r) => floorIds.has(r.floorId));
+          })(),
         ]);
+
         if (!cancelled) {
           setScenario({
             kind: 'walkin',
             lookup,
-            availableSlots: carVisitor.slots,
-            availableRows: motorcycleVisitor.rows,
+            visitorCarFloors: carFloorsRes.floors,
+            availableRows: motorcycleRowsRes,
             isExpiredResident,
           });
-          setSelectedRowId(motorcycleVisitor.rows[0]?.id ?? null);
+          // Pre-select first visitor car floor
+          if (carFloorsRes.floors.length > 0) setSelectedFloorId(carFloorsRes.floors[0].id);
         }
       } catch (err) {
         if (!cancelled) {
           setScenario({
             kind: 'error',
-            message: err instanceof Error ? err.message : 'Không tải được danh sách chỗ trống. Vui lòng thử lại.',
+            message: err instanceof Error ? err.message : 'Không tải được danh sách tầng. Vui lòng thử lại.',
           });
         }
       }
@@ -377,28 +383,43 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
     setIsSubmitting(true);
     setSubmitError(null);
     try {
-      const residentScenario = scenario.kind === 'resident' ? scenario : null;
-      let payload: Parameters<typeof checkIn>[0];
       if (sub.vehicleType === 'car') {
-        const selectedSlot = residentScenario?.availableSlots.find((slot) => slot.id === residentSlotId);
-        const floorId = sub.slot?.floorId ?? selectedSlot?.floorId ?? null;
-        if (!floorId) { setSubmitError('Không xác định được tầng check-in cho ô tô cư dân.'); return; }
-        if (!sub.slotId && !residentSlotId) { setSubmitError('Vui lòng chọn ô đỗ xe.'); return; }
-        if (!sub.slotId && !selectedSlot) {
-          setSubmitError('Vui lòng chọn ô thuộc tầng cư dân.');
+        // Resident car: slot is fixed in subscription, backend resolves it
+        // We just need floorId from sub.slot
+        const floorId = sub.slot?.floorId ?? null;
+        if (!floorId) {
+          setSubmitError('Không xác định được tầng check-in. Vui lòng liên hệ admin kiểm tra gói cư dân.');
           return;
         }
-        payload = { vehicleType: 'car', licensePlate: lookup.licensePlate, floorId, userId: sub.userId };
+        const res = await checkIn({ vehicleType: 'car', licensePlate: lookup.licensePlate, floorId, userId: sub.userId });
+        onSuccess(res.id, res.licensePlate, res.slot?.slotCode ?? '—', res.entryTime);
       } else {
-        const selectedRow = residentScenario?.availableRows.find((row) => row.id === residentRowId);
-        if (!selectedRow) {
-          setSubmitError('Vui lòng chọn hàng xe máy thuộc tầng cư dân.');
+        // Resident motorcycle: floorId MUST be a resident floor.
+        // Derive it from residentFloors (guaranteed resident), NOT from rows
+        // (rows can be empty or could include visitor floors after a filter bug).
+        const residentScenario = scenario.kind === 'resident' ? scenario : null;
+
+        // Priority 1: floor from the selected row
+        // Priority 2: first available resident floor
+        const selectedRow = residentScenario?.availableRows.find((r) => r.id === residentRowId);
+        const floorId =
+          selectedRow?.floorId ??
+          residentScenario?.residentFloors[0]?.id ??
+          null;
+
+        if (!floorId) {
+          setSubmitError('Không tìm thấy tầng xe máy cư dân. Vui lòng liên hệ admin kiểm tra cấu hình tầng.');
           return;
         }
-        payload = { vehicleType: 'motorcycle', licensePlate: lookup.licensePlate, floorId: selectedRow.floorId, rowId: selectedRow.id, userId: sub.userId };
+        const res = await checkIn({
+          vehicleType: 'motorcycle',
+          licensePlate: lookup.licensePlate,
+          floorId,
+          rowId: residentRowId ?? undefined,
+          userId: sub.userId,
+        });
+        onSuccess(res.id, res.licensePlate, res.row?.rowCode ?? '—', res.entryTime);
       }
-      const res = await checkIn(payload);
-      onSuccess(res.id, res.licensePlate, res.slot?.slotCode ?? res.row?.rowCode ?? '—', res.entryTime);
     } catch (err: unknown) {
       setSubmitError(err instanceof Error ? err.message : 'Lỗi check-in.');
     } finally {
@@ -434,26 +455,31 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
     setIsSubmitting(true);
     setSubmitError(null);
     try {
-      const walkinScenario = scenario.kind === 'walkin' ? scenario : null;
-      let payload: Parameters<typeof checkIn>[0];
       if (walkinVehicleType === 'car') {
-        if (!selectedSlotId) { setSubmitError('Vui lòng chọn ô đỗ xe.'); return; }
-        const selectedSlot = walkinScenario?.availableSlots.find((slot) => slot.id === selectedSlotId);
-        if (!selectedSlot) {
-          setSubmitError('Vui lòng chọn ô thuộc tầng vãng lai.');
+        // Visitor car: only need floorId — backend handles counter
+        if (!selectedFloorId) {
+          setSubmitError('Vui lòng chọn tầng gửi xe.');
           return;
         }
-        payload = { vehicleType: 'car', licensePlate: lookup.licensePlate, floorId: selectedSlot.floorId };
+        const res = await checkIn({ vehicleType: 'car', licensePlate: lookup.licensePlate, floorId: selectedFloorId });
+        onSuccess(res.id, res.licensePlate, res.slot?.slotCode ?? `Tầng`, res.entryTime);
       } else {
-        const selectedRow = walkinScenario?.availableRows.find((row) => row.id === selectedRowId);
-        if (!selectedRow) {
-          setSubmitError('Vui lòng chọn hàng xe máy thuộc tầng vãng lai.');
+        // Visitor motorcycle: rowId optional
+        const walkinScenario = scenario.kind === 'walkin' ? scenario : null;
+        const targetRow = walkinScenario?.availableRows.find((r) => r.id === selectedRowId);
+        const floorId = targetRow?.floorId ?? walkinScenario?.availableRows[0]?.floorId ?? null;
+        if (!floorId) {
+          setSubmitError('Không tìm thấy tầng xe máy vãng lai. Vui lòng thử lại.');
           return;
         }
-        payload = { vehicleType: 'motorcycle', licensePlate: lookup.licensePlate, floorId: selectedRow.floorId, rowId: selectedRow.id };
+        const res = await checkIn({
+          vehicleType: 'motorcycle',
+          licensePlate: lookup.licensePlate,
+          floorId,
+          rowId: selectedRowId ?? undefined,
+        });
+        onSuccess(res.id, res.licensePlate, res.row?.rowCode ?? '—', res.entryTime);
       }
-      const res = await checkIn(payload);
-      onSuccess(res.id, res.licensePlate, res.slot?.slotCode ?? res.row?.rowCode ?? '—', res.entryTime);
     } catch (err: unknown) {
       setSubmitError(err instanceof Error ? err.message : 'Lỗi check-in.');
     } finally {
@@ -483,10 +509,10 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
             <AlertTriangle className="h-5 w-5 text-red-400" />
           </div>
           <div>
-            <h3 className="font-bold text-red-300">Không kiểm tra được gói cư dân</h3>
+            <h3 className="font-bold text-red-300">Lỗi tải dữ liệu</h3>
             <p className="mt-1 text-sm leading-6 text-red-400/80">{scenario.message}</p>
             <p className="mt-2 text-xs leading-5 text-slate-500">
-              Vui lòng kiểm tra backend, token nhân viên hoặc thử tra cứu lại biển số trước khi check-in.
+              Vui lòng kiểm tra kết nối backend hoặc thử tra cứu lại biển số.
             </p>
           </div>
         </div>
@@ -529,11 +555,10 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
     );
   }
 
+  // ── Resident ──────────────────────────────────────────────────────────────
   if (scenario.kind === 'resident') {
-    const { subscription: sub, availableSlots, availableRows, floors } = scenario;
-    const needsSlotPick = sub.vehicleType === 'car' && !sub.slotId;
-    const needsRowPick = sub.vehicleType === 'motorcycle';
-    const fixedCarSlot = sub.vehicleType === 'car' ? formatFixedCarSlot(sub, floors) : null;
+    const { subscription: sub, availableRows, residentFloor } = scenario;
+    const isMotorcycle = sub.vehicleType === 'motorcycle';
 
     return (
       <motion.div
@@ -564,14 +589,24 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
           <InfoRow icon={BadgeCheck} label="Gói dịch vụ" value={sub.package.name} />
           <InfoRow icon={Phone} label="Điện thoại" value={sub.user.phone} />
           <InfoRow icon={Calendar} label="Hết hạn" value={formatDateOnly(sub.endDate)} />
-          {fixedCarSlot ? (
-            <InfoRow icon={SquareParking} label="Ô đỗ cố định" value={fixedCarSlot} />
-          ) : (
-            <div className="rounded-xl border border-amber-400/20 bg-amber-400/5 px-4 py-3 text-xs text-amber-400 flex items-center gap-2">
-              <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-              Chưa có ô đỗ cố định — vui lòng chọn bên dưới
-            </div>
+
+          {sub.vehicleType === 'car' && (
+            <>
+              {sub.slot?.slotCode ? (
+                <InfoRow
+                  icon={SquareParking}
+                  label="Ô đỗ cố định"
+                  value={`${sub.slot.slotCode}${residentFloor ? ` · Tầng ${residentFloor.floorNumber} · ${residentFloor.building?.name}` : ''}`}
+                />
+              ) : (
+                <div className="rounded-xl border border-amber-400/20 bg-amber-400/5 px-4 py-3 text-xs text-amber-400 flex items-center gap-2">
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                  Chưa có ô đỗ cố định — backend sẽ cấp tự động khi check-in
+                </div>
+              )}
+            </>
           )}
+
           <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3 flex items-center gap-3">
             <Zap className="h-4 w-4 text-emerald-500 shrink-0" />
             <span className="text-xs text-slate-500 w-28 shrink-0">Phí gửi xe</span>
@@ -579,25 +614,17 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
           </div>
         </div>
 
-        {(needsSlotPick || needsRowPick) && (
+        {/* Motorcycle: optional row picker */}
+        {isMotorcycle && availableRows.length > 0 && (
           <div className="mb-5">
-            <SlotPicker
-              vehicleType={sub.vehicleType}
-              slots={availableSlots}
+            <RowPicker
               rows={availableRows}
-              selectedSlotId={residentSlotId}
               selectedRowId={residentRowId}
-              onSelectSlot={setResidentSlotId}
-              onSelectRow={setResidentRowId}
-              motorcycleLabel="Chỗ xe máy cư dân còn trống"
+              onSelect={setResidentRowId}
+              label="Chỗ xe máy cư dân"
             />
           </div>
         )}
-
-        <div className="flex items-center gap-2 text-xs text-slate-600 mb-3">
-          <Zap className="h-3 w-3" />
-          {lookup.availableSlots.car} ô tô · {lookup.availableSlots.motorcycle} xe máy còn trống
-        </div>
 
         {submitError && <ErrorAlert message={submitError} />}
 
@@ -616,6 +643,7 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
     );
   }
 
+  // ── Booking ───────────────────────────────────────────────────────────────
   if (scenario.kind === 'booking') {
     const { booking } = scenario;
     const bookingState = getBookingCheckInState(booking);
@@ -667,7 +695,7 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
 
         {bookingState.canCheckIn && bookingState.label === 'Tới sớm' && (
           <div className="mb-3 rounded-xl border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-xs leading-5 text-amber-300">
-            Khách đến sớm hơn giờ booking. Nếu bãi còn chỗ, nhân viên có thể cho check-in như xe vãng lai theo tầng đã đặt.
+            Khách đến sớm hơn giờ booking. Nếu bãi còn chỗ, nhân viên có thể cho check-in theo tầng đã đặt.
           </div>
         )}
 
@@ -692,9 +720,9 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
     );
   }
 
-  // Walk-in
+  // ── Walk-in ───────────────────────────────────────────────────────────────
   if (scenario.kind === 'walkin') {
-    const { availableSlots, availableRows, isExpiredResident } = scenario;
+    const { visitorCarFloors, availableRows, isExpiredResident } = scenario;
     return (
       <motion.div
         initial={{ opacity: 0, y: 12 }}
@@ -706,7 +734,7 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
             <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" />
             <div>
               <p className="text-sm font-semibold text-amber-300">Cư dân nhưng gói gửi xe đã hết hạn</p>
-              <p className="mt-1 text-xs text-amber-400/80">Khách này sẽ phải gửi xe theo diện khách vãng lai có tính phí.</p>
+              <p className="mt-1 text-xs text-amber-400/80">Khách này gửi xe theo diện vãng lai có tính phí.</p>
             </div>
           </div>
         )}
@@ -728,7 +756,7 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
           </div>
         </div>
 
-        {/* Available slots summary */}
+        {/* Capacity summary */}
         <div className="mb-4 flex gap-3">
           <div className="flex-1 rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3 text-center">
             <Car className="mx-auto mb-1 h-4 w-4 text-blue-400" />
@@ -752,8 +780,10 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
                 type="button"
                 onClick={() => {
                   setWalkinVehicleType(vt);
-                  setSelectedSlotId(null);
-                  setSelectedRowId(vt === 'motorcycle' ? availableRows[0]?.id ?? null : null);
+                  setSelectedRowId(null);
+                  if (vt === 'car' && visitorCarFloors.length > 0) {
+                    setSelectedFloorId(visitorCarFloors[0].id);
+                  }
                 }}
                 className={cn(
                   'flex-1 flex items-center justify-center gap-2 rounded-xl border py-3 text-sm font-semibold transition-all',
@@ -769,25 +799,39 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
           </div>
         </div>
 
-        <div className="mb-5">
-          <SlotPicker
-            vehicleType={walkinVehicleType}
-            slots={availableSlots}
-            rows={availableRows}
-            selectedSlotId={selectedSlotId}
-            selectedRowId={selectedRowId}
-            onSelectSlot={setSelectedSlotId}
-            onSelectRow={setSelectedRowId}
-            motorcycleLabel="Chỗ xe máy vãng lai còn trống"
-          />
-        </div>
+        {/* Ô tô visitor: chọn tầng (counter-based, không cần slot) */}
+        {walkinVehicleType === 'car' && (
+          <div className="mb-5">
+            <FloorPicker
+              floors={visitorCarFloors}
+              selectedFloorId={selectedFloorId}
+              onSelect={setSelectedFloorId}
+              label="Chọn tầng gửi ô tô"
+            />
+            <p className="mt-2 text-xs text-slate-600">
+              Backend quản lý chỗ trống theo tầng — không cần chọn ô đỗ cụ thể.
+            </p>
+          </div>
+        )}
+
+        {/* Xe máy visitor: chọn hàng (optional) */}
+        {walkinVehicleType === 'motorcycle' && (
+          <div className="mb-5">
+            <RowPicker
+              rows={availableRows}
+              selectedRowId={selectedRowId}
+              onSelect={setSelectedRowId}
+              label="Chỗ xe máy vãng lai"
+            />
+          </div>
+        )}
 
         {submitError && <ErrorAlert message={submitError} />}
 
         <motion.button
           whileHover={{ scale: 1.01 }}
           whileTap={{ scale: 0.98 }}
-          disabled={isSubmitting || (walkinVehicleType === 'car' ? !selectedSlotId : !selectedRowId)}
+          disabled={isSubmitting || (walkinVehicleType === 'car' ? !selectedFloorId : availableRows.length === 0)}
           onClick={handleWalkinCheckIn}
           className="w-full rounded-xl bg-gradient-to-r from-slate-600 to-slate-700 py-3.5 font-semibold text-white shadow-[0_4px_20px_rgba(0,0,0,0.3)] transition-all hover:from-slate-500 hover:to-slate-600 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >

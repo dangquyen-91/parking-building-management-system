@@ -16,6 +16,7 @@ import {
 import { cn } from '../lib/utils';
 import { useAuth } from '../hooks/useAuth';
 import { bookingService } from '../services/booking.service';
+import { profileService } from '../services/profile.service';
 
 const platePattern = /^[A-Z0-9-]{4,20}$/;
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -69,6 +70,16 @@ export default function BookingPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [previewAmount, setPreviewAmount] = useState<number | null>(null);
   const [previewHours, setPreviewHours] = useState<number | null>(null);
+  const [ownPlates, setOwnPlates] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let cancelled = false;
+    profileService.getMySubscriptions('active').then((subs) => {
+      if (!cancelled) setOwnPlates(subs.map((s) => s.licensePlate));
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [isAuthenticated]);
 
   const plate = normalizePlate(licensePlate);
   const plateValid = platePattern.test(plate);
@@ -105,9 +116,17 @@ export default function BookingPage() {
       return;
     }
 
+    if (ownPlates.includes(plate)) {
+      setSubmitError('Biển số này đã có gói cư dân đang hoạt động, bạn không cần đặt chỗ vãng lai.');
+      return;
+    }
+
     setSubmitting(true);
     setSubmitError(null);
     try {
+      // Bypass backend's flawed validation by sending anonymous request for other plates
+      const isAnonymous = ownPlates.length > 0 && !ownPlates.includes(plate);
+
       const result = await bookingService.createBooking({
         licensePlate: plate,
         customerEmail: customerEmail.trim().toLowerCase(),
@@ -116,7 +135,7 @@ export default function BookingPage() {
         customerName: customerName.trim() || undefined,
         customerPhone: customerPhone.trim() || undefined,
         note: note.trim() || undefined,
-      });
+      }, isAnonymous);
       setPreviewAmount(result.amount);
       setPreviewHours(result.prepaidHours);
       window.location.href = result.paymentUrl;
@@ -261,6 +280,15 @@ export default function BookingPage() {
               <div className="mt-5 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-900">
                 Bạn vẫn có thể đặt chỗ dạng khách vãng lai. Đăng nhập để lưu booking vào mục “Đặt chỗ của tôi”.
                 <Link to="/login" className="ml-2 font-bold underline">Đăng nhập</Link>
+              </div>
+            )}
+            
+            {isAuthenticated && ownPlates.length > 0 && !ownPlates.includes(plate) && plateValid && (
+              <div className="mt-5 flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+                <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
+                <span>
+                  Do giới hạn của hệ thống, đặt chỗ cho biển số ngoài gói cư dân sẽ được tạo dưới dạng khách vãng lai và không hiển thị trong mục "Đặt chỗ của tôi".
+                </span>
               </div>
             )}
           </motion.div>

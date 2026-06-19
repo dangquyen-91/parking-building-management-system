@@ -69,7 +69,7 @@ async function parseDataResponse<T>(response: Response): Promise<T> {
   return result.data as T;
 }
 
-function jsonHeaders(requireAuth = false) {
+function jsonHeaders(requireAuth = false, anonymous = false) {
   const accessToken = localStorage.getItem('accessToken');
   if (requireAuth && !accessToken) {
     throw new Error('Vui lòng đăng nhập để xem đặt chỗ của bạn.');
@@ -77,15 +77,15 @@ function jsonHeaders(requireAuth = false) {
 
   return {
     'Content-Type': 'application/json',
-    ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    ...(accessToken && !anonymous ? { Authorization: `Bearer ${accessToken}` } : {}),
   };
 }
 
 export const bookingService = {
-  async createBooking(payload: BookingCreatePayload): Promise<BookingCreateResult> {
+  async createBooking(payload: BookingCreatePayload, anonymous = false): Promise<BookingCreateResult> {
     const response = await fetch(`${API_BASE_URL}/bookings`, {
       method: 'POST',
-      headers: jsonHeaders(false),
+      headers: jsonHeaders(false, anonymous),
       body: JSON.stringify({
         ...payload,
         licensePlate: payload.licensePlate.toUpperCase().replace(/\s/g, '').trim(),
