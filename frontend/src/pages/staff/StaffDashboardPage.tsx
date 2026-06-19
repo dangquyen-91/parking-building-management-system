@@ -13,7 +13,6 @@ import {
 } from 'lucide-react';
 import type { DashboardMockData } from '../../types/dashboard';
 
-// ─── Mock data cho Staff Dashboard (ca trực hiện tại) ────────────────────────
 const staffDashboardData: DashboardMockData = {
   meta: {
     eyebrow: 'Bảng điều khiển nhân viên',

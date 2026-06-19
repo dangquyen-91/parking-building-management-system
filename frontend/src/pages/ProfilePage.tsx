@@ -27,7 +27,6 @@ import { useAuth } from '../hooks/useAuth';
 import { profileService, type MySubscription } from '../services/profile.service';
 import type { UserProfile } from '../services/auth.service';
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
 const formatDate = (iso: string | null) =>
   iso
     ? new Date(iso).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
@@ -51,7 +50,6 @@ const TABS = [
 ] as const;
 type TabId = typeof TABS[number]['id'];
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
 function InfoField({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string }) {
   return (
     <div className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-slate-50/80 px-5 py-4">
@@ -142,7 +140,6 @@ function SubscriptionCard({
   );
 }
 
-// ─── Edit modal ───────────────────────────────────────────────────────────────
 function EditModal({
   profile,
   onClose,
@@ -250,7 +247,6 @@ function EditModal({
   );
 }
 
-// ─── Main page ────────────────────────────────────────────────────────────────
 export default function ProfilePage() {
   const navigate = useNavigate();
   const { user: authUser, isAuthenticated, loading: authLoading } = useAuth();
@@ -263,7 +259,6 @@ export default function ProfilePage() {
   const [error, setError] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false);
 
-  // Redirect if not authenticated
   useEffect(() => {
     if (!authLoading && !isAuthenticated) navigate('/login');
   }, [authLoading, isAuthenticated, navigate]);
@@ -307,7 +302,6 @@ export default function ProfilePage() {
   const initials = displayProfile?.fullName
     ?.split(' ').map(n => n[0]).slice(-2).join('').toUpperCase() ?? '??';
 
-  // Unique plates from active subscriptions
   const uniquePlates = [...new Map(activeSubscriptions.map(s => [s.licensePlate, s])).values()];
 
   return (
@@ -315,10 +309,8 @@ export default function ProfilePage() {
       <div className="min-h-screen bg-[#f8fbff] pt-28 pb-20 text-slate-950">
         <main className="container mx-auto px-6 md:px-12">
 
-          {/* ── Hero header ── */}
           <section className="mx-auto max-w-4xl">
             <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-center sm:gap-8">
-              {/* Avatar */}
               <div className="relative shrink-0">
                 <div className="flex h-24 w-24 items-center justify-center rounded-3xl bg-gradient-to-br from-blue-500 to-blue-700 text-3xl font-black text-white shadow-[0_8px_30px_rgba(37,99,235,0.35)]">
                   {initials}
@@ -369,7 +361,6 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            {/* Mobile edit button */}
             <div className="mt-5 flex gap-3 sm:hidden">
               <button
                 onClick={() => setEditOpen(true)}
@@ -380,7 +371,6 @@ export default function ProfilePage() {
             </div>
           </section>
 
-          {/* ── Tabs ── */}
           <section className="mx-auto mt-10 max-w-4xl">
             <div className="flex gap-1 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm">
               {TABS.map(({ id, icon: Icon, label }) => (
@@ -400,14 +390,12 @@ export default function ProfilePage() {
               ))}
             </div>
 
-            {/* ── Error bar ── */}
             {error && (
               <div className="mt-5 flex gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /> {error}
               </div>
             )}
 
-            {/* ── Tab content ── */}
             <div className="mt-6">
               {loading ? (
                 <div className="flex items-center justify-center gap-3 rounded-[28px] border border-slate-200 bg-white py-20 text-sm font-semibold text-slate-400">
@@ -415,7 +403,6 @@ export default function ProfilePage() {
                 </div>
               ) : (
                 <>
-                  {/* Tab: Thông tin cá nhân */}
                   {tab === 'info' && displayProfile && (
                     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
                       <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
@@ -442,7 +429,6 @@ export default function ProfilePage() {
                     </motion.div>
                   )}
 
-                  {/* Tab: Phương tiện & Gói */}
                   {tab === 'vehicles' && (
                     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
                       {activeSubscriptions.length === 0 ? (
@@ -465,7 +451,6 @@ export default function ProfilePage() {
                     </motion.div>
                   )}
 
-                  {/* Tab: Lịch sử gói */}
                   {tab === 'history' && (
                     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
                       {allSubscriptions.length === 0 ? (
@@ -487,7 +472,6 @@ export default function ProfilePage() {
         </main>
       </div>
 
-      {/* Edit modal */}
       <AnimatePresence>
         {editOpen && displayProfile && (
           <EditModal

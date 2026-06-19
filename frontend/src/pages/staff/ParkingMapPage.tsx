@@ -21,7 +21,6 @@ import { floorService, type Floor } from '../../services/floor.service';
 import { slotService, type ParkingSlot, type SlotStatus } from '../../services/slot.service';
 import type { ParkingRowApiItem } from '../../types/kiosk';
 
-// ─── API helper for rows ──────────────────────────────────────────────────────
 const API_BASE_URL = 'http://localhost:5000/api/v1';
 
 function authHeaders() {
@@ -36,7 +35,6 @@ async function fetchRows(floorId: number): Promise<ParkingRowApiItem[]> {
   return json.data as ParkingRowApiItem[];
 }
 
-// ─── Slot status config ───────────────────────────────────────────────────────
 const SLOT_CFG: Record<SlotStatus, { bg: string; border: string; text: string; label: string }> = {
   empty: { bg: 'bg-emerald-500/20', border: 'border-emerald-400/40', text: 'text-emerald-300', label: 'Trống' },
   occupied: { bg: 'bg-blue-500/20', border: 'border-blue-400/40', text: 'text-blue-300', label: 'Đang dùng' },
@@ -44,11 +42,10 @@ const SLOT_CFG: Record<SlotStatus, { bg: string; border: string; text: string; l
   maintenance: { bg: 'bg-amber-500/20', border: 'border-amber-400/40', text: 'text-amber-300', label: 'Bảo trì' },
 };
 
-// ─── Types ───────────────────────────────────────────────────────────────────
 interface FloorData {
   floor: Floor;
-  slots: ParkingSlot[];      // car floor
-  rows: ParkingRowApiItem[]; // motorcycle floor
+  slots: ParkingSlot[];
+  rows: ParkingRowApiItem[];
   loading: boolean;
   error: string | null;
 }
@@ -61,7 +58,6 @@ interface SlotDetail {
   buildingName: string;
 }
 
-// ─── Legend ───────────────────────────────────────────────────────────────────
 function Legend() {
   return (
     <div className="flex flex-wrap gap-3">
@@ -81,7 +77,6 @@ function Legend() {
   );
 }
 
-// ─── Mini stat bar ────────────────────────────────────────────────────────────
 function FloorStats({ slots, rows, vehicleType }: {
   slots: ParkingSlot[];
   rows: ParkingRowApiItem[];
@@ -123,7 +118,6 @@ function FloorStats({ slots, rows, vehicleType }: {
   );
 }
 
-// ─── Car floor grid ───────────────────────────────────────────────────────────
 function CarFloorGrid({ slots, onSelectSlot }: {
   slots: ParkingSlot[];
   onSelectSlot: (detail: SlotDetail) => void;
@@ -164,7 +158,6 @@ function CarFloorGrid({ slots, onSelectSlot }: {
   );
 }
 
-// ─── Motorcycle row grid ──────────────────────────────────────────────────────
 function MotoFloorGrid({ rows }: { rows: ParkingRowApiItem[] }) {
   if (!rows.length) {
     return <p className="py-6 text-center text-sm text-slate-600">Tầng này chưa có hàng xe máy nào.</p>;
@@ -196,7 +189,6 @@ function MotoFloorGrid({ rows }: { rows: ParkingRowApiItem[] }) {
                 <span className="text-xs text-slate-500">{free} trống</span>
               )}
             </div>
-            {/* Capacity bar */}
             <div className="h-2 w-full rounded-full bg-white/[0.06] overflow-hidden">
               <div
                 className={cn('h-full rounded-full transition-all', barColor)}
@@ -213,7 +205,6 @@ function MotoFloorGrid({ rows }: { rows: ParkingRowApiItem[] }) {
   );
 }
 
-// ─── Floor accordion panel ────────────────────────────────────────────────────
 function FloorPanel({
   data,
   onSelectSlot,
@@ -227,7 +218,6 @@ function FloorPanel({
 
   return (
     <div className="rounded-[24px] border border-white/10 bg-[#0F172A]/60 overflow-hidden">
-      {/* Header */}
       <button
         type="button"
         onClick={() => setOpen(!open)}
@@ -262,7 +252,6 @@ function FloorPanel({
         <ChevronDown className={cn('h-4 w-4 shrink-0 text-slate-500 transition-transform', open ? 'rotate-180' : '')} />
       </button>
 
-      {/* Body */}
       <AnimatePresence>
         {open && (
           <motion.div
@@ -296,7 +285,6 @@ function FloorPanel({
   );
 }
 
-// ─── Slot detail modal ────────────────────────────────────────────────────────
 function SlotDetailModal({ detail, onClose }: { detail: SlotDetail; onClose: () => void }) {
   const cfg = SLOT_CFG[detail.status];
   return (
@@ -345,7 +333,6 @@ function SlotDetailModal({ detail, onClose }: { detail: SlotDetail; onClose: () 
   );
 }
 
-// ─── Building section ─────────────────────────────────────────────────────────
 function BuildingSection({
   building,
   floorDataList,
@@ -367,7 +354,6 @@ function BuildingSection({
 
   return (
     <section className="rounded-[32px] border border-white/10 bg-[#0B1120]/80 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl">
-      {/* Building header */}
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500/30 to-purple-500/20">
@@ -381,7 +367,6 @@ function BuildingSection({
           </div>
         </div>
 
-        {/* Occupancy gauge */}
         <div className="flex items-center gap-3">
           <div className="w-32">
             <div className="flex justify-between text-[10px] text-slate-500 mb-1">
@@ -407,7 +392,6 @@ function BuildingSection({
         </div>
       </div>
 
-      {/* Floor panels */}
       <div className="space-y-3">
         {floorDataList.map((fd) => (
           <FloorPanel key={fd.floor.id} data={fd} onSelectSlot={onSelectSlot} />
@@ -417,7 +401,6 @@ function BuildingSection({
   );
 }
 
-// ─── Main page ────────────────────────────────────────────────────────────────
 export default function ParkingMapPage() {
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [floorDataMap, setFloorDataMap] = useState<Map<number, FloorData[]>>(new Map());
@@ -442,7 +425,6 @@ export default function ParkingMapPage() {
 
       setBuildings(buildingRes.buildings);
 
-      // Build initial map — all floors in loading state
       const newMap = new Map<number, FloorData[]>();
       for (const b of buildingRes.buildings) {
         const floorsForBuilding = allFloors.filter(f => f.buildingId === b.id);
@@ -457,7 +439,6 @@ export default function ParkingMapPage() {
       setFloorDataMap(new Map(newMap));
       setPageLoading(false);
 
-      // Now load slots/rows per floor in parallel
       const fetchPromises = allFloors.map(async (floor) => {
         try {
           let slots: ParkingSlot[] = [];
@@ -531,7 +512,6 @@ export default function ParkingMapPage() {
         </div>
       }
     >
-      {/* Legend row */}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <Legend />
         <div className="flex items-center gap-2 text-xs text-slate-600">
@@ -540,7 +520,6 @@ export default function ParkingMapPage() {
         </div>
       </div>
 
-      {/* Page-level loading */}
       {pageLoading && (
         <div className="flex flex-col items-center justify-center gap-4 rounded-[28px] border border-white/10 bg-[#0F172A]/60 py-20">
           <Loader2 className="h-8 w-8 animate-spin text-blue-400" />
@@ -548,7 +527,6 @@ export default function ParkingMapPage() {
         </div>
       )}
 
-      {/* Page-level error */}
       {pageError && !pageLoading && (
         <div className="flex flex-col items-center gap-4 rounded-[28px] border border-red-400/20 bg-red-400/10 py-12 text-center">
           <p className="text-sm text-red-300">{pageError}</p>
@@ -561,7 +539,6 @@ export default function ParkingMapPage() {
         </div>
       )}
 
-      {/* Building sections */}
       {!pageLoading && !pageError && (
         <div className="space-y-6">
           {buildings.length === 0 && (
@@ -587,7 +564,6 @@ export default function ParkingMapPage() {
         </div>
       )}
 
-      {/* Slot detail modal */}
       <AnimatePresence>
         {selectedSlot && (
           <SlotDetailModal detail={selectedSlot} onClose={() => setSelectedSlot(null)} />

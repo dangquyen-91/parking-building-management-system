@@ -34,7 +34,6 @@ import {
 } from '../../services/kiosk.service';
 import { floorService, type Floor } from '../../services/floor.service';
 
-// ─── Discriminated scenario union ─────────────────────────────────────────────
 type CheckInScenario =
   | { kind: 'resolving' }
   | { kind: 'error'; message: string }
@@ -48,7 +47,6 @@ interface LookupResultPanelProps {
   onSuccess: (sessionId: number, plate: string, slotCode: string, entryTime: string) => void;
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString('vi-VN', {
     day: '2-digit', month: '2-digit', year: 'numeric',
@@ -122,7 +120,6 @@ async function getAvailabilityByFloorType(vehicleType: VehicleType, floorType: '
   };
 }
 
-// ─── Shared sub-components ────────────────────────────────────────────────────
 function Badge({ label, tone }: { label: string; tone: 'green' | 'amber' | 'blue' | 'red' | 'slate' }) {
   const map = {
     green: 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300',
@@ -156,7 +153,6 @@ function ErrorAlert({ message }: { message: string }) {
   );
 }
 
-// ─── Slot / Row Picker ────────────────────────────────────────────────────────
 interface SlotPickerProps {
   vehicleType: VehicleType;
   slots: ParkingSlotApiItem[];
@@ -261,18 +257,15 @@ function SlotPicker({ vehicleType, slots = [], rows = [], selectedSlotId, select
   );
 }
 
-// ─── Main Component ───────────────────────────────────────────────────────────
 export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps) {
   const [scenario, setScenario] = useState<CheckInScenario>({ kind: 'resolving' });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // Walk-in form state
   const [walkinVehicleType, setWalkinVehicleType] = useState<VehicleType>('car');
   const [selectedSlotId, setSelectedSlotId] = useState<number | null>(null);
   const [selectedRowId, setSelectedRowId] = useState<number | null>(null);
 
-  // ── Resolve scenario on mount ─────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
 
@@ -282,7 +275,6 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
       setSelectedSlotId(null);
       setSelectedRowId(null);
 
-      // Step 1: Already checked in?
       if ((lookup.status === 'already_active' || lookup.status === 'active') && lookup.activeSession) {
         if (!cancelled) setScenario({ kind: 'already_in', lookup });
         return;
@@ -290,9 +282,6 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
 
       let isExpiredResident = false;
 
-      // Step 2: Check active resident subscription directly from the plate.
-      // lookup.hint.linkedResident comes from past sessions, so new subscribers
-      // may not have that hint yet.
       try {
         const subResult = await checkActiveSubscription(lookup.licensePlate);
         if (!cancelled && subResult.active && subResult.subscription) {
@@ -323,21 +312,15 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
         return;
       }
 
-      // Step 3: Any active booking? Show it even if it is not check-in ready yet.
-      try {
-        const bookingResult = await searchBookingsByPlate(lookup.licensePlate);
-        if (!cancelled && bookingResult.data.length > 0) {
-          const booking = findDisplayBooking(bookingResult.data);
-          if (booking) {
-            if (!cancelled) setScenario({ kind: 'booking', lookup, booking });
-            return;
-          }
+      const bookingResult = await searchBookingsByPlate(lookup.licensePlate).catch(() => null);
+      if (!cancelled && bookingResult && bookingResult.data.length > 0) {
+        const booking = findDisplayBooking(bookingResult.data);
+        if (booking) {
+          if (!cancelled) setScenario({ kind: 'booking', lookup, booking });
+          return;
         }
-      } catch {
-        // Booking check failed → fall through to walk-in
       }
 
-      // Step 4: Walk-in visitor — load visitor floor slots/rows
       try {
         const [carVisitor, motorcycleVisitor] = await Promise.all([
           getAvailabilityByFloorType('car', 'visitor'),
@@ -367,7 +350,6 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
     return () => { cancelled = true; };
   }, [lookup]);
 
-  // ── Submit handlers ───────────────────────────────────────────────────────
   async function handleResidentCheckIn(sub: ActiveSubscription) {
     setIsSubmitting(true);
     setSubmitError(null);
@@ -453,7 +435,6 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
     }
   }
 
-  // ── Render ────────────────────────────────────────────────────────────────
   if (scenario.kind === 'resolving') {
     return (
       <div className="flex flex-col items-center justify-center gap-4 rounded-[28px] border border-white/10 bg-[#0F172A]/80 p-10 shadow-2xl shadow-black/20 backdrop-blur-xl">
@@ -696,7 +677,6 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
     );
   }
 
-  // Walk-in
   if (scenario.kind === 'walkin') {
     const { availableSlots, availableRows, isExpiredResident } = scenario;
     return (
@@ -732,7 +712,6 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
           </div>
         </div>
 
-        {/* Available slots summary */}
         <div className="mb-4 flex gap-3">
           <div className="flex-1 rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3 text-center">
             <Car className="mx-auto mb-1 h-4 w-4 text-blue-400" />
@@ -746,7 +725,6 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
           </div>
         </div>
 
-        {/* Vehicle type toggle */}
         <div className="mb-4">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Loại xe</p>
           <div className="flex gap-2">

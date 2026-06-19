@@ -17,7 +17,6 @@ interface SuccessData {
   entryTime: string;
 }
 
-// ─── Right side info panel ────────────────────────────────────────────────────
 function InfoCard({ icon: Icon, label, value, tone = 'blue' }: {
   icon: React.ElementType;
   label: string;
@@ -55,7 +54,6 @@ export default function CheckInPage() {
   const [lookupResult, setLookupResult] = useState<LookupApiResponse | null>(null);
   const [success, setSuccess] = useState<SuccessData | null>(null);
   const [focusTrigger, setFocusTrigger] = useState(0);
-  // Used as React key to re-mount LookupResultPanel on new search
   const [resultKey, setResultKey] = useState(0);
 
   const handleClear = useCallback(() => {
@@ -96,7 +94,6 @@ export default function CheckInPage() {
     handleClear();
   }, [handleClear]);
 
-  // Keyboard shortcuts
   useKioskHotkeys({
     onEscape: handleClear,
     onCtrlL: handleClear,
@@ -108,7 +105,6 @@ export default function CheckInPage() {
       title="Xe Vào Bãi"
       subtitle="Tra cứu biển số để check-in · Phím F1 mở trang này nhanh"
     >
-      {/* ── Keyboard shortcut hint bar ── */}
       <div className="mb-5 flex flex-wrap items-center gap-2 text-xs text-slate-600">
         {[
           { key: 'F1', label: 'Check-In' },
@@ -125,12 +121,9 @@ export default function CheckInPage() {
         ))}
       </div>
 
-      {/* ── Main split-screen grid ── */}
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
 
-        {/* ══ LEFT COLUMN: Search + Result ══ */}
         <div className="space-y-5">
-          {/* Search panel */}
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
@@ -166,7 +159,6 @@ export default function CheckInPage() {
             )}
           </motion.div>
 
-          {/* Result panel */}
           {lookupResult && (
             <LookupResultPanel
               key={resultKey}
@@ -175,7 +167,6 @@ export default function CheckInPage() {
             />
           )}
 
-          {/* Empty state */}
           {!lookupResult && !isLoading && !lookupError && (
             <motion.div
               initial={{ opacity: 0 }}
@@ -189,9 +180,7 @@ export default function CheckInPage() {
           )}
         </div>
 
-        {/* ══ RIGHT COLUMN: Stats + How-to ══ */}
         <div className="space-y-5">
-          {/* Quick stats */}
           <div className="grid grid-cols-2 gap-4">
             <InfoCard icon={Activity}    label="Phiên đang hoạt động" value="—"   tone="blue" />
             <InfoCard icon={Car}         label="Chỗ ô tô còn trống"   value={lookupResult?.availableSlots.car ?? '—'} tone="emerald" />
@@ -199,7 +188,6 @@ export default function CheckInPage() {
             <InfoCard icon={Clock}       label="Thời gian hiện tại"    value={new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} tone="purple" />
           </div>
 
-          {/* How-to guide */}
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
@@ -234,7 +222,6 @@ export default function CheckInPage() {
         </div>
       </div>
 
-      {/* ── Success overlay ── */}
       <SuccessOverlay data={success} onDismiss={handleDismissSuccess} />
     </KioskLayout>
   );
