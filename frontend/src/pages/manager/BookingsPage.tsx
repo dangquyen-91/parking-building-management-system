@@ -24,6 +24,30 @@ import {
   type BookingStatus,
 } from '../../services/booking.service';
 
+interface ManagerBookingListParams {
+  status?: BookingStatus;
+  licensePlate?: string;
+  startDate?: string;
+  endDate?: string;
+  page?: number;
+  limit?: number;
+}
+
+interface ManagerBookingListResult {
+  bookings: Booking[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+const managerBookingService = bookingService as typeof bookingService & {
+  getAll: (params?: ManagerBookingListParams) => Promise<ManagerBookingListResult>;
+  expireBookings: () => Promise<{ pendingCancelled: number; expired: number }>;
+};
+
 const statusLabels: Record<BookingStatus, string> = {
   pending: 'Chờ thanh toán',
   confirmed: 'Đã xác nhận',
@@ -84,7 +108,7 @@ export default function BookingsPage() {
     setLoading(true);
     setError(null);
     try {
-      const result = await bookingService.getAll({
+      const result = await managerBookingService.getAll({
         page,
         limit: 10,
         licensePlate: resetFilters ? undefined : licensePlate.trim() || undefined,
@@ -104,7 +128,7 @@ export default function BookingsPage() {
   useEffect(() => {
     let active = true;
 
-    bookingService
+    managerBookingService
       .getAll({ page: 1, limit: 10 })
       .then((result) => {
         if (!active) return;
@@ -155,7 +179,7 @@ export default function BookingsPage() {
     setError(null);
     setSuccess(null);
     try {
-      const result = await bookingService.expireBookings();
+      const result = await managerBookingService.expireBookings();
       setSuccess(
         `Đã xử lý ${result.pendingCancelled} booking chờ thanh toán và ${result.expired} booking quá hạn`,
       );
@@ -337,7 +361,7 @@ export default function BookingsPage() {
                         <p className="mt-1 text-xs text-slate-500">#{booking.id} · {booking.prepaidHours} giờ</p>
                       </td>
                       <td className="py-4">
-                        <p className="text-sm font-semibold text-slate-200">{booking.customerName || booking.user?.fullName || 'Khách vãng lai'}</p>
+                        <p className="text-sm font-semibold text-slate-200">{booking.customerName || 'Khách vãng lai'}</p>
                         <p className="mt-1 max-w-[220px] truncate text-xs text-slate-500">{booking.customerEmail}</p>
                       </td>
                       <td className="py-4 text-sm text-slate-300">
@@ -438,9 +462,9 @@ export default function BookingsPage() {
 
               <div className="mt-6 grid gap-4 sm:grid-cols-2">
                 {[
-                  { label: 'Khách hàng', value: selectedBooking.customerName || selectedBooking.user?.fullName || 'Khách vãng lai', icon: UserRound },
+                  { label: 'Khách hàng', value: selectedBooking.customerName || 'Khách vãng lai', icon: UserRound },
                   { label: 'Email', value: selectedBooking.customerEmail, icon: Mail },
-                  { label: 'Điện thoại', value: selectedBooking.customerPhone || selectedBooking.user?.phone || '--', icon: UserRound },
+                  { label: 'Điện thoại', value: selectedBooking.customerPhone || '--', icon: UserRound },
                   { label: 'Tòa nhà / tầng', value: `Tòa #${selectedBooking.floor?.buildingId ?? '--'} · Tầng ${selectedBooking.floor?.floorNumber ?? selectedBooking.floorId}`, icon: CalendarCheck },
                   { label: 'Bắt đầu', value: formatDateTime(selectedBooking.startTime), icon: Clock3 },
                   { label: 'Kết thúc', value: formatDateTime(selectedBooking.endTime), icon: Clock3 },
