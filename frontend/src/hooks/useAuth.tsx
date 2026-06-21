@@ -9,6 +9,7 @@ interface AuthContextType {
   login: (credentials: { email: string; password: string }) => Promise<UserProfile>;
   register: (userData: { fullName: string; email: string; password: string; phone?: string }) => Promise<void>;
   logout: () => Promise<void>;
+  updateUser: (user: UserProfile) => void;
   isAuthenticated: boolean;
 }
 
@@ -97,6 +98,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(false);
   };
 
+  const updateUser = (updatedProfile: UserProfile) => {
+    setUser(updatedProfile);
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -105,6 +110,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         login,
         register,
         logout,
+        updateUser,
         isAuthenticated: !!user,
       }}
     >

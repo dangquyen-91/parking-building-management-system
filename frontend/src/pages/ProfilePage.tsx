@@ -476,7 +476,7 @@ function EditProfileModal({
 
 export default function ProfilePage() {
   const navigate = useNavigate();
-  const { user: authUser, isAuthenticated, loading: authLoading } = useAuth();
+  const { user: authUser, isAuthenticated, loading: authLoading, updateUser } = useAuth();
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [vehicles, setVehicles] = useState<MyVehicle[]>([]);
@@ -785,7 +785,10 @@ export default function ProfilePage() {
           <EditProfileModal
             profile={displayProfile as UserProfile}
             onClose={() => setEditProfileOpen(false)}
-            onSaved={updated => setProfile(updated)}
+            onSaved={updated => {
+              setProfile(updated);
+              updateUser(updated);
+            }}
           />
         )}
         {vehicleModal.open && (
