@@ -70,8 +70,7 @@ function ManagerRoute({ children }: { children: ReactNode }) {
     return <Navigate to="/login" replace />;
   }
 
-  const allowed = ['manager', 'admin'];
-  if (!user?.role || !allowed.includes(user.role)) {
+  if (user?.role !== 'manager') {
     return <Navigate to="/" replace />;
   }
 
