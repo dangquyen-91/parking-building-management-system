@@ -12,7 +12,6 @@ import {
   Plus,
   RefreshCw,
   Search,
-  Trash2,
   X,
 } from 'lucide-react';
 import { AdminLayout } from '../../components/dashboard/AdminLayout';
@@ -33,7 +32,6 @@ export default function BuildingsPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
   const [editingBuilding, setEditingBuilding] = useState<Building | null>(null);
   const [form, setForm] = useState<BuildingPayload>(emptyForm);
   const [modalOpen, setModalOpen] = useState(false);
@@ -116,23 +114,6 @@ export default function BuildingsPage() {
       setError(err instanceof Error ? err.message : 'Lưu tòa nhà thất bại');
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleDelete = async (building: Building) => {
-    if (!window.confirm(`Xóa tòa nhà "${building.name}"?`)) return;
-
-    setDeletingId(building.id);
-    setError(null);
-    setSuccess(null);
-    try {
-      await buildingService.deleteBuilding(building.id);
-      setSuccess(`Đã xóa tòa nhà ${building.name}`);
-      await loadBuildings(buildings.length === 1 && pagination.page > 1 ? pagination.page - 1 : pagination.page);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Xóa tòa nhà thất bại');
-    } finally {
-      setDeletingId(null);
     }
   };
 
@@ -314,14 +295,6 @@ export default function BuildingsPage() {
                             title="Sửa tòa nhà"
                           >
                             <Edit3 className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(building)}
-                            disabled={deletingId === building.id}
-                            className="flex h-9 w-9 items-center justify-center rounded-xl border border-red-400/20 bg-red-400/10 text-red-200 transition hover:border-red-300/50 hover:bg-red-400/20 disabled:cursor-not-allowed disabled:opacity-50"
-                            title="Xóa tòa nhà"
-                          >
-                            {deletingId === building.id ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                           </button>
                         </div>
                       </td>
