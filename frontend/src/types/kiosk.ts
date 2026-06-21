@@ -234,6 +234,12 @@ export interface ActiveSessionApiItem {
   userId: number | null;
   slotId: number | null;
   rowId: number | null;
+  floorId?: number | null;
+  paymentStatus?: 'paid' | 'unpaid';
+  prepaidHours?: number | null;
+  prepaidAmount?: string | number | null;
+  bookingId?: number | null;
+  note?: string | null;
   slot?: { id: number; slotCode: string; floor?: { floorNumber: number; building?: { id: number; name: string } } } | null;
   row?: { id: number; rowCode: string; floor?: { floorNumber: number; building?: { id: number; name: string } } } | null;
   user?: { id: number; fullName: string; email: string } | null;
