@@ -26,6 +26,7 @@ import ManagerPackagesPage from '../pages/manager/PackagesPage';
 import ManagerPaymentsPage from '../pages/manager/PaymentsPage';
 import ManagerStaffPage from '../pages/manager/StaffPage';
 import ManagerBookingsPage from '../pages/manager/BookingsPage';
+import ManagerParkingSessionsPage from '../pages/manager/ParkingSessionsPage';
 import CheckInPage from '../pages/staff/CheckInPage';
 import CheckOutPage from '../pages/staff/CheckOutPage';
 import ActiveSessionsPage from '../pages/staff/ActiveSessionsPage';
@@ -132,6 +133,7 @@ export default function AppRoutes() {
       <Route path="/manager/slots" element={<ManagerRoute><ManagerSlotsPage /></ManagerRoute>} />
       <Route path="/manager/payments" element={<ManagerRoute><ManagerPaymentsPage /></ManagerRoute>} />
       <Route path="/manager/bookings" element={<ManagerRoute><ManagerBookingsPage /></ManagerRoute>} />
+      <Route path="/manager/parking-sessions" element={<ManagerRoute><ManagerParkingSessionsPage /></ManagerRoute>} />
       <Route path="/manager/packages" element={<ManagerRoute><ManagerPackagesPage /></ManagerRoute>} />
       <Route path="/manager/users" element={<ManagerRoute><ManagerUsersPage /></ManagerRoute>} />
       <Route path="/manager/staff" element={<ManagerRoute><ManagerStaffPage /></ManagerRoute>} />

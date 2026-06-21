@@ -31,7 +31,7 @@ const menuItems = [
   { label: 'Khu vực', icon: MapPinned, path: 'zones', roles: [] },
   { label: 'Vị trí đỗ xe', icon: SquareParking, path: 'slots', roles: ['admin', 'manager'] },
   { label: 'Phương tiện', icon: Car, path: 'vehicles', roles: [] },
-  { label: 'Phiên gửi xe', icon: Clock3, path: 'parking-sessions', roles: [] },
+  { label: 'Phiên gửi xe', icon: Clock3, path: 'parking-sessions', roles: ['manager'] },
   { label: 'Thanh toán', icon: CreditCard, path: 'payments', roles: ['admin', 'manager'] },
   { label: 'Gói gửi xe', icon: Boxes, path: 'packages', roles: ['admin', 'manager'] },
   { label: 'Người dùng', icon: UsersRound, path: 'users', roles: ['admin', 'manager'] },
