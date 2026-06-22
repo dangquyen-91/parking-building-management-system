@@ -203,6 +203,9 @@ export default function CheckOutPage() {
   });
 
   const covered = Boolean(preview?.covered || preview?.fee === 0);
+  const coveredBy = preview?.coveredBy ?? null; // 'subscription' | 'booking' | null
+  const isResidentCovered = covered && coveredBy === 'subscription';
+  const isBookingCovered = covered && coveredBy === 'booking';
   const locationCode = formatSessionLocation(activeSession);
 
   return (
@@ -264,15 +267,23 @@ export default function CheckOutPage() {
                       <h3 className="text-xl font-bold text-white">{preview.licensePlate}</h3>
                       <span className={cn(
                         'rounded-full border px-3 py-1 text-xs font-bold',
-                        covered
+                        isResidentCovered
                           ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300'
+                          : isBookingCovered
+                          ? 'border-blue-400/30 bg-blue-400/10 text-blue-300'
                           : 'border-amber-400/30 bg-amber-400/10 text-amber-300'
                       )}>
-                        {covered ? 'Được bao bởi gói' : 'Cần thanh toán'}
+                        {isResidentCovered ? 'Gói cư dân' : isBookingCovered ? 'Booking đặt trước' : 'Cần thanh toán'}
                       </span>
                     </div>
                     <p className="mt-1 text-sm text-slate-500">
-                      {preview.vehicleType === 'car' ? 'Ô tô' : 'Xe máy'} · {preview.floorType === 'resident' ? 'Tầng cư dân' : 'Tầng vãng lai'}
+                      {preview.vehicleType === 'car' ? 'Ô tô' : 'Xe máy'}
+                      {' · '}
+                      {isResidentCovered
+                        ? 'Cư dân — Miễn phí'
+                        : isBookingCovered
+                        ? `Khách đặt trước — ${preview.prepaidHours ?? 0}h đã thanh toán trước`
+                        : preview.floorType === 'resident' ? 'Tầng cư dân' : 'Tầng vãng lai'}
                     </p>
                   </div>
                 </div>
@@ -296,9 +307,18 @@ export default function CheckOutPage() {
               </div>
 
               {covered ? (
-                <div className="mt-5 rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-200">
-                  Xe này được bao bởi {preview.coveredBy === 'booking' ? 'booking trả trước' : 'gói cư dân active'}.
-                  Checkout sẽ đóng session ngay và không thu thêm tiền.
+                <div className={cn(
+                  'mt-5 rounded-2xl px-4 py-3 text-sm',
+                  isResidentCovered
+                    ? 'border border-emerald-400/20 bg-emerald-400/10 text-emerald-200'
+                    : 'border border-blue-400/20 bg-blue-400/10 text-blue-200'
+                )}>
+                  {isResidentCovered ? (
+                    <>Xe này được bao bởi <strong>gói cư dân đang hiệu lực</strong>. Checkout sẽ đóng session ngay, không thu thêm tiền.</>
+                  ) : (
+                    <>Xe này đã <strong>đặt chỗ trước ({preview.prepaidHours ?? 0} giờ, {formatCurrency(preview.prepaidAmount ?? 0)})</strong>.
+                    {' '}{preview.fee === 0 ? 'Không phát sinh thêm phí.' : <>Phát sinh thêm <strong>{formatCurrency(preview.fee)}</strong> ngoài giờ.</>}</>
+                  )}
                 </div>
               ) : (
                 <div className="mt-5">
@@ -350,7 +370,13 @@ export default function CheckOutPage() {
                 )}
               >
                 {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
-                {covered ? 'Xác nhận checkout cư dân' : paymentMethod === 'vnpay' ? 'Tạo thanh toán VNPay' : 'Thu tiền mặt và checkout'}
+                {isResidentCovered
+                  ? 'Xác nhận checkout cư dân'
+                  : isBookingCovered
+                  ? 'Xác nhận checkout booking'
+                  : paymentMethod === 'vnpay'
+                  ? 'Tạo thanh toán VNPay'
+                  : 'Thu tiền mặt và checkout'}
               </button>
             </motion.section>
           )}
