@@ -38,14 +38,31 @@ const formatDuration = (iso: string) => {
   return `${hours} giờ ${remainingMinutes} phút`;
 };
 
-const formatLocation = (session: ActiveSessionApiItem) => {
-  const place = session.slot ?? session.row;
-  const code = session.slot?.slotCode ?? session.row?.rowCode;
-  if (!place || !code) return '--';
+const formatLocation = (session: ActiveSessionApiItem): { label: string; sublabel?: string } => {
+  // Ô tô cư dân: gắn slot cố định
+  if (session.slot?.slotCode) {
+    const floor = session.slot.floor;
+    const parts: string[] = [session.slot.slotCode];
+    if (floor?.floorNumber) parts.push(`Tầng ${floor.floorNumber}`);
+    if (floor?.building?.name) parts.push(floor.building.name);
+    return { label: parts.join(' · '), sublabel: 'Slot cố định' };
+  }
 
-  const floorText = place.floor?.floorNumber ? `Tầng ${place.floor.floorNumber}` : null;
-  const buildingText = place.floor?.building?.name ?? null;
-  return [code, floorText, buildingText].filter(Boolean).join(' · ');
+  // Xe máy: gắn theo hàng (row)
+  if (session.row?.rowCode) {
+    const floor = session.row.floor;
+    const parts: string[] = [session.row.rowCode];
+    if (floor?.floorNumber) parts.push(`Tầng ${floor.floorNumber}`);
+    if (floor?.building?.name) parts.push(floor.building.name);
+    return { label: parts.join(' · '), sublabel: 'Hàng xe máy' };
+  }
+
+  // Ô tô vãng lai: chỉ có floorId, đếm theo tầng
+  if (session.floorId) {
+    return { label: `Tầng #${session.floorId}`, sublabel: 'Đếm theo tầng' };
+  }
+
+  return { label: '--' };
 };
 
 export default function ActiveSessionsPage() {
@@ -206,13 +223,38 @@ export default function ActiveSessionsPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3 text-sm">
-                    <MapPin className="h-4 w-4 text-blue-300" />
-                    <div>
-                      <p className="text-xs text-slate-500">Vị trí</p>
-                      <p className="font-bold text-slate-100">{formatLocation(session)}</p>
-                    </div>
-                  </div>
+                  {(() => {
+                    const loc = formatLocation(session);
+                    const isCar = session.vehicleType === 'car';
+                    const isVisitorCar = isCar && !session.slot && !session.row;
+                    const isResidentCar = isCar && !!session.slot;
+                    const isMoto = session.vehicleType === 'motorcycle';
+
+                    return (
+                      <div className="flex items-start gap-3 text-sm">
+                        <MapPin className={cn(
+                          'mt-0.5 h-4 w-4 shrink-0',
+                          isResidentCar ? 'text-emerald-300' : isMoto ? 'text-amber-300' : 'text-blue-300'
+                        )} />
+                        <div>
+                          <p className="text-xs text-slate-500">
+                            {isResidentCar ? 'Slot cư dân' : isMoto ? 'Hàng xe máy' : 'Tầng vãng lai'}
+                          </p>
+                          <p className={cn(
+                            'font-bold',
+                            isVisitorCar ? 'text-slate-400 text-xs mt-0.5' : 'text-slate-100'
+                          )}>
+                            {loc.label}
+                          </p>
+                          {isVisitorCar && (
+                            <p className="text-[10px] text-slate-600 mt-0.5">
+                              Ô tô vãng lai — backend đếm theo tầng
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   <div className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-1">
                     <div className="flex items-center gap-3">
