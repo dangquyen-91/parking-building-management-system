@@ -230,26 +230,29 @@ export default function ActiveSessionsPage() {
                     const isResidentCar = isCar && !!session.slot;
                     const isMoto = session.vehicleType === 'motorcycle';
 
+                    const labelColor = isResidentCar
+                      ? 'text-emerald-300 bg-emerald-400/10 border-emerald-400/30'
+                      : isMoto
+                      ? 'text-amber-300 bg-amber-400/10 border-amber-400/30'
+                      : 'text-blue-300 bg-blue-400/10 border-blue-400/30';
+                    const labelText = isResidentCar ? 'Slot cư dân' : isMoto ? 'Hàng xe máy' : 'Tầng vãng lai';
+                    const iconColor = isResidentCar ? 'text-emerald-300' : isMoto ? 'text-amber-300' : 'text-blue-300';
+
                     return (
-                      <div className="flex items-start gap-3 text-sm">
-                        <MapPin className={cn(
-                          'mt-0.5 h-4 w-4 shrink-0',
-                          isResidentCar ? 'text-emerald-300' : isMoto ? 'text-amber-300' : 'text-blue-300'
-                        )} />
+                      <div className="flex items-center gap-3">
+                        <MapPin className={cn('h-5 w-5 shrink-0', iconColor)} />
                         <div>
-                          <p className="text-xs text-slate-500">
-                            {isResidentCar ? 'Slot cư dân' : isMoto ? 'Hàng xe máy' : 'Tầng vãng lai'}
-                          </p>
-                          <p className={cn(
-                            'font-bold',
-                            isVisitorCar ? 'text-slate-400 text-xs mt-0.5' : 'text-slate-100'
+                          <span className={cn(
+                            'inline-block rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide mb-1',
+                            labelColor
                           )}>
+                            {labelText}
+                          </span>
+                          <p className="text-base font-black text-white leading-tight">
                             {loc.label}
                           </p>
                           {isVisitorCar && (
-                            <p className="text-[10px] text-slate-600 mt-0.5">
-                              Ô tô vãng lai — backend đếm theo tầng
-                            </p>
+                            <p className="text-xs text-slate-500 mt-0.5">Đếm theo tầng, không phân slot</p>
                           )}
                         </div>
                       </div>
