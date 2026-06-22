@@ -52,6 +52,155 @@ components:
         default: DESC
 
   schemas:
+    # -- REPORT --
+    ReportDashboard:
+      type: object
+      properties:
+        activeSessions:
+          type: object
+          properties:
+            total: { type: integer, example: 42 }
+            motorcycle: { type: integer, example: 28 }
+            car: { type: integer, example: 14 }
+        completedSessionsToday:
+          type: integer
+          example: 135
+        revenueToday:
+          type: object
+          properties:
+            total: { type: number, example: 4750000 }
+            fromSessions: { type: number, example: 3200000 }
+            fromBookings: { type: number, example: 1050000 }
+            fromSubscriptions: { type: number, example: 500000 }
+        bookingsToday:
+          type: object
+          properties:
+            pending: { type: integer, example: 5 }
+            confirmed: { type: integer, example: 12 }
+
+    ReportRevenuePeriod:
+      type: object
+      properties:
+        period: { type: string, example: '2025-06' }
+        total: { type: number, example: 12500000 }
+        session: { type: number, example: 8000000 }
+        booking: { type: number, example: 3000000 }
+        subscription: { type: number, example: 1500000 }
+
+    ReportRevenueByVehiclePeriod:
+      type: object
+      properties:
+        period: { type: string, example: '2025-06-01' }
+        motorcycle: { type: number, example: 3500000 }
+        car: { type: number, example: 9000000 }
+        total: { type: number, example: 12500000 }
+
+    ReportRevenueComparison:
+      type: object
+      properties:
+        period: { type: string, enum: [week, month, year], example: month }
+        current:
+          type: object
+          properties:
+            from: { type: string, format: date-time }
+            to: { type: string, format: date-time }
+            revenue: { type: number, example: 45000000 }
+        previous:
+          type: object
+          properties:
+            from: { type: string, format: date-time }
+            to: { type: string, format: date-time }
+            revenue: { type: number, example: 38000000 }
+        changePercent:
+          type: number
+          nullable: true
+          example: 18.42
+
+    ReportSessionStats:
+      type: object
+      properties:
+        total: { type: integer, example: 520 }
+        byVehicleType:
+          type: object
+          properties:
+            motorcycle: { type: integer, example: 340 }
+            car: { type: integer, example: 180 }
+        byStatus:
+          type: object
+          properties:
+            active: { type: integer, example: 42 }
+            completed: { type: integer, example: 465 }
+            cancelled: { type: integer, example: 13 }
+        avgDurationMinutes: { type: integer, example: 87 }
+
+    ReportBookingStats:
+      type: object
+      properties:
+        total: { type: integer, example: 80 }
+        byStatus:
+          type: object
+          properties:
+            pending: { type: integer, example: 5 }
+            confirmed: { type: integer, example: 60 }
+            cancelled: { type: integer, example: 10 }
+            expired: { type: integer, example: 5 }
+        conversionRate: { type: number, example: 75.0, description: '% pending -> confirmed' }
+        noShowRate: { type: number, example: 8.33, description: '% confirmed chua check-in' }
+        checkedIn: { type: integer, example: 55 }
+
+    ReportSubscriptionStats:
+      type: object
+      properties:
+        activeByPlan:
+          type: array
+          items:
+            type: object
+            properties:
+              packageId: { type: integer }
+              packageName: { type: string, example: 'Goi thang xe may' }
+              vehicleType: { type: string, enum: [motorcycle, car] }
+              count: { type: integer, example: 45 }
+        expiringIn7Days: { type: integer, example: 8 }
+        newSubscriptionsDaily:
+          type: array
+          items:
+            type: object
+            properties:
+              date: { type: string, format: date, example: '2025-06-01' }
+              count: { type: integer, example: 3 }
+
+    ReportOccupancyFloor:
+      type: object
+      properties:
+        floorId: { type: integer, example: 1 }
+        floorNumber: { type: integer, example: 1 }
+        vehicleType: { type: string, enum: [motorcycle, car] }
+        floorType: { type: string, enum: [resident, visitor] }
+        occupancyRate: { type: number, example: 72.5, description: 'Phan tram ly so' }
+
+    ReportOccupancyTrendItem:
+      type: object
+      properties:
+        date: { type: string, format: date, example: '2025-06-01' }
+        floorId: { type: integer, example: 2 }
+        checkIns: { type: integer, example: 38 }
+
+    ReportPeakHourItem:
+      type: object
+      properties:
+        hour: { type: integer, minimum: 0, maximum: 23, example: 8 }
+        count: { type: integer, example: 47 }
+
+    ReportStaffItem:
+      type: object
+      properties:
+        staffId: { type: integer, example: 3 }
+        staffName: { type: string, example: 'Tran Van B' }
+        totalSessions: { type: integer, example: 120 }
+        completedSessions: { type: integer, example: 115 }
+        paidSessions: { type: integer, example: 110 }
+        cashCollected: { type: number, example: 2750000 }
+
     # -- COMMON --
     SuccessResponse:
       type: object
@@ -4350,3 +4499,318 @@ paths:
               schema:
                 $ref: '#/components/schemas/SuccessResponse'
         '403': { description: 'Forbidden' }
+
+  # ── REPORTS ─────────────────────────────────────────────────────────────────
+
+  /reports/dashboard:
+    get:
+      tags: [Reports]
+      summary: Snapshot hoat dong hom nay
+      description: |
+        Tra ve tong quan hoat dong trong ngay: so xe dang gui, doanh thu hom nay
+        (chia theo loai giao dich), va booking hom nay. Khong can query params.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Dashboard data
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ReportDashboard'
+        '401': { description: Unauthorized }
+        '403': { description: 'Chi admin/manager' }
+
+  /reports/revenue:
+    get:
+      tags: [Reports]
+      summary: Doanh thu theo loai giao dich (session / booking / subscription)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          schema: { type: string, format: date, example: '2025-01-01' }
+        - name: to
+          in: query
+          schema: { type: string, format: date, example: '2025-06-30' }
+        - name: groupBy
+          in: query
+          schema: { type: string, enum: [day, week, month], default: day }
+      responses:
+        '200':
+          description: Mang cac period, moi period co total + session + booking + subscription
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ReportRevenuePeriod'
+        '400': { description: 'Invalid date / groupBy' }
+        '403': { description: 'Chi admin/manager' }
+
+  /reports/revenue/by-vehicle:
+    get:
+      tags: [Reports]
+      summary: Doanh thu chia theo loai xe (motorcycle / car)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          schema: { type: string, format: date, example: '2025-01-01' }
+        - name: to
+          in: query
+          schema: { type: string, format: date, example: '2025-06-30' }
+        - name: groupBy
+          in: query
+          schema: { type: string, enum: [day, week, month], default: day }
+      responses:
+        '200':
+          description: Mang cac period, moi period co motorcycle + car + total
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ReportRevenueByVehiclePeriod'
+        '400': { description: 'Invalid date / groupBy' }
+        '403': { description: 'Chi admin/manager' }
+
+  /reports/revenue/comparison:
+    get:
+      tags: [Reports]
+      summary: So sanh doanh thu ky nay vs ky truoc + % tang/giam
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: period
+          in: query
+          schema: { type: string, enum: [week, month, year], default: month }
+      responses:
+        '200':
+          description: current vs previous revenue + changePercent
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ReportRevenueComparison'
+        '400': { description: 'Invalid period' }
+        '403': { description: 'Chi admin/manager' }
+
+  /reports/sessions:
+    get:
+      tags: [Reports]
+      summary: Thong ke phien gui xe (tong, loai xe, trang thai, avg duration)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          schema: { type: string, format: date, example: '2025-06-01' }
+        - name: to
+          in: query
+          schema: { type: string, format: date, example: '2025-06-30' }
+      responses:
+        '200':
+          description: Session stats
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ReportSessionStats'
+        '400': { description: 'Invalid date range' }
+        '403': { description: 'Chi admin/manager' }
+
+  /reports/bookings:
+    get:
+      tags: [Reports]
+      summary: Booking funnel — conversion rate, no-show rate
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          schema: { type: string, format: date, example: '2025-06-01' }
+        - name: to
+          in: query
+          schema: { type: string, format: date, example: '2025-06-30' }
+      responses:
+        '200':
+          description: Booking funnel stats
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ReportBookingStats'
+        '400': { description: 'Invalid date range' }
+        '403': { description: 'Chi admin/manager' }
+
+  /reports/subscriptions:
+    get:
+      tags: [Reports]
+      summary: Subscription analytics — active by plan, sap het han, daily new
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          schema: { type: string, format: date, example: '2025-06-01' }
+        - name: to
+          in: query
+          schema: { type: string, format: date, example: '2025-06-30' }
+      responses:
+        '200':
+          description: Subscription stats
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ReportSubscriptionStats'
+        '400': { description: 'Invalid date range' }
+        '403': { description: 'Chi admin/manager' }
+
+  /reports/occupancy:
+    get:
+      tags: [Reports]
+      summary: Real-time occupancy snapshot theo tung tang
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Danh sach tang voi occupancy rate hien tai
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ReportOccupancyFloor'
+        '403': { description: 'Chi admin/manager' }
+
+  /reports/occupancy/trend:
+    get:
+      tags: [Reports]
+      summary: Lich su check-in theo ngay (theo tang tuy chon)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          schema: { type: string, format: date, example: '2025-06-01' }
+        - name: to
+          in: query
+          schema: { type: string, format: date, example: '2025-06-30' }
+        - name: floorId
+          in: query
+          description: Loc theo tang cu the (optional)
+          schema: { type: integer, example: 2 }
+      responses:
+        '200':
+          description: Mang (date, floorId, checkIns)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ReportOccupancyTrendItem'
+        '400': { description: 'Invalid params' }
+        '403': { description: 'Chi admin/manager' }
+
+  /reports/peak-hours:
+    get:
+      tags: [Reports]
+      summary: Phan bo gio cao diem check-in (0-23h)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: days
+          in: query
+          description: Tinh trong N ngay gan nhat (1-365, default 30)
+          schema: { type: integer, default: 30, minimum: 1, maximum: 365, example: 30 }
+      responses:
+        '200':
+          description: Mang 24 phan tu (hour 0..23, count)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ReportPeakHourItem'
+        '400': { description: 'Invalid days param' }
+        '403': { description: 'Chi admin/manager' }
+
+  /reports/staff:
+    get:
+      tags: [Reports]
+      summary: Hieu suat staff — check-in/out, tien mat thu duoc
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          schema: { type: string, format: date, example: '2025-06-01' }
+        - name: to
+          in: query
+          schema: { type: string, format: date, example: '2025-06-30' }
+      responses:
+        '200':
+          description: Danh sach staff voi thong ke hoat dong
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ReportStaffItem'
+        '400': { description: 'Invalid date range' }
+        '403': { description: 'Chi admin/manager' }
