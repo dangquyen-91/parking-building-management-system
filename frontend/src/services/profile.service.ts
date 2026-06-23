@@ -19,6 +19,23 @@ export interface MySubscription extends ResidentSubscription {
   } | null;
 }
 
+// ─── Vehicle types ────────────────────────────────────────────────────────────
+export interface MyVehicle {
+  id: number;
+  userId: number;
+  licensePlate: string;
+  vehicleType: 'car' | 'motorcycle';
+  nickname: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface VehiclePayload {
+  licensePlate: string;
+  vehicleType: 'car' | 'motorcycle';
+  nickname?: string;
+}
+
 export interface UpdateProfilePayload {
   fullName?: string;
   phone?: string;
@@ -31,6 +48,7 @@ function authHeaders() {
 }
 
 async function parseResponse<T>(response: Response): Promise<T> {
+  if (response.status === 204) return undefined as T;
   const result = await response.json().catch(() => ({ success: false, message: 'Invalid server response' }));
   if (!response.ok || !result.success) {
     throw new Error(result.message || `API error ${response.status}`);
@@ -60,5 +78,48 @@ export const profileService = {
       headers: authHeaders(),
     });
     return parseResponse<MySubscription[]>(res);
+  },
+
+  // ─── Vehicle CRUD ─────────────────────────────────────────────────────────
+
+  /** GET /vehicles/me */
+  async getMyVehicles(): Promise<MyVehicle[]> {
+    const res = await fetch(`${API_BASE_URL}/vehicles/me`, { headers: authHeaders() });
+    return parseResponse<MyVehicle[]>(res);
+  },
+
+  /** POST /vehicles */
+  async addVehicle(payload: VehiclePayload): Promise<MyVehicle> {
+    const res = await fetch(`${API_BASE_URL}/vehicles`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({
+        ...payload,
+        licensePlate: payload.licensePlate.toUpperCase().trim(),
+      }),
+    });
+    return parseResponse<MyVehicle>(res);
+  },
+
+  /** PATCH /vehicles/{id} */
+  async updateVehicle(id: number, payload: Partial<VehiclePayload>): Promise<MyVehicle> {
+    const res = await fetch(`${API_BASE_URL}/vehicles/${id}`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify({
+        ...payload,
+        ...(payload.licensePlate ? { licensePlate: payload.licensePlate.toUpperCase().trim() } : {}),
+      }),
+    });
+    return parseResponse<MyVehicle>(res);
+  },
+
+  /** DELETE /vehicles/{id} — 204 No Content */
+  async deleteVehicle(id: number): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/vehicles/${id}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    });
+    return parseResponse<void>(res);
   },
 };

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Building2,
@@ -61,6 +61,7 @@ interface SlotDetail {
 function Legend() {
   return (
     <div className="flex flex-wrap gap-3">
+      <span className="text-xs text-slate-600 self-center">Slot cư dân:</span>
       {(Object.entries(SLOT_CFG) as [SlotStatus, typeof SLOT_CFG[SlotStatus]][]).map(([, cfg]) => (
         <span
           key={cfg.label}
@@ -73,6 +74,7 @@ function Legend() {
           {cfg.label}
         </span>
       ))}
+      <span className="ml-2 text-xs text-slate-600 self-center border-l border-white/10 pl-2">Tầng vãng lai: đếm theo tầng</span>
     </div>
   );
 }
@@ -118,7 +120,7 @@ function FloorStats({ slots, rows, vehicleType }: {
   );
 }
 
-function CarFloorGrid({ slots, onSelectSlot }: {
+function CarResidentFloorGrid({ slots, onSelectSlot }: {
   slots: ParkingSlot[];
   onSelectSlot: (detail: SlotDetail) => void;
 }) {
@@ -154,6 +156,56 @@ function CarFloorGrid({ slots, onSelectSlot }: {
           </motion.button>
         );
       })}
+    </div>
+  );
+}
+
+function CarVisitorFloorGrid({ slots, floor }: { slots: ParkingSlot[]; floor: Floor }) {
+  // Visitor car: backend đếm theo tầng, không phân slot vật lý
+  // slots có thể có (legacy) hoặc rỗng — hiển thị dạng counter
+  const total = floor.totalSlots;
+  const legacyOccupied = slots.filter(s => s.status === 'occupied').length;
+  const legacyEmpty = slots.filter(s => s.status === 'empty').length;
+
+  // Nếu có slot legacy, hiển thị chúst; nếu không, chỉ hiển total
+  const usedDisplay = legacyOccupied > 0 ? legacyOccupied : null;
+  const pct = total > 0 && usedDisplay !== null ? Math.round((usedDisplay / total) * 100) : null;
+
+  return (
+    <div className="rounded-2xl border border-blue-400/20 bg-blue-400/5 p-5">
+      <div className="flex items-center gap-4">
+        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-blue-500/20">
+          <Car className="h-7 w-7 text-blue-300" />
+        </div>
+        <div className="flex-1">
+          <p className="text-sm font-semibold text-blue-200">Ô tô vãng lai — Đếm theo tầng</p>
+          <p className="mt-1 text-xs text-slate-500 leading-5">
+            Backend quản lý chỗ trống bằng cách đếm số phiên đang hoạt động trên tầng,
+            không phân công slot vật lý cho từng xe.
+          </p>
+        </div>
+        <div className="text-right shrink-0">
+          <p className="text-3xl font-black text-white">{total}</p>
+          <p className="text-xs text-slate-500">tổng chỗ</p>
+        </div>
+      </div>
+
+      {pct !== null && (
+        <div className="mt-4">
+          <div className="flex justify-between text-xs text-slate-500 mb-1">
+            <span>{usedDisplay} đang dùng / {legacyEmpty} trống</span>
+            <span className={cn('font-bold', pct >= 90 ? 'text-red-400' : pct >= 60 ? 'text-amber-400' : 'text-emerald-400')}>
+              {pct}%
+            </span>
+          </div>
+          <div className="h-2 w-full rounded-full bg-white/[0.06] overflow-hidden">
+            <div
+              className={cn('h-full rounded-full transition-all', pct >= 90 ? 'bg-red-500' : pct >= 60 ? 'bg-amber-400' : 'bg-emerald-400')}
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -215,6 +267,8 @@ function FloorPanel({
   const [open, setOpen] = useState(true);
   const { floor, slots, rows, loading, error } = data;
   const isCar = floor.vehicleType === 'car';
+  const isResidentCar = isCar && floor.floorType === 'resident';
+  const isVisitorCar = isCar && floor.floorType === 'visitor';
 
   return (
     <div className="rounded-[24px] border border-white/10 bg-[#0F172A]/60 overflow-hidden">
@@ -225,9 +279,11 @@ function FloorPanel({
       >
         <div className={cn(
           'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl',
-          isCar ? 'bg-blue-500/20' : 'bg-amber-500/20',
+          isResidentCar ? 'bg-emerald-500/20' : isVisitorCar ? 'bg-blue-500/20' : 'bg-amber-500/20',
         )}>
-          {isCar ? <Car className="h-4 w-4 text-blue-400" /> : <Motorbike className="h-4 w-4 text-amber-400" />}
+          {isCar
+            ? <Car className={cn('h-4 w-4', isResidentCar ? 'text-emerald-400' : 'text-blue-400')} />
+            : <Motorbike className="h-4 w-4 text-amber-400" />}
         </div>
 
         <div className="flex-1 text-left">
@@ -237,10 +293,13 @@ function FloorPanel({
               'ml-2 rounded-full border px-2 py-0.5 text-[10px] font-semibold',
               floor.floorType === 'resident'
                 ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300'
-                : 'border-slate-400/20 bg-slate-400/10 text-slate-400',
+                : 'border-blue-400/20 bg-blue-400/10 text-blue-300',
             )}>
               {floor.floorType === 'resident' ? 'Cư dân' : 'Vãng lai'}
             </span>
+            {isVisitorCar && (
+              <span className="ml-1.5 text-[10px] text-slate-600">đếm theo tầng</span>
+            )}
           </p>
           {!loading && !error && (
             <div className="mt-1 pr-4">
@@ -273,8 +332,10 @@ function FloorPanel({
                 </div>
               )}
               {!loading && !error && (
-                isCar
-                  ? <CarFloorGrid slots={slots} onSelectSlot={onSelectSlot} />
+                isResidentCar
+                  ? <CarResidentFloorGrid slots={slots} onSelectSlot={onSelectSlot} />
+                  : isVisitorCar
+                  ? <CarVisitorFloorGrid slots={slots} floor={floor} />
                   : <MotoFloorGrid rows={rows} />
               )}
             </div>
@@ -408,6 +469,13 @@ export default function ParkingMapPage() {
   const [pageError, setPageError] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<SlotDetail | null>(null);
   const [lastUpdated, setLastUpdated] = useState('');
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [countdown, setCountdown] = useState(30);
+
+  const POLL_INTERVAL = 30; // seconds
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const allFloorsRef = useRef<typeof import('../../services/floor.service').Floor[] | any[]>([]);
 
   const loadAll = useCallback(async () => {
     setPageLoading(true);
@@ -422,6 +490,9 @@ export default function ParkingMapPage() {
       const allFloors = [...carFloorRes.floors, ...motoFloorRes.floors].sort(
         (a, b) => a.floorNumber - b.floorNumber,
       );
+
+      // Cache floors list for silent refresh
+      allFloorsRef.current = allFloors;
 
       setBuildings(buildingRes.buildings);
 
@@ -487,7 +558,93 @@ export default function ParkingMapPage() {
     }
   }, []);
 
-  useEffect(() => { loadAll(); }, [loadAll]);
+  /** Silent refresh: only reload slot/row data for already-known floors, no full spinner */
+  const silentRefresh = useCallback(async () => {
+    const floors = allFloorsRef.current;
+    if (!floors.length) return;
+    setIsRefreshing(true);
+    try {
+      await Promise.allSettled(
+        floors.map(async (floor) => {
+          try {
+            let slots: ParkingSlot[] = [];
+            let rows: ParkingRowApiItem[] = [];
+            if (floor.vehicleType === 'car') {
+              const res = await slotService.getSlots({ floorId: floor.id, limit: 200 });
+              slots = res.slots;
+            } else {
+              rows = await fetchRows(floor.id);
+            }
+            setFloorDataMap(prev => {
+              const next = new Map(prev);
+              const list = next.get(floor.buildingId) ?? [];
+              next.set(floor.buildingId, list.map(fd =>
+                fd.floor.id === floor.id ? { ...fd, slots, rows, loading: false, error: null } : fd
+              ));
+              return next;
+            });
+          } catch {
+            // keep stale data on transient errors
+          }
+        })
+      );
+      setLastUpdated(new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, []);
+
+  const resetCountdown = useCallback(() => {
+    setCountdown(POLL_INTERVAL);
+    if (countdownRef.current) clearInterval(countdownRef.current);
+    countdownRef.current = setInterval(() => {
+      setCountdown(prev => (prev <= 1 ? POLL_INTERVAL : prev - 1));
+    }, 1000);
+  }, []);
+
+  const startPolling = useCallback(() => {
+    if (pollingRef.current) clearInterval(pollingRef.current);
+    pollingRef.current = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        silentRefresh();
+        resetCountdown();
+      }
+    }, POLL_INTERVAL * 1000);
+  }, [silentRefresh, resetCountdown]);
+
+  const handleManualRefresh = useCallback(async () => {
+    resetCountdown();
+    await silentRefresh();
+  }, [silentRefresh, resetCountdown]);
+
+  useEffect(() => {
+    loadAll();
+  }, [loadAll]);
+
+  useEffect(() => {
+    startPolling();
+    resetCountdown();
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+      if (countdownRef.current) clearInterval(countdownRef.current);
+    };
+  }, [startPolling, resetCountdown]);
+
+  // Pause/resume polling when tab visibility changes
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        silentRefresh();
+        resetCountdown();
+        startPolling();
+      } else {
+        if (pollingRef.current) clearInterval(pollingRef.current);
+        if (countdownRef.current) clearInterval(countdownRef.current);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [silentRefresh, resetCountdown, startPolling]);
 
   return (
     <KioskLayout
@@ -495,28 +652,37 @@ export default function ParkingMapPage() {
       title="Sơ Đồ Bãi Xe"
       subtitle="Theo dõi trực quan trạng thái từng tầng, từng ô đỗ và hàng xe máy theo thời gian thực"
       headerRight={
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           {lastUpdated && (
-            <span className="hidden text-xs text-slate-600 sm:block">
-              Cập nhật: <span className="font-semibold text-slate-400">{lastUpdated}</span>
-            </span>
+            <div className="hidden flex-col items-end sm:flex">
+              <span className="text-[10px] text-slate-600">
+                Cập nhật: <span className="font-semibold text-slate-400">{lastUpdated}</span>
+              </span>
+              <span className="text-[10px] text-slate-700">
+                Tự động sau{' '}
+                <span className={cn(
+                  'font-bold tabular-nums',
+                  countdown <= 5 ? 'text-amber-400' : 'text-slate-500'
+                )}>{countdown}s</span>
+              </span>
+            </div>
           )}
           <button
-            onClick={loadAll}
-            disabled={pageLoading}
-            title="Làm mới"
+            onClick={handleManualRefresh}
+            disabled={pageLoading || isRefreshing}
+            title="Làm mới ngay"
             className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-slate-400 transition hover:border-blue-400/40 hover:text-blue-300 disabled:opacity-40"
           >
-            <RefreshCw className={cn('h-4 w-4', pageLoading && 'animate-spin')} />
+            <RefreshCw className={cn('h-4 w-4', (pageLoading || isRefreshing) && 'animate-spin')} />
           </button>
         </div>
       }
     >
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <Legend />
-        <div className="flex items-center gap-2 text-xs text-slate-600">
+        <div className="flex items-center gap-3 text-xs text-slate-600">
           <ZoomIn className="h-3.5 w-3.5" />
-          Nhấn vào ô để xem chi tiết
+          <span>Nhấn vào slot cư dân để xem chi tiết</span>
         </div>
       </div>
 

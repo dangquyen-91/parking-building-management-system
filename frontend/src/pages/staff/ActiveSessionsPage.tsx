@@ -17,6 +17,7 @@ import {
 import { KioskLayout } from '../../components/kiosk/KioskLayout';
 import { useKioskHotkeys } from '../../hooks/useKioskHotkeys';
 import { getActiveSessions } from '../../services/kiosk.service';
+import { floorService, type Floor } from '../../services/floor.service';
 import { cn } from '../../lib/utils';
 import type { ActiveSessionApiItem } from '../../types/kiosk';
 
@@ -38,14 +39,41 @@ const formatDuration = (iso: string) => {
   return `${hours} giờ ${remainingMinutes} phút`;
 };
 
-const formatLocation = (session: ActiveSessionApiItem) => {
-  const place = session.slot ?? session.row;
-  const code = session.slot?.slotCode ?? session.row?.rowCode;
-  if (!place || !code) return '--';
+const formatLocation = (
+  session: ActiveSessionApiItem,
+  floorMap: Map<number, Floor>
+): { label: string; sublabel?: string } => {
+  // Ô tô cư dân: gắn slot cố định
+  if (session.slot?.slotCode) {
+    const floor = session.slot.floor;
+    const parts: string[] = [session.slot.slotCode];
+    if (floor?.floorNumber) parts.push(`Tầng ${floor.floorNumber}`);
+    if (floor?.building?.name) parts.push(floor.building.name);
+    return { label: parts.join(' · '), sublabel: 'Slot cố định' };
+  }
 
-  const floorText = place.floor?.floorNumber ? `Tầng ${place.floor.floorNumber}` : null;
-  const buildingText = place.floor?.building?.name ?? null;
-  return [code, floorText, buildingText].filter(Boolean).join(' · ');
+  // Xe máy: gắn theo hàng (row)
+  if (session.row?.rowCode) {
+    const floor = session.row.floor;
+    const parts: string[] = [session.row.rowCode];
+    if (floor?.floorNumber) parts.push(`Tầng ${floor.floorNumber}`);
+    if (floor?.building?.name) parts.push(floor.building.name);
+    return { label: parts.join(' · '), sublabel: 'Hàng xe máy' };
+  }
+
+  // Ô tô vãng lai: chỉ có floorId, dùng map để lấy floorNumber thực
+  if (session.floorId) {
+    const floor = floorMap.get(session.floorId);
+    if (floor) {
+      const parts: string[] = [`Tầng ${floor.floorNumber}`];
+      if (floor.building?.name) parts.push(floor.building.name);
+      return { label: parts.join(' · '), sublabel: 'Đếm theo tầng' };
+    }
+    // fallback nếu chưa load xong map
+    return { label: `Tầng ?`, sublabel: 'Đang tải...' };
+  }
+
+  return { label: '--' };
 };
 
 export default function ActiveSessionsPage() {
@@ -56,6 +84,18 @@ export default function ActiveSessionsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [floorMap, setFloorMap] = useState<Map<number, Floor>>(new Map());
+
+  // Load floor lookup map once on mount
+  useEffect(() => {
+    floorService.getFloors({ limit: 200, isActive: true })
+      .then(res => {
+        const map = new Map<number, Floor>();
+        res.floors.forEach(f => map.set(f.id, f));
+        setFloorMap(map);
+      })
+      .catch(() => { /* non-critical, formatLocation has fallback */ });
+  }, []);
 
   const loadSessions = useCallback(async () => {
     setLoading(true);
@@ -206,13 +246,41 @@ export default function ActiveSessionsPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3 text-sm">
-                    <MapPin className="h-4 w-4 text-blue-300" />
-                    <div>
-                      <p className="text-xs text-slate-500">Vị trí</p>
-                      <p className="font-bold text-slate-100">{formatLocation(session)}</p>
-                    </div>
-                  </div>
+                  {(() => {
+                    const loc = formatLocation(session, floorMap);
+                    const isCar = session.vehicleType === 'car';
+                    const isVisitorCar = isCar && !session.slot && !session.row;
+                    const isResidentCar = isCar && !!session.slot;
+                    const isMoto = session.vehicleType === 'motorcycle';
+
+                    const labelColor = isResidentCar
+                      ? 'text-emerald-300 bg-emerald-400/10 border-emerald-400/30'
+                      : isMoto
+                      ? 'text-amber-300 bg-amber-400/10 border-amber-400/30'
+                      : 'text-blue-300 bg-blue-400/10 border-blue-400/30';
+                    const labelText = isResidentCar ? 'Slot cư dân' : isMoto ? 'Hàng xe máy' : 'Tầng vãng lai';
+                    const iconColor = isResidentCar ? 'text-emerald-300' : isMoto ? 'text-amber-300' : 'text-blue-300';
+
+                    return (
+                      <div className="flex items-center gap-3">
+                        <MapPin className={cn('h-5 w-5 shrink-0', iconColor)} />
+                        <div>
+                          <span className={cn(
+                            'inline-block rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide mb-1',
+                            labelColor
+                          )}>
+                            {labelText}
+                          </span>
+                          <p className="text-base font-black text-white leading-tight">
+                            {loc.label}
+                          </p>
+                          {isVisitorCar && (
+                            <p className="text-xs text-slate-500 mt-0.5">Đếm theo tầng, không phân slot</p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   <div className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-1">
                     <div className="flex items-center gap-3">
