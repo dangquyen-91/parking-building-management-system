@@ -17,6 +17,7 @@ import {
 import { KioskLayout } from '../../components/kiosk/KioskLayout';
 import { useKioskHotkeys } from '../../hooks/useKioskHotkeys';
 import { getActiveSessions } from '../../services/kiosk.service';
+import { floorService, type Floor } from '../../services/floor.service';
 import { cn } from '../../lib/utils';
 import type { ActiveSessionApiItem } from '../../types/kiosk';
 
@@ -38,7 +39,10 @@ const formatDuration = (iso: string) => {
   return `${hours} giờ ${remainingMinutes} phút`;
 };
 
-const formatLocation = (session: ActiveSessionApiItem): { label: string; sublabel?: string } => {
+const formatLocation = (
+  session: ActiveSessionApiItem,
+  floorMap: Map<number, Floor>
+): { label: string; sublabel?: string } => {
   // Ô tô cư dân: gắn slot cố định
   if (session.slot?.slotCode) {
     const floor = session.slot.floor;
@@ -57,9 +61,16 @@ const formatLocation = (session: ActiveSessionApiItem): { label: string; sublabe
     return { label: parts.join(' · '), sublabel: 'Hàng xe máy' };
   }
 
-  // Ô tô vãng lai: chỉ có floorId, đếm theo tầng
+  // Ô tô vãng lai: chỉ có floorId, dùng map để lấy floorNumber thực
   if (session.floorId) {
-    return { label: `Tầng #${session.floorId}`, sublabel: 'Đếm theo tầng' };
+    const floor = floorMap.get(session.floorId);
+    if (floor) {
+      const parts: string[] = [`Tầng ${floor.floorNumber}`];
+      if (floor.building?.name) parts.push(floor.building.name);
+      return { label: parts.join(' · '), sublabel: 'Đếm theo tầng' };
+    }
+    // fallback nếu chưa load xong map
+    return { label: `Tầng ?`, sublabel: 'Đang tải...' };
   }
 
   return { label: '--' };
@@ -73,6 +84,18 @@ export default function ActiveSessionsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [floorMap, setFloorMap] = useState<Map<number, Floor>>(new Map());
+
+  // Load floor lookup map once on mount
+  useEffect(() => {
+    floorService.getFloors({ limit: 200, isActive: true })
+      .then(res => {
+        const map = new Map<number, Floor>();
+        res.floors.forEach(f => map.set(f.id, f));
+        setFloorMap(map);
+      })
+      .catch(() => { /* non-critical, formatLocation has fallback */ });
+  }, []);
 
   const loadSessions = useCallback(async () => {
     setLoading(true);
@@ -224,7 +247,7 @@ export default function ActiveSessionsPage() {
                   </div>
 
                   {(() => {
-                    const loc = formatLocation(session);
+                    const loc = formatLocation(session, floorMap);
                     const isCar = session.vehicleType === 'car';
                     const isVisitorCar = isCar && !session.slot && !session.row;
                     const isResidentCar = isCar && !!session.slot;
