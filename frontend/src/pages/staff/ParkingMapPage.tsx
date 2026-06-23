@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Building2,
@@ -469,6 +469,13 @@ export default function ParkingMapPage() {
   const [pageError, setPageError] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<SlotDetail | null>(null);
   const [lastUpdated, setLastUpdated] = useState('');
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [countdown, setCountdown] = useState(30);
+
+  const POLL_INTERVAL = 30; // seconds
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const allFloorsRef = useRef<typeof import('../../services/floor.service').Floor[] | any[]>([]);
 
   const loadAll = useCallback(async () => {
     setPageLoading(true);
@@ -483,6 +490,9 @@ export default function ParkingMapPage() {
       const allFloors = [...carFloorRes.floors, ...motoFloorRes.floors].sort(
         (a, b) => a.floorNumber - b.floorNumber,
       );
+
+      // Cache floors list for silent refresh
+      allFloorsRef.current = allFloors;
 
       setBuildings(buildingRes.buildings);
 
@@ -548,7 +558,93 @@ export default function ParkingMapPage() {
     }
   }, []);
 
-  useEffect(() => { loadAll(); }, [loadAll]);
+  /** Silent refresh: only reload slot/row data for already-known floors, no full spinner */
+  const silentRefresh = useCallback(async () => {
+    const floors = allFloorsRef.current;
+    if (!floors.length) return;
+    setIsRefreshing(true);
+    try {
+      await Promise.allSettled(
+        floors.map(async (floor) => {
+          try {
+            let slots: ParkingSlot[] = [];
+            let rows: ParkingRowApiItem[] = [];
+            if (floor.vehicleType === 'car') {
+              const res = await slotService.getSlots({ floorId: floor.id, limit: 200 });
+              slots = res.slots;
+            } else {
+              rows = await fetchRows(floor.id);
+            }
+            setFloorDataMap(prev => {
+              const next = new Map(prev);
+              const list = next.get(floor.buildingId) ?? [];
+              next.set(floor.buildingId, list.map(fd =>
+                fd.floor.id === floor.id ? { ...fd, slots, rows, loading: false, error: null } : fd
+              ));
+              return next;
+            });
+          } catch {
+            // keep stale data on transient errors
+          }
+        })
+      );
+      setLastUpdated(new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, []);
+
+  const resetCountdown = useCallback(() => {
+    setCountdown(POLL_INTERVAL);
+    if (countdownRef.current) clearInterval(countdownRef.current);
+    countdownRef.current = setInterval(() => {
+      setCountdown(prev => (prev <= 1 ? POLL_INTERVAL : prev - 1));
+    }, 1000);
+  }, []);
+
+  const startPolling = useCallback(() => {
+    if (pollingRef.current) clearInterval(pollingRef.current);
+    pollingRef.current = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        silentRefresh();
+        resetCountdown();
+      }
+    }, POLL_INTERVAL * 1000);
+  }, [silentRefresh, resetCountdown]);
+
+  const handleManualRefresh = useCallback(async () => {
+    resetCountdown();
+    await silentRefresh();
+  }, [silentRefresh, resetCountdown]);
+
+  useEffect(() => {
+    loadAll();
+  }, [loadAll]);
+
+  useEffect(() => {
+    startPolling();
+    resetCountdown();
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+      if (countdownRef.current) clearInterval(countdownRef.current);
+    };
+  }, [startPolling, resetCountdown]);
+
+  // Pause/resume polling when tab visibility changes
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        silentRefresh();
+        resetCountdown();
+        startPolling();
+      } else {
+        if (pollingRef.current) clearInterval(pollingRef.current);
+        if (countdownRef.current) clearInterval(countdownRef.current);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [silentRefresh, resetCountdown, startPolling]);
 
   return (
     <KioskLayout
@@ -556,19 +652,28 @@ export default function ParkingMapPage() {
       title="Sơ Đồ Bãi Xe"
       subtitle="Theo dõi trực quan trạng thái từng tầng, từng ô đỗ và hàng xe máy theo thời gian thực"
       headerRight={
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           {lastUpdated && (
-            <span className="hidden text-xs text-slate-600 sm:block">
-              Cập nhật: <span className="font-semibold text-slate-400">{lastUpdated}</span>
-            </span>
+            <div className="hidden flex-col items-end sm:flex">
+              <span className="text-[10px] text-slate-600">
+                Cập nhật: <span className="font-semibold text-slate-400">{lastUpdated}</span>
+              </span>
+              <span className="text-[10px] text-slate-700">
+                Tự động sau{' '}
+                <span className={cn(
+                  'font-bold tabular-nums',
+                  countdown <= 5 ? 'text-amber-400' : 'text-slate-500'
+                )}>{countdown}s</span>
+              </span>
+            </div>
           )}
           <button
-            onClick={loadAll}
-            disabled={pageLoading}
-            title="Làm mới"
+            onClick={handleManualRefresh}
+            disabled={pageLoading || isRefreshing}
+            title="Làm mới ngay"
             className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-slate-400 transition hover:border-blue-400/40 hover:text-blue-300 disabled:opacity-40"
           >
-            <RefreshCw className={cn('h-4 w-4', pageLoading && 'animate-spin')} />
+            <RefreshCw className={cn('h-4 w-4', (pageLoading || isRefreshing) && 'animate-spin')} />
           </button>
         </div>
       }
