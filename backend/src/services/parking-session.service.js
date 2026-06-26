@@ -557,6 +557,11 @@ const checkOutCash = async (id, staffId) => {
 
     await releaseSpot(session, t, exitTime);
 
+    await SessionPayment.update(
+      { status: 'cancelled' },
+      { where: { sessionId: session.id, status: 'pending' }, transaction: t }
+    );
+
     let payment = null;
     if (!(covered && coveredBy === 'subscription')) {
       payment = await SessionPayment.create(

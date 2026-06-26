@@ -51,6 +51,26 @@ const reserveCarSlot = async (slotId, plate, t) => {
   return slot;
 };
 
+const cancelStalePendingSubs = async (plate, t) => {
+  const stale = await ResidentSubscription.findAll({
+    where: {
+      licensePlate: plate,
+      status: 'pending',
+      createdAt: { [Op.lt]: new Date(Date.now() - PENDING_TTL_MS) },
+    },
+    lock: t.LOCK.UPDATE,
+    transaction: t,
+  });
+  for (const sub of stale) {
+    await sub.update({ status: 'cancelled' }, { transaction: t });
+    await SubscriptionPayment.update(
+      { status: 'cancelled' },
+      { where: { subscriptionId: sub.id, status: 'pending' }, transaction: t }
+    );
+    await freeSlotIfUnused(sub.slotId, sub.id, t);
+  }
+};
+
 export const buyPackage = async ({ userId, packageId, licensePlate, slotId, ipAddr }) => {
   const plate = normalizePlate(licensePlate);
 
@@ -58,6 +78,9 @@ export const buyPackage = async ({ userId, packageId, licensePlate, slotId, ipAd
     .transaction(async (t) => {
       const pkg = await ParkingPackage.findByPk(packageId, { transaction: t });
       if (!pkg || !pkg.isActive) throw new AppError('Package not found or inactive', 404);
+
+      // Self-heal: huỷ pending đã quá hạn 15 phút cho plate này (kèm payment) trước khi chặn.
+      await cancelStalePendingSubs(plate, t);
 
       // 1 biển số = 1 sub: chặn nếu plate đang có giao dịch pending (bất kỳ package).
       const existingPending = await ResidentSubscription.findOne({
@@ -206,6 +229,10 @@ export const expireSubscriptions = async () => {
     });
     for (const sub of stalePending) {
       await sub.update({ status: 'cancelled' }, { transaction: t });
+      await SubscriptionPayment.update(
+        { status: 'cancelled' },
+        { where: { subscriptionId: sub.id, status: 'pending' }, transaction: t }
+      );
       await freeSlotIfUnused(sub.slotId, sub.id, t);
       pendingCancelled += 1;
     }
