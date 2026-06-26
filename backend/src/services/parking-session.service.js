@@ -201,12 +201,16 @@ const checkIn = async ({ floorId, rowId, licensePlate, vehicleType, userId, note
     }
 
     // ── MOTORCYCLE ───────────────────────────────────────
-    // rowId optional: nếu truyền thì dùng, không thì auto-pick row còn chỗ.
+    // Ưu tiên: row cố định từ subscription → rowId truyền vào → auto-pick.
+    const effectiveRowId = activeSub?.rowId || rowId;
     let row;
-    if (rowId) {
-      row = await ParkingRow.findByPk(rowId, { transaction: t, lock: t.LOCK.UPDATE });
+    if (effectiveRowId) {
+      row = await ParkingRow.findByPk(effectiveRowId, { transaction: t, lock: t.LOCK.UPDATE });
       if (!row || row.floorId !== floor.id) {
-        throw new AppError('Row không thuộc tầng này', 400);
+        throw new AppError(
+          activeSub?.rowId ? `Row của gói (rowId=${effectiveRowId}) không thuộc tầng này.` : 'Row không thuộc tầng này',
+          400
+        );
       }
       if (row.status === 'maintenance') throw new AppError('Row đang bảo trì', 409);
       if (row.occupiedCount >= row.capacity) throw new AppError(`Row đã đầy (${row.capacity}/${row.capacity})`, 409);

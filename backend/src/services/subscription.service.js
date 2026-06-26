@@ -3,6 +3,7 @@ import { sequelize } from '../config/database.js';
 import ResidentSubscription from '../models/resident-subscription.model.js';
 import ParkingPackage from '../models/parking-package.model.js';
 import ParkingSlot from '../models/parking-slot.model.js';
+import ParkingRow from '../models/parking-row.model.js';
 import Floor from '../models/floor.model.js';
 import SubscriptionPayment from '../models/subscription-payment.model.js';
 import User from '../models/user.model.js';
@@ -51,7 +52,36 @@ const reserveCarSlot = async (slotId, plate, t) => {
   return slot;
 };
 
-export const buyPackage = async ({ userId, packageId, licensePlate, slotId, ipAddr }) => {
+const reserveMotorcycleRow = async (rowId, t) => {
+  if (!rowId) throw new AppError('rowId is required for motorcycle packages', 400);
+
+  const row = await ParkingRow.findByPk(rowId, {
+    include: [{ model: Floor, as: 'floor', attributes: ['id', 'floorType', 'vehicleType', 'isActive'] }],
+    lock: t.LOCK.UPDATE,
+    transaction: t,
+  });
+
+  if (!row) throw new AppError('Parking row not found', 404);
+  if (!row.floor || row.floor.vehicleType !== 'motorcycle') {
+    throw new AppError('Row không thuộc tầng xe máy', 400);
+  }
+  if (!row.floor || row.floor.floorType !== 'resident') {
+    throw new AppError('Gói cư dân chỉ có thể đặt row trên tầng cư dân', 400);
+  }
+  if (row.status === 'maintenance') throw new AppError('Row đang bảo trì', 409);
+
+  const heldCount = await ResidentSubscription.count({
+    where: { rowId: row.id, status: { [Op.in]: ACTIVE_HOLD } },
+    transaction: t,
+  });
+  if (heldCount >= row.capacity) {
+    throw new AppError(`Row đã đầy (${heldCount}/${row.capacity} chỗ đã đặt)`, 409);
+  }
+
+  return row;
+};
+
+export const buyPackage = async ({ userId, packageId, licensePlate, slotId, rowId, ipAddr }) => {
   const plate = normalizePlate(licensePlate);
 
   return sequelize
@@ -84,12 +114,20 @@ export const buyPackage = async ({ userId, packageId, licensePlate, slotId, ipAd
       const isRenewal = !!activeSub;
 
       let reservedSlotId = null;
+      let reservedRowId = null;
       if (pkg.vehicleType === 'car') {
         if (isRenewal) {
           reservedSlotId = activeSub.slotId;
         } else {
           const slot = await reserveCarSlot(slotId, plate, t);
           reservedSlotId = slot.id;
+        }
+      } else if (pkg.vehicleType === 'motorcycle') {
+        if (isRenewal && activeSub.rowId) {
+          reservedRowId = activeSub.rowId;
+        } else {
+          const row = await reserveMotorcycleRow(rowId, t);
+          reservedRowId = row.id;
         }
       }
 
@@ -98,6 +136,7 @@ export const buyPackage = async ({ userId, packageId, licensePlate, slotId, ipAd
           userId,
           packageId,
           slotId: reservedSlotId,
+          rowId: reservedRowId,
           licensePlate: plate,
           vehicleType: pkg.vehicleType,
           amount: pkg.price,
@@ -131,6 +170,7 @@ export const buyPackage = async ({ userId, packageId, licensePlate, slotId, ipAd
         orderId,
         subscriptionId: subscription.id,
         slotId: reservedSlotId,
+        rowId: reservedRowId,
         amount: Number(pkg.price),
         isRenewal,
       };
@@ -147,6 +187,7 @@ const baseInclude = [
   { model: ParkingPackage, as: 'package', attributes: ['id', 'name', 'vehicleType', 'durationDays', 'price'] },
   { model: User, as: 'user', attributes: ['id', 'fullName', 'email', 'phone'] },
   { model: ParkingSlot, as: 'slot', attributes: ['id', 'slotCode', 'floorId', 'status'] },
+  { model: ParkingRow, as: 'row', attributes: ['id', 'rowCode', 'floorId', 'capacity', 'occupiedCount', 'status'] },
 ];
 
 export const getMine = async (userId, { status } = {}) => {

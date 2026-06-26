@@ -10,6 +10,7 @@ const ResidentSubscription = sequelize.define(
     userId: { type: DataTypes.INTEGER, allowNull: false },
     packageId: { type: DataTypes.INTEGER, allowNull: false },
     slotId: { type: DataTypes.INTEGER, allowNull: true },
+    rowId: { type: DataTypes.INTEGER, allowNull: true },
     licensePlate: { type: DataTypes.STRING(20), allowNull: false },
     vehicleType: { type: DataTypes.ENUM('motorcycle', 'car'), allowNull: false },
     amount: { type: DataTypes.DECIMAL(12, 2), allowNull: false },

@@ -48,6 +48,9 @@ ResidentSubscription.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 ParkingSlot.hasMany(ResidentSubscription, { foreignKey: 'slotId', as: 'subscriptions' });
 ResidentSubscription.belongsTo(ParkingSlot, { foreignKey: 'slotId', as: 'slot' });
 
+ParkingRow.hasMany(ResidentSubscription, { foreignKey: 'rowId', as: 'subscriptions' });
+ResidentSubscription.belongsTo(ParkingRow, { foreignKey: 'rowId', as: 'row' });
+
 Floor.hasMany(Booking, { foreignKey: 'floorId', as: 'bookings', onDelete: 'RESTRICT' });
 Booking.belongsTo(Floor, { foreignKey: 'floorId', as: 'floor' });
 

@@ -15,6 +15,7 @@ export const buyPackageSchema = Joi.object({
   packageId: Joi.number().integer().positive().required(),
   licensePlate: licensePlateField,
   slotId: Joi.number().integer().positive(),
+  rowId: Joi.number().integer().positive(),
   userId: Joi.number().integer().positive(),
 });
 

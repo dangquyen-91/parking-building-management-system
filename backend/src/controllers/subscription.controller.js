@@ -22,6 +22,7 @@ const buy = async (req, res, next) => {
       packageId: req.body.packageId,
       licensePlate: req.body.licensePlate,
       slotId: req.body.slotId,
+      rowId: req.body.rowId,
       ipAddr: getClientIp(req),
     });
     response.success(res, result, 201);
