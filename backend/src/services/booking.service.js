@@ -338,6 +338,12 @@ export const cancelBooking = async (id, requester) => {
       },
       { transaction: t }
     );
+
+    await BookingPayment.update(
+      { status: 'cancelled' },
+      { where: { bookingId: booking.id, status: 'pending' }, transaction: t }
+    );
+
     return booking;
   });
 };
