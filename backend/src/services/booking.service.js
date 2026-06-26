@@ -150,6 +150,19 @@ export const createBooking = async ({ body, requester, ipAddr }) => {
 
       await ensureResidentBooksOwnPlate(requester, plate, t);
 
+      // Biển đã có gói cư dân (bất kỳ loại xe) → không cho booking vãng lai.
+      // Check-in tầng visitor sẽ chặn biển có sub, nên booking này là "ảo" + tiền kẹt.
+      const subbedPlate = await ResidentSubscription.findOne({
+        where: { licensePlate: plate, status: 'active', endDate: { [Op.gt]: new Date() } },
+        transaction: t,
+      });
+      if (subbedPlate) {
+        throw new AppError(
+          `Biển ${plate} đã có gói cư dân đang hoạt động — vào thẳng tầng cư dân, không cần booking vãng lai.`,
+          409
+        );
+      }
+
       const floor = await findVisitorCarFloor(body.floorId, t);
       await checkFloorCapacity(floor, t);
 
