@@ -36,7 +36,7 @@ const menuItems = [
   { label: 'Gói gửi xe', icon: Boxes, path: 'packages', roles: ['admin', 'manager'] },
   { label: 'Người dùng', icon: UsersRound, path: 'users', roles: ['admin', 'manager'] },
   { label: 'Nhân viên', icon: ShieldCheck, path: 'staff', roles: ['manager'] },
-  { label: 'Báo cáo', icon: BarChart3, path: 'reports', roles: [] },
+  { label: 'Báo cáo', icon: BarChart3, path: 'reports', roles: ['admin'] },
   { label: 'Cài đặt', icon: Settings, path: 'settings', roles: [] },
   { label: 'Nhật ký hệ thống', icon: ScrollText, path: 'system-logs', roles: [] },
 ] satisfies Array<{
