@@ -17,6 +17,7 @@ import AdminFloorsPage from '../pages/admin/FloorsPage';
 import AdminSlotsPage from '../pages/admin/SlotsPage';
 import AdminPackagesPage from '../pages/admin/PackagesPage';
 import AdminPaymentsPage from '../pages/admin/PaymentsPage';
+import AdminReportsPage from '../pages/admin/ReportsPage';
 import ManagerDashboardPage from '../pages/manager/DashboardPage';
 import ManagerUsersPage from '../pages/manager/UsersPage';
 import ManagerBuildingsPage from '../pages/manager/BuildingsPage';
@@ -125,6 +126,7 @@ export default function AppRoutes() {
       <Route path="/admin/payments" element={<AdminRoute><AdminPaymentsPage /></AdminRoute>} />
       <Route path="/admin/packages" element={<AdminRoute><AdminPackagesPage /></AdminRoute>} />
       <Route path="/admin/users" element={<AdminRoute><AdminUsersPage /></AdminRoute>} />
+      <Route path="/admin/reports" element={<AdminRoute><AdminReportsPage /></AdminRoute>} />
 
       <Route path="/manager" element={<Navigate to="/manager/dashboard" replace />} />
       <Route path="/manager/dashboard" element={<ManagerRoute><ManagerDashboardPage /></ManagerRoute>} />

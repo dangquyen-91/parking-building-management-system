@@ -33,6 +33,7 @@ export const occupancyTrendSchema = Joi.object({
 });
 
 export const peakHoursSchema = Joi.object({
+  ...dateRangeFields,
   days: Joi.number().integer().min(1).max(365).default(30),
 });
 

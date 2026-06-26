@@ -221,25 +221,28 @@ export const getRevenueByVehicle = async ({ from, to, groupBy = 'day' }) => {
 
 const buildComparisonRange = (period) => {
   const now = new Date();
-  let curStart, curEnd, prevStart, prevEnd;
+  let curStart, prevStart;
 
   if (period === 'week') {
-    const day = now.getDay();
-    curStart = new Date(now); curStart.setDate(now.getDate() - day); curStart.setHours(0, 0, 0, 0);
-    curEnd = new Date(now); curEnd.setHours(23, 59, 59, 999);
-    prevStart = new Date(curStart); prevStart.setDate(curStart.getDate() - 7);
-    prevEnd = new Date(curStart); prevEnd.setMilliseconds(-1);
+    curStart = new Date(now);
+    curStart.setDate(now.getDate() - now.getDay()); // về Chủ nhật đầu tuần
+    curStart.setHours(0, 0, 0, 0);
+    prevStart = new Date(curStart);
+    prevStart.setDate(curStart.getDate() - 7);
   } else if (period === 'year') {
     curStart = new Date(now.getFullYear(), 0, 1);
-    curEnd = new Date(now); curEnd.setHours(23, 59, 59, 999);
     prevStart = new Date(now.getFullYear() - 1, 0, 1);
-    prevEnd = new Date(now.getFullYear(), 0, 0, 23, 59, 59, 999);
   } else {
     curStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    curEnd = new Date(now); curEnd.setHours(23, 59, 59, 999);
     prevStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    prevEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
   }
+
+  // So sánh "cùng khoảng thời gian đã trôi qua" (period-to-date):
+  // kỳ trước được cắt đúng bằng lượng thời gian đã trôi của kỳ này,
+  // nên 26/06 so với 01–26/05, và tự xử lý lệch số ngày giữa các tháng.
+  const elapsed = now.getTime() - curStart.getTime();
+  const curEnd = now;
+  const prevEnd = new Date(prevStart.getTime() + elapsed);
 
   return { curStart, curEnd, prevStart, prevEnd };
 };
@@ -460,12 +463,21 @@ export const getOccupancyTrend = async ({ from, to, floorId }) => {
   }));
 };
 
-export const getPeakHours = async ({ days = 30 }) => {
+// Khoảng lọc cho biểu đồ cao điểm: ưu tiên from/to (đồng bộ filter của trang),
+// nếu không có thì lùi về cửa sổ "N ngày gần nhất".
+const buildPeakWhere = ({ from, to, days = 30 }) => {
+  if (from || to) {
+    const { start, end } = parseDateRange(from, to);
+    return { entryTime: { [Op.between]: [start, end] } };
+  }
   const daysInt = Math.min(Math.max(parseInt(days) || 30, 1), 365);
   const since = new Date(Date.now() - daysInt * 24 * 60 * 60 * 1000);
+  return { entryTime: { [Op.gte]: since } };
+};
 
+export const getPeakHours = async ({ from, to, days = 30 } = {}) => {
   const rows = await ParkingSession.findAll({
-    where: { entryTime: { [Op.gte]: since } },
+    where: buildPeakWhere({ from, to, days }),
     attributes: [
       [fn('HOUR', col('entryTime')), 'hour'],
       [fn('COUNT', col('id')), 'count'],
@@ -483,12 +495,9 @@ export const getPeakHours = async ({ days = 30 }) => {
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-export const getPeakDays = async ({ days = 30 }) => {
-  const daysInt = Math.min(Math.max(parseInt(days) || 30, 1), 365);
-  const since = new Date(Date.now() - daysInt * 24 * 60 * 60 * 1000);
-
+export const getPeakDays = async ({ from, to, days = 30 } = {}) => {
   const rows = await ParkingSession.findAll({
-    where: { entryTime: { [Op.gte]: since } },
+    where: buildPeakWhere({ from, to, days }),
     attributes: [
       [fn('DAYOFWEEK', col('entryTime')), 'dayOfWeek'],
       [fn('COUNT', col('id')), 'count'],
