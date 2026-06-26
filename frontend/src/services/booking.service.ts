@@ -11,6 +11,7 @@ export interface BookingCreatePayload {
   customerPhone?: string;
   floorId?: number;
   note?: string;
+  anonymous?: boolean;
 }
 
 export interface BookingCreateResult {
@@ -112,13 +113,14 @@ function jsonHeaders(requireAuth = false, anonymous = false) {
 }
 
 export const bookingService = {
-  async createBooking(payload: BookingCreatePayload, anonymous = false): Promise<BookingCreateResult> {
+  async createBooking(payload: BookingCreatePayload): Promise<BookingCreateResult> {
+    const { anonymous = false, ...bookingPayload } = payload;
     const response = await fetch(`${API_BASE_URL}/bookings`, {
       method: 'POST',
       headers: jsonHeaders(false, anonymous),
       body: JSON.stringify({
-        ...payload,
-        licensePlate: payload.licensePlate.toUpperCase().replace(/\s/g, '').trim(),
+        ...bookingPayload,
+        licensePlate: bookingPayload.licensePlate.toUpperCase().replace(/\s/g, '').trim(),
       }),
     });
     return parseDataResponse<BookingCreateResult>(response);
