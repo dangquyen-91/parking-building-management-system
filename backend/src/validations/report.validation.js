@@ -35,3 +35,9 @@ export const occupancyTrendSchema = Joi.object({
 export const peakHoursSchema = Joi.object({
   days: Joi.number().integer().min(1).max(365).default(30),
 });
+
+export const topVehiclesSchema = Joi.object({
+  ...dateRangeFields,
+  limit: Joi.number().integer().min(1).max(100).default(10),
+  vehicleType: Joi.string().valid('motorcycle', 'car'),
+});

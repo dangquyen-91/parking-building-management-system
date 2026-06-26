@@ -91,6 +91,24 @@ const getPeakHours = async (req, res, next) => {
   }
 };
 
+const getPeakDays = async (req, res, next) => {
+  try {
+    const data = await reportService.getPeakDays(req.query);
+    response.success(res, data);
+  } catch (err) {
+    next(err);
+  }
+};
+
+const getTopVehicles = async (req, res, next) => {
+  try {
+    const data = await reportService.getTopVehicles(req.query);
+    response.success(res, data);
+  } catch (err) {
+    next(err);
+  }
+};
+
 const getStaffStats = async (req, res, next) => {
   try {
     const data = await reportService.getStaffStats(req.query);
@@ -111,5 +129,7 @@ export {
   getOccupancy,
   getOccupancyTrend,
   getPeakHours,
+  getPeakDays,
+  getTopVehicles,
   getStaffStats,
 };

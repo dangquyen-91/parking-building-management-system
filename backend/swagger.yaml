@@ -191,6 +191,24 @@ components:
         hour: { type: integer, minimum: 0, maximum: 23, example: 8 }
         count: { type: integer, example: 47 }
 
+    ReportPeakDayItem:
+      type: object
+      properties:
+        dayOfWeek: { type: integer, minimum: 1, maximum: 7, example: 2, description: '1=Sunday ... 7=Saturday' }
+        dayName: { type: string, example: Monday }
+        isWeekend: { type: boolean, example: false }
+        count: { type: integer, example: 312 }
+
+    ReportTopVehicleItem:
+      type: object
+      properties:
+        rank: { type: integer, example: 1 }
+        licensePlate: { type: string, example: '51A-123.45' }
+        vehicleType: { type: string, enum: [motorcycle, car] }
+        sessionCount: { type: integer, example: 48 }
+        totalFee: { type: number, example: 840000 }
+        lastSeen: { type: string, format: date-time }
+
     ReportStaffItem:
       type: object
       properties:
@@ -4783,6 +4801,72 @@ paths:
                         items:
                           $ref: '#/components/schemas/ReportPeakHourItem'
         '400': { description: 'Invalid days param' }
+        '403': { description: 'Chi admin/manager' }
+
+  /reports/peak-days:
+    get:
+      tags: [Reports]
+      summary: Phan bo luot check-in theo thu trong tuan (biet cuoi tuan vs ngay thuong)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: days
+          in: query
+          description: Tinh trong N ngay gan nhat (1-365, default 30)
+          schema: { type: integer, default: 30, minimum: 1, maximum: 365, example: 30 }
+      responses:
+        '200':
+          description: Mang 7 phan tu (dayOfWeek 1..7, dayName, isWeekend, count)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ReportPeakDayItem'
+        '400': { description: 'Invalid days param' }
+        '403': { description: 'Chi admin/manager' }
+
+  /reports/top-vehicles:
+    get:
+      tags: [Reports]
+      summary: Top phuong tien quay lai nhieu nhat (huu ich cho marketing / khuyen mai sub)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          schema: { type: string, format: date, example: '2025-01-01' }
+        - name: to
+          in: query
+          schema: { type: string, format: date, example: '2025-06-30' }
+        - name: limit
+          in: query
+          description: So luong tra ve (1-100, default 10)
+          schema: { type: integer, default: 10, minimum: 1, maximum: 100 }
+        - name: vehicleType
+          in: query
+          description: Loc theo loai xe (optional)
+          schema: { type: string, enum: [motorcycle, car] }
+      responses:
+        '200':
+          description: Danh sach bien so xe sap xep giam dan theo so luot gui
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ReportTopVehicleItem'
+        '400': { description: 'Invalid params' }
         '403': { description: 'Chi admin/manager' }
 
   /reports/staff:

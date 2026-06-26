@@ -9,6 +9,7 @@ import {
   dateRangeSchema,
   occupancyTrendSchema,
   peakHoursSchema,
+  topVehiclesSchema,
 } from '../validations/report.validation.js';
 
 const router = Router();
@@ -30,6 +31,9 @@ router.get('/occupancy', reportController.getOccupancy);
 router.get('/occupancy/trend', validate(occupancyTrendSchema, 'query'), reportController.getOccupancyTrend);
 
 router.get('/peak-hours', validate(peakHoursSchema, 'query'), reportController.getPeakHours);
+router.get('/peak-days', validate(peakHoursSchema, 'query'), reportController.getPeakDays);
+
+router.get('/top-vehicles', validate(topVehiclesSchema, 'query'), reportController.getTopVehicles);
 
 router.get('/staff', validate(dateRangeSchema, 'query'), reportController.getStaffStats);
 
