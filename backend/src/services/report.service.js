@@ -481,6 +481,67 @@ export const getPeakHours = async ({ days = 30 }) => {
   return Object.entries(hourMap).map(([hour, count]) => ({ hour: parseInt(hour), count }));
 };
 
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+export const getPeakDays = async ({ days = 30 }) => {
+  const daysInt = Math.min(Math.max(parseInt(days) || 30, 1), 365);
+  const since = new Date(Date.now() - daysInt * 24 * 60 * 60 * 1000);
+
+  const rows = await ParkingSession.findAll({
+    where: { entryTime: { [Op.gte]: since } },
+    attributes: [
+      [fn('DAYOFWEEK', col('entryTime')), 'dayOfWeek'],
+      [fn('COUNT', col('id')), 'count'],
+    ],
+    group: [fn('DAYOFWEEK', col('entryTime'))],
+    order: [[fn('DAYOFWEEK', col('entryTime')), 'ASC']],
+    raw: true,
+  });
+
+  // MySQL DAYOFWEEK: 1=Sunday, 2=Monday, ..., 7=Saturday
+  const dowMap = Object.fromEntries(Array.from({ length: 7 }, (_, i) => [i + 1, 0]));
+  for (const r of rows) dowMap[parseInt(r.dayOfWeek)] = parseInt(r.count);
+
+  return Object.entries(dowMap).map(([dow, count]) => ({
+    dayOfWeek: parseInt(dow),
+    dayName: DAY_NAMES[parseInt(dow) - 1],
+    isWeekend: parseInt(dow) === 1 || parseInt(dow) === 7,
+    count,
+  }));
+};
+
+export const getTopVehicles = async ({ from, to, limit = 10, vehicleType }) => {
+  const { start, end } = parseDateRange(from, to);
+  const limitInt = Math.min(Math.max(parseInt(limit) || 10, 1), 100);
+
+  const where = { createdAt: { [Op.between]: [start, end] }, status: 'completed' };
+  if (vehicleType) where.vehicleType = vehicleType;
+
+  const rows = await ParkingSession.findAll({
+    where,
+    attributes: [
+      'licensePlate',
+      'vehicleType',
+      [fn('COUNT', col('id')), 'sessionCount'],
+      [fn('SUM', col('fee')), 'totalFee'],
+      [fn('MAX', col('entryTime')), 'lastSeen'],
+    ],
+    group: ['licensePlate', 'vehicleType'],
+    order: [[fn('COUNT', col('id')), 'DESC']],
+    limit: limitInt,
+    raw: true,
+  });
+
+  return rows.map((r, i) => ({
+    rank: i + 1,
+    licensePlate: r.licensePlate,
+    vehicleType: r.vehicleType,
+    sessionCount: parseInt(r.sessionCount),
+    totalFee: parseFloat(r.totalFee) || 0,
+    lastSeen: r.lastSeen,
+  }));
+};
+
 export const getStaffStats = async ({ from, to }) => {
   const { start, end } = parseDateRange(from, to);
   const where = { createdAt: { [Op.between]: [start, end] } };
