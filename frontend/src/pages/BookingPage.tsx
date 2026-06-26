@@ -127,7 +127,7 @@ export default function BookingPage() {
       // Bypass backend's flawed validation by sending anonymous request for other plates
       const isAnonymous = ownPlates.length > 0 && !ownPlates.includes(plate);
 
-      const result = await bookingService.createBooking({
+      const bookingPayload = {
         licensePlate: plate,
         customerEmail: customerEmail.trim().toLowerCase(),
         startTime: toIsoFromInput(startTime),
@@ -135,7 +135,10 @@ export default function BookingPage() {
         customerName: customerName.trim() || undefined,
         customerPhone: customerPhone.trim() || undefined,
         note: note.trim() || undefined,
-      }, isAnonymous);
+        anonymous: isAnonymous,
+      };
+
+      const result = await bookingService.createBooking(bookingPayload);
       setPreviewAmount(result.amount);
       setPreviewHours(result.prepaidHours);
       window.location.href = result.paymentUrl;
@@ -157,6 +160,22 @@ export default function BookingPage() {
           <p className="mx-auto mt-5 max-w-3xl text-lg font-light leading-8 text-slate-600">
             Nhập biển số, chọn khung giờ gửi xe, hệ thống sẽ tạo booking theo tầng ô tô vãng lai phù hợp.
           </p>
+        </section>
+
+        <section className="mx-auto mt-8 max-w-6xl rounded-[24px] border border-amber-200 bg-amber-50 px-5 py-4 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
+              <AlertCircle className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-sm font-black uppercase tracking-[0.14em] text-amber-800">Lưu ý booking</p>
+              <ul className="mt-2 space-y-1.5 text-sm font-medium leading-6 text-amber-900">
+                <li>Booking sai thông tin không hoàn tiền.</li>
+                <li>Booking người dùng đến trễ lưu ý mất tiền.</li>
+                <li>Người dùng được phép đến sớm khi bãi xe còn chỗ.</li>
+              </ul>
+            </div>
+          </div>
         </section>
 
         <section className="mx-auto mt-12 grid max-w-6xl gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
