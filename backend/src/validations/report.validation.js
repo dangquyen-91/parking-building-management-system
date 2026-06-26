@@ -40,4 +40,10 @@ export const topVehiclesSchema = Joi.object({
   ...dateRangeFields,
   limit: Joi.number().integer().min(1).max(100).default(10),
   vehicleType: Joi.string().valid('motorcycle', 'car'),
+  dayType: Joi.string().valid('weekday', 'weekend'),
+});
+
+export const topUsersSchema = Joi.object({
+  ...dateRangeFields,
+  limit: Joi.number().integer().min(1).max(100).default(10),
 });

@@ -510,12 +510,15 @@ export const getPeakDays = async ({ days = 30 }) => {
   }));
 };
 
-export const getTopVehicles = async ({ from, to, limit = 10, vehicleType }) => {
+export const getTopVehicles = async ({ from, to, limit = 10, vehicleType, dayType }) => {
   const { start, end } = parseDateRange(from, to);
   const limitInt = Math.min(Math.max(parseInt(limit) || 10, 1), 100);
 
   const where = { createdAt: { [Op.between]: [start, end] }, status: 'completed' };
   if (vehicleType) where.vehicleType = vehicleType;
+  // MySQL DAYOFWEEK: 1=Sunday, 7=Saturday → weekend = (1,7), weekday = (2..6)
+  if (dayType === 'weekend') where[Op.and] = [literal('DAYOFWEEK(entryTime) IN (1, 7)')];
+  else if (dayType === 'weekday') where[Op.and] = [literal('DAYOFWEEK(entryTime) IN (2, 3, 4, 5, 6)')];
 
   const rows = await ParkingSession.findAll({
     where,
@@ -539,6 +542,38 @@ export const getTopVehicles = async ({ from, to, limit = 10, vehicleType }) => {
     sessionCount: parseInt(r.sessionCount),
     totalFee: parseFloat(r.totalFee) || 0,
     lastSeen: r.lastSeen,
+  }));
+};
+
+export const getTopUsers = async ({ from, to, limit = 10 }) => {
+  const { start, end } = parseDateRange(from, to);
+  const limitInt = Math.min(Math.max(parseInt(limit) || 10, 1), 100);
+
+  // Chỉ tính phiên gắn với user đã đăng nhập (cư dân / người đặt chỗ);
+  // khách vãng lai check-in tay có userId = null nên không nằm trong bảng này.
+  const rows = await ParkingSession.findAll({
+    where: { createdAt: { [Op.between]: [start, end] }, status: 'completed', userId: { [Op.not]: null } },
+    include: [{ model: User, as: 'user', attributes: ['id', 'fullName', 'email'] }],
+    attributes: [
+      'userId',
+      [fn('COUNT', col('ParkingSession.id')), 'sessionCount'],
+      [fn('SUM', col('ParkingSession.fee')), 'totalFee'],
+      [fn('MAX', col('ParkingSession.entryTime')), 'lastVisit'],
+    ],
+    group: ['userId', 'user.id', 'user.fullName', 'user.email'],
+    order: [[fn('COUNT', col('ParkingSession.id')), 'DESC']],
+    limit: limitInt,
+    raw: true,
+  });
+
+  return rows.map((r, i) => ({
+    rank: i + 1,
+    userId: r.userId,
+    fullName: r['user.fullName'],
+    email: r['user.email'],
+    sessionCount: parseInt(r.sessionCount),
+    totalFee: parseFloat(r.totalFee) || 0,
+    lastVisit: r.lastVisit,
   }));
 };
 

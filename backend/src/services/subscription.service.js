@@ -56,7 +56,7 @@ export const buyPackage = async ({ userId, packageId, licensePlate, slotId, ipAd
 
   return sequelize
     .transaction(async (t) => {
-      const pkg = await ParkingPackage.findByPk(packageId, { transaction: t });
+      const pkg = await ParkingPackage.findByPk(packageId, { transaction: t });s
       if (!pkg || !pkg.isActive) throw new AppError('Package not found or inactive', 404);
 
       // 1 biển số = 1 sub: chặn nếu plate đang có giao dịch pending (bất kỳ package).
