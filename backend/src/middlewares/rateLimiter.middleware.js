@@ -35,4 +35,11 @@ export const refreshLimiter = rateLimit({
   message: { success: false, message: 'Refresh token bị giới hạn. Vui lòng đăng nhập lại.' },
 });
 
+export const resendVerificationLimiter = rateLimit({
+  ...baseConfig,
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  message: { success: false, message: 'Quá nhiều yêu cầu gửi lại email. Vui lòng thử lại sau 1 giờ.' },
+});
+
 export const authLimiter = loginLimiter;

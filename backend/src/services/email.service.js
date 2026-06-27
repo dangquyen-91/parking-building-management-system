@@ -63,4 +63,37 @@ export const sendBookingConfirmation = async (booking) => {
   });
 };
 
-export default { sendEmail, sendBookingConfirmation };
+export const sendVerificationEmail = async ({ to, toName, token }) => {
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+  const link = `${frontendUrl}/verify-email?token=${token}`;
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto;">
+      <h2 style="color: #1565c0;">📧 Xác minh email của bạn</h2>
+      <p>Xin chào <b>${toName || to}</b>,</p>
+      <p>Bạn vừa đăng ký tài khoản tại hệ thống quản lý bãi xe. Vui lòng nhấn vào nút bên dưới để xác minh địa chỉ email:</p>
+      <div style="text-align: center; margin: 32px 0;">
+        <a href="${link}"
+           style="background:#1565c0; color:#fff; padding:14px 28px; border-radius:6px; text-decoration:none; font-size:16px; font-weight:bold;">
+          Xác minh Email
+        </a>
+      </div>
+      <p style="font-size:13px; color:#555;">
+        Hoặc copy đường link sau vào trình duyệt:<br/>
+        <a href="${link}" style="color:#1565c0;">${link}</a>
+      </p>
+      <p style="font-size:13px; color:#888;">Link có hiệu lực trong <b>24 giờ</b>. Nếu bạn không đăng ký tài khoản, hãy bỏ qua email này.</p>
+      <hr style="border:none; border-top:1px solid #eee; margin-top:24px;"/>
+      <p style="font-size:12px; color:#999;">Email tự động — vui lòng không trả lời.</p>
+    </div>
+  `;
+
+  return sendEmail({
+    to,
+    toName,
+    subject: 'Xác minh email đăng ký tài khoản',
+    htmlContent: html,
+  });
+};
+
+export default { sendEmail, sendBookingConfirmation, sendVerificationEmail };

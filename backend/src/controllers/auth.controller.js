@@ -46,4 +46,22 @@ const changePassword = async (req, res, next) => {
   }
 };
 
-export { register, login, refresh, logout, changePassword };
+const verifyEmail = async (req, res, next) => {
+  try {
+    const result = await authService.verifyEmail(req.query.token);
+    response.success(res, result);
+  } catch (err) {
+    next(err);
+  }
+};
+
+const resendVerification = async (req, res, next) => {
+  try {
+    const result = await authService.resendVerification(req.body.email);
+    response.success(res, result);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export { register, login, refresh, logout, changePassword, verifyEmail, resendVerification };
