@@ -31,6 +31,28 @@ export const resendVerificationSchema = Joi.object({
   }),
 });
 
+export const forgotPasswordSchema = Joi.object({
+  email: Joi.string().email().required().messages({
+    'any.required': 'Email là bắt buộc',
+    'string.empty': 'Email là bắt buộc',
+    'string.email': 'Email không hợp lệ',
+  }),
+});
+
+export const resetPasswordSchema = Joi.object({
+  newPassword: Joi.string().min(8).max(128).required().messages({
+    'any.required': 'Mật khẩu mới là bắt buộc',
+    'string.empty': 'Mật khẩu mới là bắt buộc',
+    'string.min': 'Mật khẩu phải có ít nhất 8 ký tự',
+    'string.max': 'Mật khẩu không được quá 128 ký tự',
+  }),
+  confirmPassword: Joi.string().valid(Joi.ref('newPassword')).required().messages({
+    'any.only': 'Mật khẩu xác nhận không khớp',
+    'any.required': 'Vui lòng xác nhận mật khẩu',
+    'string.empty': 'Vui lòng xác nhận mật khẩu',
+  }),
+});
+
 export const changePasswordSchema = Joi.object({
   currentPassword: Joi.string().required().messages({
     'any.required': 'Current password is required',

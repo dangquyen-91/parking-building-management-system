@@ -96,4 +96,37 @@ export const sendVerificationEmail = async ({ to, toName, token }) => {
   });
 };
 
-export default { sendEmail, sendBookingConfirmation, sendVerificationEmail };
+export const sendPasswordResetEmail = async ({ to, toName, token }) => {
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+  const link = `${frontendUrl}/reset-password?token=${token}`;
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto;">
+      <h2 style="color: #c62828;">🔐 Đặt lại mật khẩu</h2>
+      <p>Xin chào <b>${toName || to}</b>,</p>
+      <p>Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản của bạn. Nhấn vào nút bên dưới để tiếp tục:</p>
+      <div style="text-align: center; margin: 32px 0;">
+        <a href="${link}"
+           style="background:#c62828; color:#fff; padding:14px 28px; border-radius:6px; text-decoration:none; font-size:16px; font-weight:bold;">
+          Đặt lại mật khẩu
+        </a>
+      </div>
+      <p style="font-size:13px; color:#555;">
+        Hoặc copy đường link sau vào trình duyệt:<br/>
+        <a href="${link}" style="color:#c62828;">${link}</a>
+      </p>
+      <p style="font-size:13px; color:#888;">Link có hiệu lực trong <b>1 giờ</b>. Nếu bạn không yêu cầu đặt lại mật khẩu, hãy bỏ qua email này — tài khoản của bạn vẫn an toàn.</p>
+      <hr style="border:none; border-top:1px solid #eee; margin-top:24px;"/>
+      <p style="font-size:12px; color:#999;">Email tự động — vui lòng không trả lời.</p>
+    </div>
+  `;
+
+  return sendEmail({
+    to,
+    toName,
+    subject: 'Đặt lại mật khẩu tài khoản',
+    htmlContent: html,
+  });
+};
+
+export default { sendEmail, sendBookingConfirmation, sendVerificationEmail, sendPasswordResetEmail };

@@ -1553,6 +1553,122 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /auth/forgot-password:
+    post:
+      tags: [Auth]
+      summary: Quên mật khẩu — gửi email đặt lại
+      description: |
+        Gửi email chứa link đặt lại mật khẩu đến địa chỉ email đã đăng ký.
+        Token có hiệu lực trong **1 giờ**.
+        Để tránh lộ thông tin tài khoản, response luôn trả về thông báo chung.
+        Rate limit: **5 lần/giờ** mỗi IP.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+      responses:
+        '200':
+          description: Đã xử lý yêu cầu (thông báo chung để tránh lộ thông tin tài khoản)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          message:
+                            type: string
+                            example: Nếu email tồn tại trong hệ thống, chúng tôi đã gửi hướng dẫn đặt lại mật khẩu.
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Quá nhiều yêu cầu (5 lần/giờ)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/reset-password:
+    post:
+      tags: [Auth]
+      summary: Đặt lại mật khẩu bằng token
+      description: |
+        Đặt mật khẩu mới bằng token nhận được qua email.
+        Token phải còn hiệu lực (trong vòng 1 giờ kể từ khi yêu cầu).
+        Sau khi đặt lại thành công, **tất cả session đang đăng nhập sẽ bị vô hiệu hoá** (refreshToken bị xóa).
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+            example: a3f2c1d4e5b6a7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2
+          description: Token 64 ký tự hex nhận được qua email đặt lại mật khẩu
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [newPassword, confirmPassword]
+              properties:
+                newPassword:
+                  type: string
+                  minLength: 8
+                  maxLength: 128
+                  example: NewPassword123
+                confirmPassword:
+                  type: string
+                  description: Phải khớp với newPassword
+                  example: NewPassword123
+      responses:
+        '200':
+          description: Đặt lại mật khẩu thành công
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          message:
+                            type: string
+                            example: Đặt lại mật khẩu thành công. Vui lòng đăng nhập lại.
+        '400':
+          description: Token không hợp lệ / hết hạn, mật khẩu không khớp, hoặc trùng mật khẩu cũ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalidToken:
+                  summary: Token không hợp lệ
+                  value: { success: false, message: Token không hợp lệ hoặc đã được sử dụng }
+                expiredToken:
+                  summary: Token hết hạn
+                  value: { success: false, message: Token đã hết hạn. Vui lòng yêu cầu đặt lại mật khẩu mới. }
+                samePassword:
+                  summary: Trùng mật khẩu cũ
+                  value: { success: false, message: Mật khẩu mới không được trùng với mật khẩu hiện tại }
+
   # -- USERS --
   /users/me:
     get:

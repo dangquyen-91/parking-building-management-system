@@ -4,7 +4,7 @@ import Role from '../models/role.model.js';
 import AppError from '../utils/appError.js';
 import { hashPassword, comparePassword } from '../utils/hash.js';
 import { generateTokens, verifyRefresh } from '../utils/jwt.js';
-import { sendVerificationEmail } from './email.service.js';
+import { sendVerificationEmail, sendPasswordResetEmail } from './email.service.js';
 
 const DEFAULT_ROLE_NAME = 'user';
 
@@ -142,4 +142,52 @@ const resendVerification = async (email) => {
   return { message: 'Nếu email tồn tại và chưa xác minh, chúng tôi đã gửi lại email xác minh.' };
 };
 
-export { register, login, refresh, logout, changePassword, verifyEmail, resendVerification };
+const forgotPassword = async (email) => {
+  const normalizedEmail = email.toLowerCase().trim();
+  const user = await User.findOne({ where: { email: normalizedEmail, isActive: true } });
+
+  // Trả về thông báo chung để tránh lộ thông tin tài khoản
+  if (!user) {
+    return { message: 'Nếu email tồn tại trong hệ thống, chúng tôi đã gửi hướng dẫn đặt lại mật khẩu.' };
+  }
+
+  const resetToken = crypto.randomBytes(32).toString('hex');
+  const tokenExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 giờ
+
+  await user.update({
+    passwordResetToken: resetToken,
+    passwordResetTokenExpires: tokenExpires,
+  });
+
+  await sendPasswordResetEmail({ to: normalizedEmail, toName: user.fullName, token: resetToken });
+
+  return { message: 'Nếu email tồn tại trong hệ thống, chúng tôi đã gửi hướng dẫn đặt lại mật khẩu.' };
+};
+
+const resetPassword = async (token, { newPassword, confirmPassword }) => {
+  if (!token) throw new AppError('Token không hợp lệ', 400);
+  if (newPassword !== confirmPassword) throw new AppError('Mật khẩu xác nhận không khớp', 400);
+
+  const user = await User.findOne({ where: { passwordResetToken: token } });
+  if (!user) throw new AppError('Token không hợp lệ hoặc đã được sử dụng', 400);
+
+  if (new Date() > new Date(user.passwordResetTokenExpires)) {
+    throw new AppError('Token đã hết hạn. Vui lòng yêu cầu đặt lại mật khẩu mới.', 400);
+  }
+
+  const isSame = await comparePassword(newPassword, user.password);
+  if (isSame) throw new AppError('Mật khẩu mới không được trùng với mật khẩu hiện tại', 400);
+
+  const hashed = await hashPassword(newPassword);
+
+  await user.update({
+    password: hashed,
+    passwordResetToken: null,
+    passwordResetTokenExpires: null,
+    refreshToken: null, // vô hiệu hoá tất cả session đang đăng nhập
+  });
+
+  return { message: 'Đặt lại mật khẩu thành công. Vui lòng đăng nhập lại.' };
+};
+
+export { register, login, refresh, logout, changePassword, verifyEmail, resendVerification, forgotPassword, resetPassword };

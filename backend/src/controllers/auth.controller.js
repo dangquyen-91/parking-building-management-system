@@ -1,4 +1,5 @@
 import * as authService from '../services/auth.service.js';
+
 import response from '../utils/response.js';
 
 const register = async (req, res, next) => {
@@ -64,4 +65,22 @@ const resendVerification = async (req, res, next) => {
   }
 };
 
-export { register, login, refresh, logout, changePassword, verifyEmail, resendVerification };
+const forgotPassword = async (req, res, next) => {
+  try {
+    const result = await authService.forgotPassword(req.body.email);
+    response.success(res, result);
+  } catch (err) {
+    next(err);
+  }
+};
+
+const resetPassword = async (req, res, next) => {
+  try {
+    const result = await authService.resetPassword(req.query.token, req.body);
+    response.success(res, result);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export { register, login, refresh, logout, changePassword, verifyEmail, resendVerification, forgotPassword, resetPassword };

@@ -42,4 +42,11 @@ export const resendVerificationLimiter = rateLimit({
   message: { success: false, message: 'Quá nhiều yêu cầu gửi lại email. Vui lòng thử lại sau 1 giờ.' },
 });
 
+export const forgotPasswordLimiter = rateLimit({
+  ...baseConfig,
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  message: { success: false, message: 'Quá nhiều yêu cầu đặt lại mật khẩu. Vui lòng thử lại sau 1 giờ.' },
+});
+
 export const authLimiter = loginLimiter;
