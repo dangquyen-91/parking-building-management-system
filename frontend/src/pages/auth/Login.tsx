@@ -4,9 +4,11 @@ import { useFormik } from 'formik';
 import { motion, type Variants } from 'framer-motion';
 import { Mail, Lock, LogIn, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { authService } from '../../services/auth.service';
 import { loginSchema } from '../../validation/authSchema';
 import { AuthLayout } from '../../components/auth/AuthLayout';
 import { Input } from '../../components/ui/Input';
+import { useCooldown } from '../../hooks/useCooldown';
 
 export const Login: React.FC = () => {
   const { login } = useAuth();
@@ -14,8 +16,13 @@ export const Login: React.FC = () => {
   const location = useLocation();
   const [apiError, setApiError] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState<boolean>(false);
+  const [needsVerify, setNeedsVerify] = useState<boolean>(false);
+  const [resendMsg, setResendMsg] = useState<string | null>(null);
+  const cooldown = useCooldown('cooldown:verify', 60);
 
   const registerSuccess = location.state?.registerSuccess;
+  const verified = location.state?.verified;
+  const passwordReset = location.state?.passwordReset;
 
   const formik = useFormik({
     initialValues: {
@@ -27,6 +34,7 @@ export const Login: React.FC = () => {
     onSubmit: async (values, { setSubmitting }) => {
       setApiError(null);
       setIsSuccess(false);
+      setNeedsVerify(false);
       try {
         const profile = await login({
           email: values.email,
@@ -52,11 +60,27 @@ export const Login: React.FC = () => {
           }
         }, 800);
       } catch (err: any) {
-        setApiError(err.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.');
+        if (err?.status === 403 || (err?.message || '').toLowerCase().includes('xác minh')) {
+          setNeedsVerify(true);
+        } else {
+          setApiError(err.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.');
+        }
         setSubmitting(false);
       }
     },
   });
+
+  const handleResend = async () => {
+    if (!formik.values.email || cooldown.active) return;
+    setResendMsg(null);
+    try {
+      const res = await authService.resendVerification(formik.values.email);
+      setResendMsg(res.message);
+      cooldown.start();
+    } catch (err) {
+      setResendMsg(err instanceof Error ? err.message : 'Không gửi được email.');
+    }
+  };
 
   React.useEffect(() => {
     const savedEmail = localStorage.getItem('rememberedEmail');
@@ -99,14 +123,49 @@ export const Login: React.FC = () => {
           </div>
         </motion.div>
       )}
+      {(verified || passwordReset) && !apiError && !isSuccess && !needsVerify && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          className="mb-6 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm flex items-start gap-2.5"
+        >
+          <CheckCircle2 className="w-5 h-5 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold">{verified ? 'Xác minh email thành công!' : 'Đặt lại mật khẩu thành công!'}</p>
+            <p className="text-xs text-emerald-400/80 mt-0.5">Vui lòng đăng nhập để tiếp tục.</p>
+          </div>
+        </motion.div>
+      )}
       {apiError && (
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: 'auto' }}
           className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex items-start gap-2.5"
         >
           <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
           <span className="font-medium">{apiError}</span>
+        </motion.div>
+      )}
+      {needsVerify && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          className="mb-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-sm flex items-start gap-2.5"
+        >
+          <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="font-semibold">Email chưa được xác minh</p>
+            <p className="text-xs text-amber-300/80 mt-0.5">Vui lòng kiểm tra hộp thư để kích hoạt tài khoản trước khi đăng nhập.</p>
+            <button
+              type="button"
+              onClick={handleResend}
+              disabled={cooldown.active || !formik.values.email}
+              className="mt-2.5 rounded-lg bg-amber-500/15 px-3 py-1.5 text-xs font-semibold text-amber-200 transition hover:bg-amber-500/25 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {cooldown.active ? `Gửi lại sau ${cooldown.remaining}s` : 'Gửi lại email xác minh'}
+            </button>
+            {resendMsg && <p className="mt-1.5 text-xs text-amber-300/70">{resendMsg}</p>}
+          </div>
         </motion.div>
       )}
       {isSuccess && (
@@ -174,10 +233,9 @@ export const Login: React.FC = () => {
               />
               <span>Ghi nhớ tôi</span>
             </label>
-            <Link 
-              to="/forgot-password" 
+            <Link
+              to="/forgot-password"
               className="text-blue-400 hover:text-blue-300 font-medium transition-colors"
-              onClick={(e) => { e.preventDefault(); alert('Chức năng Quên mật khẩu đang được phát triển!'); }}
             >
               Quên mật khẩu?
             </Link>

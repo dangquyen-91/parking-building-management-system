@@ -3,10 +3,15 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { AlertCircle, ArrowRight, CheckCircle2, CreditCard, Loader2, Receipt, XCircle } from 'lucide-react';
 import { paymentService, type Payment } from '../services/payment.service';
+import { subscriptionService, type ResidentSubscription } from '../services/subscription.service';
 import { useAuth } from '../hooks/useAuth';
+
+const POLL_INTERVAL = 2000;
+const POLL_MAX = 5;
 
 const formatCurrency = (value: string | number) =>
   Number(value).toLocaleString('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 });
+const formatDate = (value?: string | null) => (value ? new Date(value).toLocaleDateString('vi-VN') : '--');
 
 const statusLabels: Record<string, string> = {
   pending: 'Chờ xác nhận',
@@ -21,59 +26,129 @@ const typeLabels: Record<string, string> = {
   booking: 'Thanh toán đặt chỗ',
 };
 
+const VT_LABEL: Record<string, string> = { car: 'Ô tô', motorcycle: 'Xe máy' };
+
 export default function PaymentReturnPage() {
   const [params] = useSearchParams();
   const { isAuthenticated } = useAuth();
   const orderId = params.get('orderId') ?? '';
   const returnStatus = params.get('status') ?? '';
+  const optimisticSuccess = returnStatus === 'success';
+
   const [payment, setPayment] = useState<Payment | null>(null);
+  const [subDetail, setSubDetail] = useState<ResidentSubscription | null>(null);
   const [loading, setLoading] = useState(Boolean(orderId && isAuthenticated));
   const [error, setError] = useState<string | null>(null);
 
-  const optimisticSuccess = returnStatus === 'success';
+  const paymentType =
+    payment?.paymentType ??
+    (orderId.startsWith('BOOK-') ? 'booking' : orderId.startsWith('SUB-') ? 'subscription' : orderId.startsWith('SESS-') ? 'session' : '');
+  const isBooking = paymentType === 'booking';
+  const isSubscription = paymentType === 'subscription';
+  const isSession = paymentType === 'session';
+
+  // #3 — Tin trạng thái từ server, không tin URL:
+  // đã đăng nhập → chỉ "thành công" khi payment.status === 'success'.
+  // chưa đăng nhập → không gọi được API nên tạm theo tham số URL.
   const resolvedSuccess = payment?.status === 'success';
-  const isSuccess = resolvedSuccess || (optimisticSuccess && !payment);
-  const paymentType = payment?.paymentType ?? (orderId.startsWith('BOOK-') ? 'booking' : orderId.startsWith('SUB-') ? 'subscription' : orderId.startsWith('SESS-') ? 'session' : '');
-  const isBookingPayment = paymentType === 'booking';
-  const isSubscriptionPayment = paymentType === 'subscription';
-  const isSessionPayment = paymentType === 'session';
+  const resolvedFailed = payment?.status === 'failed' || payment?.status === 'cancelled';
+  const isSuccess = resolvedSuccess || (!isAuthenticated && optimisticSuccess);
+  const isChecking = isAuthenticated && !resolvedSuccess && !resolvedFailed && (loading || payment?.status === 'pending');
+  const isFailed = !isSuccess && !isChecking && resolvedFailed;
 
-  const title = useMemo(() => {
-    if (!orderId) return 'Thiếu mã thanh toán';
-    if (loading) return 'Đang kiểm tra thanh toán';
-    if (error) return 'Cần kiểm tra lại thanh toán';
-    return isSuccess ? 'Thanh toán thành công' : 'Thanh toán chưa hoàn tất';
-  }, [error, isSuccess, loading, orderId]);
-
+  // #3 — Tải + poll trạng thái cho tới khi IPN của VNPay cập nhật xong
   useEffect(() => {
+    if (!orderId || !isAuthenticated) {
+      setPayment(null);
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
 
-    async function loadPayment() {
-      if (!orderId || !isAuthenticated) {
-        setPayment(null);
-        setLoading(false);
-        return;
-      }
-
-      setLoading(true);
-      setError(null);
+    const run = async (attempt: number) => {
       try {
         const result = await paymentService.getByOrderId(orderId);
-        if (!cancelled) setPayment(result);
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Không đọc được trạng thái thanh toán.');
+        if (cancelled) return;
+        setPayment(result);
+        setError(null);
+        if (result.status === 'pending' && optimisticSuccess && attempt < POLL_MAX) {
+          timer = setTimeout(() => run(attempt + 1), POLL_INTERVAL);
+        } else {
+          setLoading(false);
         }
-      } finally {
-        if (!cancelled) setLoading(false);
+      } catch (err) {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : 'Không đọc được trạng thái thanh toán.');
+        setLoading(false);
       }
-    }
+    };
 
-    loadPayment();
+    setLoading(true);
+    setError(null);
+    run(1);
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [isAuthenticated, orderId, optimisticSuccess]);
+
+  // #4 (cách B) — lấy chi tiết gói thật để hiện hạn dùng/biển số/tên gói
+  useEffect(() => {
+    const isSub = payment?.paymentType === 'subscription' || payment?.orderId?.startsWith('SUB-');
+    if (!isAuthenticated || !payment || !isSub || payment.status !== 'success' || !payment.subscriptionId) {
+      return;
+    }
+    let cancelled = false;
+    subscriptionService
+      .getById(payment.subscriptionId)
+      .then((s) => !cancelled && setSubDetail(s))
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated, orderId]);
+  }, [payment, isAuthenticated]);
+
+  const title = useMemo(() => {
+    if (!orderId) return 'Thiếu mã thanh toán';
+    if (isChecking) return 'Đang xác nhận thanh toán';
+    if (isSuccess) return 'Thanh toán thành công';
+    if (isFailed) return 'Thanh toán chưa hoàn tất';
+    return 'Kết quả thanh toán';
+  }, [orderId, isChecking, isSuccess, isFailed]);
+
+  // #2 — Mô tả thân thiện với người dùng (bỏ ngôn ngữ kỹ thuật)
+  const description = useMemo(() => {
+    if (isChecking) return 'Chúng tôi đang xác nhận giao dịch với VNPay, vui lòng đợi trong giây lát…';
+    if (!isAuthenticated) {
+      return isBooking
+        ? 'Nếu giao dịch thành công, email xác nhận đặt chỗ sẽ được gửi tới địa chỉ bạn đã nhập.'
+        : 'Đăng nhập lại để xem chi tiết giao dịch và tiếp tục thao tác với tài khoản của bạn.';
+    }
+    if (isFailed) return 'Giao dịch chưa hoàn tất. Bạn có thể thử thanh toán lại hoặc liên hệ hỗ trợ nếu đã bị trừ tiền.';
+    if (isBooking) return 'Đặt chỗ của bạn đã được xác nhận. Email xác nhận đã được gửi tới bạn.';
+    if (isSubscription) return 'Gói cư dân của bạn đã được kích hoạt. Bạn có thể xem chi tiết trong mục Gói của tôi.';
+    return 'Giao dịch đã hoàn tất.';
+  }, [isChecking, isAuthenticated, isFailed, isBooking, isSubscription]);
+
+  // #1 — CTA theo đúng ngữ cảnh (bỏ nút "Sang check-in")
+  const ctas = useMemo<{ primary: { to: string; label: string }; secondary: { to: string; label: string } | null }>(() => {
+    if (!isAuthenticated) {
+      return {
+        primary: isBooking ? { to: '/booking', label: 'Đặt chỗ khác' } : { to: '/login', label: 'Đăng nhập lại' },
+        secondary: { to: '/', label: 'Về trang chủ' },
+      };
+    }
+    if (isFailed) {
+      return {
+        primary: { to: isBooking ? '/booking' : '/membership', label: 'Thử thanh toán lại' },
+        secondary: { to: '/contact', label: 'Liên hệ hỗ trợ' },
+      };
+    }
+    if (isBooking) return { primary: { to: '/my-bookings', label: 'Xem booking của tôi' }, secondary: { to: '/booking', label: 'Đặt chỗ khác' } };
+    if (isSubscription) return { primary: { to: '/membership', label: 'Xem gói của tôi' }, secondary: { to: '/', label: 'Về trang chủ' } };
+    return { primary: { to: '/', label: 'Về trang chủ' }, secondary: null };
+  }, [isAuthenticated, isFailed, isBooking, isSubscription]);
 
   return (
     <div className="min-h-screen bg-slate-50 px-6 pt-32 pb-20">
@@ -84,34 +159,23 @@ export default function PaymentReturnPage() {
           className="rounded-[30px] border border-slate-200 bg-white p-8 shadow-xl shadow-slate-900/5"
         >
           <div className="mb-6 flex items-start gap-4">
-            <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl ${
-              loading ? 'bg-blue-50 text-blue-600' : isSuccess ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'
-            }`}>
-              {loading ? <Loader2 className="h-7 w-7 animate-spin" /> : isSuccess ? <CheckCircle2 className="h-7 w-7" /> : <AlertCircle className="h-7 w-7" />}
+            <div
+              className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl ${
+                isChecking ? 'bg-blue-50 text-blue-600' : isSuccess ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'
+              }`}
+            >
+              {isChecking ? <Loader2 className="h-7 w-7 animate-spin" /> : isSuccess ? <CheckCircle2 className="h-7 w-7" /> : <AlertCircle className="h-7 w-7" />}
             </div>
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.16em] text-blue-600">Kết quả VNPay</p>
               <h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-950">{title}</h1>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
-                {!isAuthenticated
-                  ? isBookingPayment
-                    ? 'Thanh toán booking đã được VNPay chuyển về hệ thống. Nếu giao dịch thành công, email xác nhận sẽ được gửi về địa chỉ bạn đã nhập khi đặt chỗ.'
-                    : 'Thanh toán đã được VNPay chuyển về hệ thống. Vì bạn chưa đăng nhập, trang này chỉ hiển thị kết quả cơ bản và mã đơn hàng.'
-                  : isBookingPayment
-                    ? 'Nếu VNPay xác nhận thành công, booking sẽ được chuyển sang trạng thái đã xác nhận và email xác nhận sẽ được gửi cho khách.'
-                    : isSubscriptionPayment
-                      ? 'Nếu thanh toán thành công, gói cư dân sẽ được kích hoạt hoặc cộng dồn vào gói còn hạn của cùng biển số.'
-                      : 'Backend redirect về trang này kèm orderId. Nếu IPN từ VNPay đã xử lý, trạng thái payment sẽ được cập nhật tự động.'}
-              </p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
             </div>
           </div>
 
           {!isAuthenticated && (
             <div className="mb-5 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-900">
-              {isBookingPayment
-                ? 'Bạn có thể dùng mã đơn hàng để đối chiếu khi cần hỗ trợ. Vé booking chi tiết sẽ được gửi qua email sau khi thanh toán thành công.'
-                : 'Bạn cần đăng nhập lại để xem chi tiết thanh toán và tiếp tục thao tác với tài khoản.'}
-              {' '}Mã đơn hàng: <span className="font-bold">{orderId || '--'}</span>
+              Mã đơn hàng: <span className="font-bold">{orderId || '--'}</span> — dùng để đối chiếu khi cần hỗ trợ.
             </div>
           )}
 
@@ -136,7 +200,7 @@ export default function PaymentReturnPage() {
                 <span className="text-xs font-semibold uppercase tracking-[0.14em]">Trạng thái</span>
               </div>
               <p className="text-sm font-bold text-slate-950">
-                {payment ? statusLabels[payment.status] ?? payment.status : returnStatus || '--'}
+                {isChecking ? 'Đang xác nhận…' : payment ? statusLabels[payment.status] ?? payment.status : isSuccess ? 'Thanh toán thành công' : returnStatus || '--'}
               </p>
             </div>
           </div>
@@ -152,61 +216,73 @@ export default function PaymentReturnPage() {
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Số tiền</p>
                   <p className="mt-1 font-bold text-slate-950">{formatCurrency(payment.amount)}</p>
                 </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Thông tin</p>
-                  <p className="mt-1 font-bold text-slate-950">{payment.orderInfo || '--'}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
-                    {isBookingPayment ? 'Booking' : isSessionPayment ? 'Phiên checkout' : 'Gói cư dân'}
-                  </p>
-                  <p className="mt-1 font-bold text-slate-950">
-                    {isBookingPayment
-                      ? `#${payment.bookingId ?? '--'}`
-                      : isSessionPayment
-                        ? `#${payment.sessionId ?? '--'}`
-                        : payment.status === 'success'
-                          ? 'Đã xử lý'
-                          : payment.subscription?.status ?? '--'}
-                  </p>
-                </div>
+
+                {/* #4 — chi tiết gói cư dân thật (cách B) */}
+                {isSubscription && (
+                  <>
+                    {(() => {
+                      const vt = subDetail?.vehicleType ?? payment.subscription?.vehicleType;
+                      const endDate = subDetail?.endDate ?? payment.subscription?.endDate;
+                      const plate = subDetail?.licensePlate ?? payment.subscription?.licensePlate ?? '--';
+                      const subStatus = subDetail?.status ?? payment.subscription?.status;
+                      return (
+                        <>
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Gói</p>
+                            <p className="mt-1 font-bold text-slate-950">
+                              {subDetail?.package?.name ?? payment.orderInfo ?? '--'}
+                              {vt ? ` · ${VT_LABEL[vt]}` : ''}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Hiệu lực đến</p>
+                            <p className="mt-1 font-bold text-slate-950">{formatDate(endDate)}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Biển số</p>
+                            <p className="mt-1 font-bold text-slate-950">{plate}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Trạng thái gói</p>
+                            <p className="mt-1 font-bold text-slate-950">{subStatus === 'active' ? 'Đã kích hoạt' : subStatus ?? '--'}</p>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </>
+                )}
+
+                {isBooking && (
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Mã booking</p>
+                    <p className="mt-1 font-bold text-slate-950">#{payment.bookingId ?? '--'}</p>
+                  </div>
+                )}
+                {isSession && (
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Phiên checkout</p>
+                    <p className="mt-1 font-bold text-slate-950">#{payment.sessionId ?? '--'}</p>
+                  </div>
+                )}
               </div>
             </div>
           )}
 
           <div className="mt-7 flex flex-wrap gap-3">
-            {!isAuthenticated ? (
-              <>
-                <Link
-                  to={isBookingPayment ? '/booking' : '/login'}
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 text-sm font-bold text-white transition hover:bg-blue-500"
-                >
-                  {isBookingPayment ? 'Đặt booking khác' : 'Đăng nhập lại'}
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-                <Link
-                  to="/"
-                  className="inline-flex h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 text-sm font-bold text-slate-700 transition hover:border-blue-300 hover:text-blue-600"
-                >
-                  Về trang chủ
-                </Link>
-              </>
-            ) : (
-              <>
-                <Link
-                  to={isBookingPayment ? '/my-bookings' : '/membership'}
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 text-sm font-bold text-white transition hover:bg-blue-500"
-                >
-                  {isBookingPayment ? 'Xem booking của tôi' : 'Quay lại mua gói'}
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-                <Link
-                  to="/staff/check-in"
-                  className="inline-flex h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 text-sm font-bold text-slate-700 transition hover:border-blue-300 hover:text-blue-600"
-                >
-                  Sang check-in
-                </Link>
-              </>
+            <Link
+              to={ctas.primary.to}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 text-sm font-bold text-white transition hover:bg-blue-500"
+            >
+              {ctas.primary.label}
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+            {ctas.secondary && (
+              <Link
+                to={ctas.secondary.to}
+                className="inline-flex h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 text-sm font-bold text-slate-700 transition hover:border-blue-300 hover:text-blue-600"
+              >
+                {ctas.secondary.label}
+              </Link>
             )}
           </div>
         </motion.div>

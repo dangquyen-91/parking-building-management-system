@@ -5,6 +5,8 @@ export type PaymentStatus = 'pending' | 'success' | 'failed' | 'cancelled';
 interface PaymentSubscription {
   id: number;
   licensePlate?: string;
+  vehicleType?: 'car' | 'motorcycle';
+  endDate?: string | null;
   status?: string;
 }
 

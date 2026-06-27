@@ -82,6 +82,14 @@ export const subscriptionService = {
     return parseResponse<BuyPackageResult>(response);
   },
 
+  async getById(id: number): Promise<ResidentSubscription> {
+    const response = await fetch(`${API_BASE_URL}/subscriptions/${id}`, {
+      method: 'GET',
+      headers: authHeaders(),
+    });
+    return parseResponse<ResidentSubscription>(response);
+  },
+
   async getMine(status?: SubscriptionStatus): Promise<ResidentSubscription[]> {
     const query = new URLSearchParams();
     if (status) query.set('status', status);

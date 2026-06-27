@@ -76,7 +76,7 @@ export const buyPackage = async ({ userId, packageId, licensePlate, slotId, ipAd
 
   return sequelize
     .transaction(async (t) => {
-      const pkg = await ParkingPackage.findByPk(packageId, { transaction: t });s
+      const pkg = await ParkingPackage.findByPk(packageId, { transaction: t });
       if (!pkg || !pkg.isActive) throw new AppError('Package not found or inactive', 404);
 
       // Self-heal: huỷ pending đã quá hạn 15 phút cho plate này (kèm payment) trước khi chặn.
