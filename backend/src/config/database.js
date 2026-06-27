@@ -39,7 +39,8 @@ const sequelize = databaseUrl
 
 const connectDB = async () => {
   await sequelize.authenticate();
-  console.log('MySQL connected');
+  const target = databaseUrl ? new URL(databaseUrl).host : `${dbHost}:${dbPort}`;
+  console.log(`MySQL connected → ${target}`);
   if (process.env.NODE_ENV !== 'production') {
     await sequelize.sync();
     console.log('Tables synced');
