@@ -37,6 +37,24 @@ const sequelize = databaseUrl
       }
     );
 
+const runMigrations = async () => {
+  const migrations = [
+    `ALTER TABLE users ADD COLUMN isEmailVerified TINYINT(1) DEFAULT 1`,
+    `ALTER TABLE users ADD COLUMN emailVerificationToken VARCHAR(255) DEFAULT NULL`,
+    `ALTER TABLE users ADD COLUMN emailVerificationTokenExpires DATETIME DEFAULT NULL`,
+    `ALTER TABLE users ADD COLUMN passwordResetToken VARCHAR(255) DEFAULT NULL`,
+    `ALTER TABLE users ADD COLUMN passwordResetTokenExpires DATETIME DEFAULT NULL`,
+  ];
+  for (const sql of migrations) {
+    try {
+      await sequelize.query(sql);
+    } catch (err) {
+      if (err.original?.errno !== 1060) throw err; // 1060 = Duplicate column — bỏ qua
+    }
+  }
+  console.log('Migrations applied');
+};
+
 const connectDB = async () => {
   await sequelize.authenticate();
   const target = databaseUrl ? new URL(databaseUrl).host : `${dbHost}:${dbPort}`;
@@ -45,6 +63,7 @@ const connectDB = async () => {
     await sequelize.sync();
     console.log('Tables synced');
   }
+  await runMigrations();
 };
 
 export { sequelize, connectDB };

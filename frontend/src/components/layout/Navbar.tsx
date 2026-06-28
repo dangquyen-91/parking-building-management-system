@@ -159,7 +159,7 @@ export default function Navbar() {
                   isLight ? 'text-slate-700' : 'text-slate-200'
                 }`}
               >
-                Sign In
+                Đăng nhập
               </Link>
               <Link
                 to="/register"
@@ -169,7 +169,7 @@ export default function Navbar() {
                     : 'border-white/20 text-white hover:bg-white/10'
                 }`}
               >
-                Sign Up
+                Đăng ký
               </Link>
             </>
           )}
@@ -243,13 +243,13 @@ export default function Navbar() {
                     to="/login"
                     className="px-4 py-2.5 rounded-full border border-slate-200 bg-white text-slate-800 font-medium text-sm text-center shadow-sm inline-block"
                   >
-                    Sign In
+                    Đăng nhập
                   </Link>
                   <Link
                     to="/register"
                     className="px-4 py-2.5 rounded-full bg-slate-950 text-white font-medium text-sm text-center shadow-sm inline-block"
                   >
-                    Sign Up
+                    Đăng ký
                   </Link>
                 </div>
               )}

@@ -10,6 +10,9 @@ import About from '../pages/About';
 import Contact from '../pages/Contact';
 import { Login } from '../pages/auth/Login';
 import { Register } from '../pages/auth/Register';
+import { VerifyEmail } from '../pages/auth/VerifyEmail';
+import { ForgotPassword } from '../pages/auth/ForgotPassword';
+import { ResetPassword } from '../pages/auth/ResetPassword';
 import AdminDashboardPage from '../pages/admin/DashboardPage';
 import AdminUsersPage from '../pages/admin/UsersPage';
 import AdminBuildingsPage from '../pages/admin/BuildingsPage';
@@ -115,6 +118,9 @@ export default function AppRoutes() {
       <Route path="/profile" element={<ProfilePage />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/verify-email" element={<VerifyEmail />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/signin" element={<Navigate to="/login" replace />} />
       <Route path="/signup" element={<Navigate to="/register" replace />} />
 

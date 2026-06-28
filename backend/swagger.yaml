@@ -1221,7 +1221,10 @@ paths:
     post:
       tags: [Auth]
       summary: Register a new account
-      description: Creates a new account with role `user` by default.
+      description: |
+        Tạo tài khoản mới với role `user` mặc định.
+        Sau khi đăng ký, một email xác minh sẽ được gửi đến địa chỉ email đã cung cấp.
+        Tài khoản chỉ có thể đăng nhập sau khi xác minh email thành công qua `GET /auth/verify-email`.
       requestBody:
         required: true
         content:
@@ -1242,15 +1245,15 @@ paths:
                 password:
                   type: string
                   minLength: 8
-                  maxLength: 72
-                  description: Must contain at least one uppercase letter, one lowercase letter, and one digit
+                  maxLength: 128
                   example: Password1
                 phone:
                   type: string
+                  pattern: '^[0-9]{9,11}$'
                   example: '0901234567'
       responses:
         '201':
-          description: Registered successfully
+          description: Đăng ký thành công, email xác minh đã được gửi
           content:
             application/json:
               schema:
@@ -1259,7 +1262,11 @@ paths:
                   - type: object
                     properties:
                       data:
-                        $ref: '#/components/schemas/User'
+                        type: object
+                        properties:
+                          message:
+                            type: string
+                            example: Đăng ký thành công. Vui lòng kiểm tra email để xác minh tài khoản.
         '400':
           description: Validation error
           content:
@@ -1268,6 +1275,12 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '409':
           description: Email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Quá nhiều lần đăng ký (10 lần/giờ)
           content:
             application/json:
               schema:
@@ -1305,13 +1318,25 @@ paths:
                       data:
                         $ref: '#/components/schemas/Tokens'
         '401':
-          description: Invalid credentials or account inactive
+          description: Sai email hoặc mật khẩu, hoặc tài khoản bị vô hiệu hóa
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Email chưa được xác minh
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ErrorResponse'
+                  - type: object
+                    properties:
+                      message:
+                        type: string
+                        example: Vui lòng xác minh email trước khi đăng nhập. Kiểm tra hộp thư của bạn.
         '429':
-          description: Too many login attempts
+          description: Quá nhiều lần đăng nhập sai (15 lần/15 phút)
           content:
             application/json:
               schema:
@@ -1428,6 +1453,221 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/verify-email:
+    get:
+      tags: [Auth]
+      summary: Xác minh email
+      description: |
+        Xác minh địa chỉ email của tài khoản bằng token nhận được qua email.
+        Token có hiệu lực trong **24 giờ** kể từ thời điểm đăng ký hoặc gửi lại.
+        Sau khi xác minh thành công, tài khoản có thể đăng nhập bình thường.
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+            example: a3f2c1d4e5b6a7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2
+          description: Token 64 ký tự hex nhận được qua email xác minh
+      responses:
+        '200':
+          description: Xác minh email thành công
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          message:
+                            type: string
+                            example: Xác minh email thành công. Bạn có thể đăng nhập ngay bây giờ.
+        '400':
+          description: Token không hợp lệ, đã sử dụng, hoặc đã hết hạn
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalid:
+                  summary: Token không hợp lệ
+                  value: { success: false, message: Token không hợp lệ hoặc đã được sử dụng }
+                expired:
+                  summary: Token hết hạn
+                  value: { success: false, message: Token đã hết hạn. Vui lòng yêu cầu gửi lại email xác minh. }
+                alreadyVerified:
+                  summary: Email đã được xác minh
+                  value: { success: false, message: Email đã được xác minh trước đó }
+
+  /auth/resend-verification:
+    post:
+      tags: [Auth]
+      summary: Gửi lại email xác minh
+      description: |
+        Gửi lại email xác minh cho tài khoản chưa được xác minh.
+        Token cũ sẽ bị thay thế bằng token mới, có hiệu lực trong 24 giờ.
+        Để tránh lộ thông tin tài khoản, response luôn trả về thông báo chung dù email có tồn tại hay không.
+        Rate limit: **5 lần/giờ** mỗi IP.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+      responses:
+        '200':
+          description: Đã xử lý yêu cầu (thông báo chung để tránh lộ thông tin tài khoản)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          message:
+                            type: string
+                            example: Nếu email tồn tại và chưa xác minh, chúng tôi đã gửi lại email xác minh.
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Quá nhiều yêu cầu (5 lần/giờ)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/forgot-password:
+    post:
+      tags: [Auth]
+      summary: Quên mật khẩu — gửi email đặt lại
+      description: |
+        Gửi email chứa link đặt lại mật khẩu đến địa chỉ email đã đăng ký.
+        Token có hiệu lực trong **1 giờ**.
+        Để tránh lộ thông tin tài khoản, response luôn trả về thông báo chung.
+        Rate limit: **5 lần/giờ** mỗi IP.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+      responses:
+        '200':
+          description: Đã xử lý yêu cầu (thông báo chung để tránh lộ thông tin tài khoản)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          message:
+                            type: string
+                            example: Nếu email tồn tại trong hệ thống, chúng tôi đã gửi hướng dẫn đặt lại mật khẩu.
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Quá nhiều yêu cầu (5 lần/giờ)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/reset-password:
+    post:
+      tags: [Auth]
+      summary: Đặt lại mật khẩu bằng token
+      description: |
+        Đặt mật khẩu mới bằng token nhận được qua email.
+        Token phải còn hiệu lực (trong vòng 1 giờ kể từ khi yêu cầu).
+        Sau khi đặt lại thành công, **tất cả session đang đăng nhập sẽ bị vô hiệu hoá** (refreshToken bị xóa).
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+            example: a3f2c1d4e5b6a7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2
+          description: Token 64 ký tự hex nhận được qua email đặt lại mật khẩu
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [newPassword, confirmPassword]
+              properties:
+                newPassword:
+                  type: string
+                  minLength: 8
+                  maxLength: 128
+                  example: NewPassword123
+                confirmPassword:
+                  type: string
+                  description: Phải khớp với newPassword
+                  example: NewPassword123
+      responses:
+        '200':
+          description: Đặt lại mật khẩu thành công
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          message:
+                            type: string
+                            example: Đặt lại mật khẩu thành công. Vui lòng đăng nhập lại.
+        '400':
+          description: Token không hợp lệ / hết hạn, mật khẩu không khớp, hoặc trùng mật khẩu cũ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalidToken:
+                  summary: Token không hợp lệ
+                  value: { success: false, message: Token không hợp lệ hoặc đã được sử dụng }
+                expiredToken:
+                  summary: Token hết hạn
+                  value: { success: false, message: Token đã hết hạn. Vui lòng yêu cầu đặt lại mật khẩu mới. }
+                samePassword:
+                  summary: Trùng mật khẩu cũ
+                  value: { success: false, message: Mật khẩu mới không được trùng với mật khẩu hiện tại }
 
   # -- USERS --
   /users/me:

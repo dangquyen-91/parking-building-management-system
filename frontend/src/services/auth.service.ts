@@ -33,7 +33,9 @@ async function handleResponse<T>(response: Response): Promise<T> {
   }
 
   if (!response.ok || !result.success) {
-    throw new Error(result.message || `API error with status ${response.status}`);
+    const error = new Error(result.message || `API error with status ${response.status}`) as Error & { status?: number };
+    error.status = response.status;
+    throw error;
   }
 
   return result.data as T;
@@ -97,6 +99,38 @@ export const authService = {
   },
 
   
+  async verifyEmail(token: string): Promise<{ message: string }> {
+    const response = await fetch(`${API_BASE_URL}/auth/verify-email?token=${encodeURIComponent(token)}`);
+    return handleResponse<{ message: string }>(response);
+  },
+
+  async resendVerification(email: string): Promise<{ message: string }> {
+    const response = await fetch(`${API_BASE_URL}/auth/resend-verification`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    return handleResponse<{ message: string }>(response);
+  },
+
+  async forgotPassword(email: string): Promise<{ message: string }> {
+    const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    return handleResponse<{ message: string }>(response);
+  },
+
+  async resetPassword(token: string, newPassword: string, confirmPassword: string): Promise<{ message: string }> {
+    const response = await fetch(`${API_BASE_URL}/auth/reset-password?token=${encodeURIComponent(token)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ newPassword, confirmPassword }),
+    });
+    return handleResponse<{ message: string }>(response);
+  },
+
   async getProfile(accessToken: string): Promise<UserProfile> {
     const response = await fetch(`${API_BASE_URL}/users/me`, {
       method: 'GET',

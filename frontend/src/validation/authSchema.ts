@@ -9,6 +9,23 @@ export const loginSchema = Yup.object().shape({
     .required('Vui lòng nhập mật khẩu'),
 });
 
+export const forgotPasswordSchema = Yup.object().shape({
+  email: Yup.string()
+    .email('Email không đúng định dạng')
+    .required('Vui lòng nhập email'),
+});
+
+export const resetPasswordSchema = Yup.object().shape({
+  newPassword: Yup.string()
+    .min(8, 'Mật khẩu phải có ít nhất 8 ký tự')
+    .matches(/[A-Z]/, 'Mật khẩu phải chứa ít nhất 1 chữ cái in hoa')
+    .matches(/[0-9]/, 'Mật khẩu phải chứa ít nhất 1 chữ số')
+    .required('Vui lòng nhập mật khẩu mới'),
+  confirmPassword: Yup.string()
+    .oneOf([Yup.ref('newPassword')], 'Mật khẩu xác nhận không khớp')
+    .required('Vui lòng xác nhận mật khẩu'),
+});
+
 export const registerSchema = Yup.object().shape({
   fullName: Yup.string()
     .trim()
