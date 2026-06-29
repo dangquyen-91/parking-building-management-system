@@ -31,6 +31,8 @@ import ManagerPaymentsPage from '../pages/manager/PaymentsPage';
 import ManagerStaffPage from '../pages/manager/StaffPage';
 import ManagerBookingsPage from '../pages/manager/BookingsPage';
 import ManagerParkingSessionsPage from '../pages/manager/ParkingSessionsPage';
+import ManagerParkingRowsPage from '../pages/manager/ParkingRowsPage';
+import ManagerSubscriptionsPage from '../pages/manager/SubscriptionsPage';
 import CheckInPage from '../pages/staff/CheckInPage';
 import CheckOutPage from '../pages/staff/CheckOutPage';
 import ActiveSessionsPage from '../pages/staff/ActiveSessionsPage';
@@ -142,9 +144,12 @@ export default function AppRoutes() {
       <Route path="/manager/payments" element={<ManagerRoute><ManagerPaymentsPage /></ManagerRoute>} />
       <Route path="/manager/bookings" element={<ManagerRoute><ManagerBookingsPage /></ManagerRoute>} />
       <Route path="/manager/parking-sessions" element={<ManagerRoute><ManagerParkingSessionsPage /></ManagerRoute>} />
+      <Route path="/manager/parking-rows" element={<ManagerRoute><ManagerParkingRowsPage /></ManagerRoute>} />
+      <Route path="/manager/subscriptions" element={<ManagerRoute><ManagerSubscriptionsPage /></ManagerRoute>} />
       <Route path="/manager/packages" element={<ManagerRoute><ManagerPackagesPage /></ManagerRoute>} />
       <Route path="/manager/users" element={<ManagerRoute><ManagerUsersPage /></ManagerRoute>} />
       <Route path="/manager/staff" element={<ManagerRoute><ManagerStaffPage /></ManagerRoute>} />
+      <Route path="/manager/reports" element={<ManagerRoute><AdminReportsPage /></ManagerRoute>} />
 
       <Route path="/staff" element={<Navigate to="/staff/check-in" replace />} />
       <Route path="/staff/check-in" element={<StaffRoute><CheckInPage /></StaffRoute>} />
