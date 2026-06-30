@@ -133,11 +133,21 @@ function SubscriptionCard({
         </div>
       </div>
 
-      <div className="mt-5 grid gap-3 sm:grid-cols-3">
+      <div className={`mt-5 grid gap-3 ${sub.vehicleType === 'car' ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
         {[
           { icon: Calendar, label: 'Bắt đầu',  value: renewedInto ? formatDate(renewedInto.startDate) : formatDate(sub.startDate) },
           { icon: Clock,    label: 'Kết thúc', value: renewedInto ? formatDate(renewedInto.endDate) : formatDate(sub.endDate) },
-          { icon: SquareParking, label: 'Ô đỗ xe', value: sub.slot?.slotCode ?? 'Chưa cấp' },
+          ...(sub.vehicleType === 'car'
+            ? [{
+                icon: SquareParking,
+                label: 'Ô đỗ xe',
+                value: sub.slot?.slotCode
+                  ? `Ô ${sub.slot.slotCode}`
+                  : sub.status === 'pending'
+                    ? 'Đang xử lý'
+                    : '—',
+              }]
+            : []),
         ].map(({ icon: Icon, label, value }) => (
           <div key={label} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
             <Icon className="mb-2 h-5 w-5 text-blue-600" />
