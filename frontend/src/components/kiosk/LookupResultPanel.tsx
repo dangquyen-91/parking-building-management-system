@@ -34,12 +34,25 @@ import {
 } from '../../services/kiosk.service';
 import { floorService, type Floor } from '../../services/floor.service';
 
+/** Phải khớp với EARLY_GRACE_MS trong backend/booking.service.js */
+const EARLY_GRACE_MS = 30 * 60 * 1000;
+
+type BookingCheckInStatus = {
+  canCheckIn: boolean;
+  label: string;
+  tone: 'green' | 'amber' | 'blue' | 'red' | 'slate';
+  /** true = đến sớm hơn 30 phút, backend sẽ bỏ qua booking và tạo session vãng lai */
+  forceWalkin?: boolean;
+  /** true = booking đã hết hạn, chỉ có thể vãng lai */
+  expired?: boolean;
+};
+
 type CheckInScenario =
   | { kind: 'resolving' }
   | { kind: 'error'; message: string }
   | { kind: 'already_in'; lookup: LookupApiResponse }
   | { kind: 'resident'; lookup: LookupApiResponse; subscription: ActiveSubscription; availableSlots: ParkingSlotApiItem[]; availableRows: ParkingRowApiItem[]; floors: Floor[] }
-  | { kind: 'booking'; lookup: LookupApiResponse; booking: BookingApiItem }
+  | { kind: 'booking'; lookup: LookupApiResponse; booking: BookingApiItem; bookingStatus: BookingCheckInStatus }
   | { kind: 'walkin'; lookup: LookupApiResponse; availableSlots: ParkingSlotApiItem[]; availableRows: ParkingRowApiItem[]; floors: Floor[]; isExpiredResident?: boolean };
 
 interface LookupResultPanelProps {
@@ -67,19 +80,39 @@ function formatFixedCarSlot(sub: ActiveSubscription, floors: Floor[]) {
   return `${slotCode} · Tầng ${floor.floorNumber}${floor.building?.name ? ` · ${floor.building.name}` : ''}`;
 }
 
-function getBookingCheckInState(booking: BookingApiItem) {
+function getBookingCheckInState(booking: BookingApiItem): BookingCheckInStatus {
   const now = Date.now();
   const start = booking.startTime ? new Date(booking.startTime).getTime() : Number.NaN;
   const end = booking.endTime ? new Date(booking.endTime).getTime() : Number.NaN;
 
-  if (booking.sessionId) return { canCheckIn: false, label: 'Đã check-in', tone: 'slate' as const };
-  if (booking.status === 'pending') return { canCheckIn: false, label: 'Chờ thanh toán', tone: 'amber' as const };
-  if (booking.status !== 'confirmed') return { canCheckIn: false, label: 'Không còn hiệu lực', tone: 'red' as const };
-  if (Number.isNaN(start) || Number.isNaN(end)) return { canCheckIn: false, label: 'Thiếu thời gian', tone: 'red' as const };
-  if (end < now) return { canCheckIn: false, label: 'Đã hết giờ', tone: 'red' as const };
-  if (start > now) return { canCheckIn: true, label: 'Tới sớm', tone: 'amber' as const };
+  if (booking.sessionId) return { canCheckIn: false, label: 'Đã check-in', tone: 'slate' };
+  if (booking.status === 'pending') return { canCheckIn: false, label: 'Chờ thanh toán', tone: 'amber' };
+  if (booking.status !== 'confirmed') return { canCheckIn: false, label: 'Không còn hiệu lực', tone: 'red' };
+  if (Number.isNaN(start) || Number.isNaN(end)) return { canCheckIn: false, label: 'Thiếu thời gian', tone: 'red' };
 
-  return { canCheckIn: true, label: 'Sẵn sàng check-in', tone: 'green' as const };
+  // Booking đã quá giờ kết thúc → chỉ có thể vãng lai
+  if (end < now) return { canCheckIn: false, label: 'Đã hết giờ', tone: 'red', expired: true };
+
+  // Đến SỚM HƠN 30 phút so với startTime:
+  // Backend (findActiveBookingByPlate) chỉ chấp nhận startTime <= now + 30min.
+  // Nếu start > now + 30min → backend KHÔNG tìm thấy booking → tạo session vãng lai → mất tiền.
+  // Vì vậy phải ngăn staff check-in theo kiểu booking trong khoảng này.
+  if (start > now + EARLY_GRACE_MS) {
+    const minutesUntilGrace = Math.ceil((start - EARLY_GRACE_MS - now) / 60000);
+    return {
+      canCheckIn: false,
+      label: `Đến quá sớm (còn ${minutesUntilGrace} phút)`,
+      tone: 'amber',
+      forceWalkin: true,
+    };
+  }
+
+  // Trong vùng grace (start <= now + 30min, end >= now) → check-in booking ok
+  if (start > now) {
+    return { canCheckIn: true, label: 'Tới sớm (trong 30 phút)', tone: 'green' };
+  }
+
+  return { canCheckIn: true, label: 'Sẵn sàng check-in', tone: 'green' };
 }
 
 function findDisplayBooking(bookings: BookingApiItem[]) {
@@ -318,7 +351,8 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
       if (!cancelled && bookingResult && bookingResult.data.length > 0) {
         const booking = findDisplayBooking(bookingResult.data);
         if (booking) {
-          if (!cancelled) setScenario({ kind: 'booking', lookup, booking });
+          const bookingStatus = getBookingCheckInState(booking);
+          if (!cancelled) setScenario({ kind: 'booking', lookup, booking, bookingStatus });
           return;
         }
       }
@@ -384,13 +418,12 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
     }
   }
 
-  async function handleBookingCheckIn(booking: BookingApiItem) {
+  async function handleBookingCheckIn(booking: BookingApiItem, bookingStatus: BookingCheckInStatus) {
     setIsSubmitting(true);
     setSubmitError(null);
     try {
-      const bookingState = getBookingCheckInState(booking);
-      if (!bookingState.canCheckIn) {
-        setSubmitError(`Booking ${bookingState.label.toLowerCase()}, chưa thể check-in.`);
+      if (!bookingStatus.canCheckIn) {
+        setSubmitError(`Booking ${bookingStatus.label.toLowerCase()}, chưa thể check-in.`);
         return;
       }
       const res = await checkIn({
@@ -405,6 +438,31 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
       setSubmitError(err instanceof Error ? err.message : 'Lỗi check-in booking.');
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  async function handleSwitchToWalkin() {
+    setSubmitError(null);
+    setScenario({ kind: 'resolving' });
+    try {
+      const [carVisitor, motorcycleVisitor] = await Promise.all([
+        getAvailabilityByFloorType('car', 'visitor'),
+        getAvailabilityByFloorType('motorcycle', 'visitor'),
+      ]);
+      setScenario({
+        kind: 'walkin',
+        lookup,
+        availableSlots: carVisitor.slots,
+        availableRows: motorcycleVisitor.rows,
+        floors: carVisitor.floors,
+      });
+      setSelectedRowId(motorcycleVisitor.rows[0]?.id ?? null);
+      setSelectedFloorId(carVisitor.floors[0]?.id ?? null);
+    } catch (err) {
+      setScenario({
+        kind: 'error',
+        message: err instanceof Error ? err.message : 'Không tải được danh sách chỗ trống vãng lai.',
+      });
     }
   }
 
@@ -601,24 +659,30 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
   }
 
   if (scenario.kind === 'booking') {
-    const { booking } = scenario;
-    const bookingState = getBookingCheckInState(booking);
+    const { booking, bookingStatus } = scenario;
+    const borderColor = bookingStatus.forceWalkin || bookingStatus.expired
+      ? 'border-amber-400/30'
+      : 'border-blue-400/20';
     return (
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        className="rounded-[28px] border border-blue-400/20 bg-[#0F172A]/80 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl"
+        className={`rounded-[28px] border ${borderColor} bg-[#0F172A]/80 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl`}
       >
         <div className="mb-5 flex items-start justify-between gap-3">
           <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-500/20">
-              <Calendar className="h-5 w-5 text-blue-400" />
+            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+              bookingStatus.forceWalkin || bookingStatus.expired ? 'bg-amber-500/20' : 'bg-blue-500/20'
+            }`}>
+              <Calendar className={`h-5 w-5 ${
+                bookingStatus.forceWalkin || bookingStatus.expired ? 'text-amber-400' : 'text-blue-400'
+              }`} />
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="font-bold text-white">Khách Đặt Trước</h3>
                 <Badge label="Có Booking" tone="blue" />
-                <Badge label={bookingState.label} tone={bookingState.tone} />
+                <Badge label={bookingStatus.label} tone={bookingStatus.tone} />
               </div>
               <p className="mt-0.5 text-sm text-slate-400">{booking.customerName || booking.customerEmail}</p>
             </div>
@@ -649,29 +713,82 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
 
         {submitError && <ErrorAlert message={submitError} />}
 
-        {bookingState.canCheckIn && bookingState.label === 'Tới sớm' && (
-          <div className="mb-3 rounded-xl border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-xs leading-5 text-amber-300">
-            Khách đến sớm hơn giờ booking. Nếu bãi còn chỗ, nhân viên có thể cho check-in như xe vãng lai theo tầng đã đặt.
+        {/* ── Đến QUÁ SỚM (> 30 phút trước startTime) ── */}
+        {bookingStatus.forceWalkin && (
+          <div className="mb-4 rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-xs leading-5">
+            <p className="font-semibold text-amber-300 flex items-center gap-1.5">
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+              Khách đến sớm hơn 30 phút so với giờ đặt
+            </p>
+            <p className="mt-1 text-amber-400/80">
+              Hệ thống backend chỉ nhận check-in booking trong vòng <strong>30 phút</strong> trước giờ hẹn.
+              Nếu check-in ngay bây giờ, backend sẽ <strong className="text-red-400">bỏ qua booking</strong> và
+              tạo phiên vãng lai — khách sẽ bị tính phí vãng lai và mất tiền đặt trước.
+            </p>
+            <p className="mt-1.5 font-medium text-amber-300">
+              → Để tránh mất tiền: yêu cầu khách đợi đến trong vòng 30 phút trước giờ hẹn,
+              hoặc check-in vãng lai dưới đây.
+            </p>
           </div>
         )}
 
-        {!bookingState.canCheckIn && (
+        {/* ── Booking ĐÃ HẾT HẠN ── */}
+        {bookingStatus.expired && (
+          <div className="mb-4 rounded-xl border border-red-400/30 bg-red-400/10 px-4 py-3 text-xs leading-5">
+            <p className="font-semibold text-red-300 flex items-center gap-1.5">
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+              Booking đã hết hạn — không thể check-in theo booking
+            </p>
+            <p className="mt-1 text-red-400/80">
+              Giờ kết thúc của booking đã qua. Nếu khách vẫn muốn vào bãi,
+              chỉ có thể check-in theo diện <strong>vãng lai</strong> và trả phí theo giờ thực tế.
+            </p>
+          </div>
+        )}
+
+        {/* ── Trong grace period, đến sớm hợp lệ ── */}
+        {bookingStatus.canCheckIn && bookingStatus.label.startsWith('Tới sớm') && (
+          <div className="mb-3 rounded-xl border border-green-400/20 bg-green-400/5 px-4 py-3 text-xs leading-5 text-green-300">
+            Khách đến sớm nhưng trong vùng 30 phút cho phép. Backend sẽ nhận diện và check-in theo booking.
+          </div>
+        )}
+
+        {/* ── Trạng thái khác không cho check-in (pending, cancelled…) ── */}
+        {!bookingStatus.canCheckIn && !bookingStatus.forceWalkin && !bookingStatus.expired && (
           <div className="mb-3 rounded-xl border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-xs leading-5 text-amber-300">
             Biển số này đã có booking trong hệ thống, nhưng chỉ có thể check-in khi booking đã thanh toán thành công và chưa hết hạn.
           </div>
         )}
 
-        <motion.button
-          whileHover={{ scale: 1.01 }}
-          whileTap={{ scale: 0.98 }}
-          disabled={isSubmitting || !bookingState.canCheckIn}
-          onClick={() => handleBookingCheckIn(booking)}
-          className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 py-3.5 font-semibold text-white shadow-[0_4px_20px_rgba(37,99,235,0.25)] transition-all hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-        >
-          {isSubmitting
-            ? <><Loader2 className="h-4 w-4 animate-spin" /> Đang xử lý…</>
-            : <><CheckCircle2 className="h-4 w-4" /> Xác Nhận & Check-In Khách Đặt Trước</>}
-        </motion.button>
+        {/* Nút check-in booking — chỉ hiện khi có thể check-in */}
+        {!bookingStatus.forceWalkin && !bookingStatus.expired && (
+          <motion.button
+            whileHover={{ scale: 1.01 }}
+            whileTap={{ scale: 0.98 }}
+            disabled={isSubmitting || !bookingStatus.canCheckIn}
+            onClick={() => handleBookingCheckIn(booking, bookingStatus)}
+            className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 py-3.5 font-semibold text-white shadow-[0_4px_20px_rgba(37,99,235,0.25)] transition-all hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {isSubmitting
+              ? <><Loader2 className="h-4 w-4 animate-spin" /> Đang xử lý…</>
+              : <><CheckCircle2 className="h-4 w-4" /> Xác Nhận & Check-In Khách Đặt Trước</>}
+          </motion.button>
+        )}
+
+        {/* Nút chuyển vãng lai — hiện khi đến quá sớm hoặc booking hết hạn */}
+        {(bookingStatus.forceWalkin || bookingStatus.expired) && (
+          <motion.button
+            whileHover={{ scale: 1.01 }}
+            whileTap={{ scale: 0.98 }}
+            disabled={isSubmitting}
+            onClick={handleSwitchToWalkin}
+            className="w-full rounded-xl border border-amber-400/30 bg-amber-500/10 py-3.5 font-semibold text-amber-300 transition-all hover:bg-amber-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {isSubmitting
+              ? <><Loader2 className="h-4 w-4 animate-spin" /> Đang tải…</>
+              : <><CheckCircle2 className="h-4 w-4" /> Chuyển sang Check-In Vãng Lai</>}
+          </motion.button>
+        )}
       </motion.div>
     );
   }

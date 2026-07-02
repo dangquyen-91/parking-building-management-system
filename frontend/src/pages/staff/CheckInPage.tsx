@@ -43,8 +43,8 @@ function InfoCard({ icon: Icon, label, value, tone = 'blue' }: {
 const HOW_TO = [
   { step: '1', text: 'Nhập biển số xe vào ô tìm kiếm (tự động IN HOA)' },
   { step: '2', text: 'Bấm Enter hoặc nút Tra Cứu' },
-  { step: '3', text: 'Chọn hành động phù hợp (Cư dân / Đặt trước / Vãng lai)' },
-  { step: '4', text: 'Xác nhận — hệ thống ghi nhận giờ vào tự động' },
+  { step: '3', text: 'Hệ thống tự phân loại: Cư dân / Đặt trước / Vãng lai' },
+  { step: '4', text: 'Xác nhận hành động phù hợp — hệ thống ghi nhận giờ vào tự động' },
 ];
 
 export default function CheckInPage() {
@@ -217,6 +217,14 @@ export default function CheckInPage() {
                 <li>⚪ <strong className="text-slate-400">Vãng lai</strong> – Không có gói, không có booking</li>
                 <li>🔴 <strong className="text-red-400">Đang trong bãi</strong> – Không thể check-in lại</li>
               </ul>
+              <div className="mt-3 border-t border-white/5 pt-3">
+                <strong className="text-amber-400">⚠️ Lưu ý grace period 30 phút:</strong>
+                <ul className="mt-1.5 space-y-1">
+                  <li>🟢 Đến trong vòng <strong className="text-white">30 phút trước giờ hẹn</strong> → check-in được theo booking</li>
+                  <li>🟡 Đến <strong className="text-white">sớm hơn 30 phút</strong> → backend bỏ qua booking → <strong className="text-red-400">chỉ được vãng lai</strong></li>
+                  <li>🔴 Đến sau giờ kết thúc booking → booking expired → <strong className="text-red-400">chỉ được vãng lai</strong></li>
+                </ul>
+              </div>
             </div>
           </motion.div>
         </div>
