@@ -19,6 +19,7 @@ import { cn } from '../../lib/utils';
 import { buildingService, type Building } from '../../services/building.service';
 import { floorService, type Floor } from '../../services/floor.service';
 import { slotService, type ParkingSlot, type SlotStatus } from '../../services/slot.service';
+import { getActiveSessions } from '../../services/kiosk.service';
 import type { ParkingRowApiItem } from '../../types/kiosk';
 
 const API_BASE_URL = 'http://localhost:5000/api/v1';
@@ -46,6 +47,8 @@ interface FloorData {
   floor: Floor;
   slots: ParkingSlot[];
   rows: ParkingRowApiItem[];
+  // Số phiên đang hoạt động của tầng — dùng cho tầng ô tô vãng lai (đếm theo tầng).
+  activeCount?: number;
   loading: boolean;
   error: string | null;
 }
@@ -79,12 +82,32 @@ function Legend() {
   );
 }
 
-function FloorStats({ slots, rows, vehicleType }: {
+function FloorStats({ slots, rows, floor, activeCount }: {
   slots: ParkingSlot[];
   rows: ParkingRowApiItem[];
-  vehicleType: 'car' | 'motorcycle';
+  floor: Floor;
+  activeCount?: number;
 }) {
-  if (vehicleType === 'car') {
+  if (floor.vehicleType === 'car') {
+    // Tầng vãng lai "đếm theo tầng": đang dùng = số phiên active, không theo trạng thái slot.
+    if (floor.floorType === 'visitor') {
+      const total = floor.totalSlots;
+      const occupied = activeCount ?? 0;
+      const empty = Math.max(0, total - occupied);
+      const pct = total > 0 ? Math.round((occupied / total) * 100) : 0;
+      return (
+        <div className="flex flex-wrap items-center gap-3 text-xs">
+          <span className="text-slate-500">{total} ô</span>
+          <span className="text-emerald-400">●&nbsp;{empty} trống</span>
+          <span className="text-blue-400">●&nbsp;{occupied} đang dùng</span>
+          <span className={cn('ml-auto font-bold', pct >= 90 ? 'text-red-400' : pct >= 60 ? 'text-amber-400' : 'text-emerald-400')}>
+            {pct}% lấp đầy
+          </span>
+        </div>
+      );
+    }
+
+    // Tầng cư dân: mỗi xe có slot cố định → theo trạng thái slot vật lý.
     const total = slots.length;
     const empty = slots.filter(s => s.status === 'empty').length;
     const occupied = slots.filter(s => s.status === 'occupied').length;
@@ -160,16 +183,12 @@ function CarResidentFloorGrid({ slots, onSelectSlot }: {
   );
 }
 
-function CarVisitorFloorGrid({ slots, floor }: { slots: ParkingSlot[]; floor: Floor }) {
-  // Visitor car: backend đếm theo tầng, không phân slot vật lý
-  // slots có thể có (legacy) hoặc rỗng — hiển thị dạng counter
+function CarVisitorFloorGrid({ floor, activeCount }: { floor: Floor; activeCount: number }) {
+  // Visitor car: backend đếm theo tầng (số phiên đang hoạt động), không phân slot vật lý.
   const total = floor.totalSlots;
-  const legacyOccupied = slots.filter(s => s.status === 'occupied').length;
-  const legacyEmpty = slots.filter(s => s.status === 'empty').length;
-
-  // Nếu có slot legacy, hiển thị chúst; nếu không, chỉ hiển total
-  const usedDisplay = legacyOccupied > 0 ? legacyOccupied : null;
-  const pct = total > 0 && usedDisplay !== null ? Math.round((usedDisplay / total) * 100) : null;
+  const used = activeCount;
+  const empty = Math.max(0, total - used);
+  const pct = total > 0 ? Math.round((used / total) * 100) : 0;
 
   return (
     <div className="rounded-2xl border border-blue-400/20 bg-blue-400/5 p-5">
@@ -190,22 +209,20 @@ function CarVisitorFloorGrid({ slots, floor }: { slots: ParkingSlot[]; floor: Fl
         </div>
       </div>
 
-      {pct !== null && (
-        <div className="mt-4">
-          <div className="flex justify-between text-xs text-slate-500 mb-1">
-            <span>{usedDisplay} đang dùng / {legacyEmpty} trống</span>
-            <span className={cn('font-bold', pct >= 90 ? 'text-red-400' : pct >= 60 ? 'text-amber-400' : 'text-emerald-400')}>
-              {pct}%
-            </span>
-          </div>
-          <div className="h-2 w-full rounded-full bg-white/[0.06] overflow-hidden">
-            <div
-              className={cn('h-full rounded-full transition-all', pct >= 90 ? 'bg-red-500' : pct >= 60 ? 'bg-amber-400' : 'bg-emerald-400')}
-              style={{ width: `${pct}%` }}
-            />
-          </div>
+      <div className="mt-4">
+        <div className="flex justify-between text-xs text-slate-500 mb-1">
+          <span>{used} đang dùng / {empty} trống</span>
+          <span className={cn('font-bold', pct >= 90 ? 'text-red-400' : pct >= 60 ? 'text-amber-400' : 'text-emerald-400')}>
+            {pct}%
+          </span>
         </div>
-      )}
+        <div className="h-2 w-full rounded-full bg-white/[0.06] overflow-hidden">
+          <div
+            className={cn('h-full rounded-full transition-all', pct >= 90 ? 'bg-red-500' : pct >= 60 ? 'bg-amber-400' : 'bg-emerald-400')}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      </div>
     </div>
   );
 }
@@ -265,7 +282,7 @@ function FloorPanel({
   onSelectSlot: (detail: SlotDetail) => void;
 }) {
   const [open, setOpen] = useState(true);
-  const { floor, slots, rows, loading, error } = data;
+  const { floor, slots, rows, activeCount, loading, error } = data;
   const isCar = floor.vehicleType === 'car';
   const isResidentCar = isCar && floor.floorType === 'resident';
   const isVisitorCar = isCar && floor.floorType === 'visitor';
@@ -303,7 +320,7 @@ function FloorPanel({
           </p>
           {!loading && !error && (
             <div className="mt-1 pr-4">
-              <FloorStats slots={slots} rows={rows} vehicleType={floor.vehicleType} />
+              <FloorStats slots={slots} rows={rows} floor={floor} activeCount={activeCount} />
             </div>
           )}
         </div>
@@ -335,7 +352,7 @@ function FloorPanel({
                 isResidentCar
                   ? <CarResidentFloorGrid slots={slots} onSelectSlot={onSelectSlot} />
                   : isVisitorCar
-                  ? <CarVisitorFloorGrid slots={slots} floor={floor} />
+                  ? <CarVisitorFloorGrid floor={floor} activeCount={activeCount ?? 0} />
                   : <MotoFloorGrid rows={rows} />
               )}
             </div>
@@ -475,7 +492,7 @@ export default function ParkingMapPage() {
   const POLL_INTERVAL = 30; // seconds
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const allFloorsRef = useRef<typeof import('../../services/floor.service').Floor[] | any[]>([]);
+  const allFloorsRef = useRef<Floor[]>([]);
 
   const loadAll = useCallback(async () => {
     setPageLoading(true);
@@ -514,10 +531,16 @@ export default function ParkingMapPage() {
         try {
           let slots: ParkingSlot[] = [];
           let rows: ParkingRowApiItem[] = [];
+          let activeCount: number | undefined;
 
           if (floor.vehicleType === 'car') {
             const res = await slotService.getSlots({ floorId: floor.id, limit: 200 });
             slots = res.slots;
+            // Tầng ô tô vãng lai đếm theo số phiên đang hoạt động, không theo trạng thái slot.
+            if (floor.floorType === 'visitor') {
+              const active = await getActiveSessions({ floorId: floor.id, limit: 1 });
+              activeCount = active.pagination.total;
+            }
           } else {
             rows = await fetchRows(floor.id);
           }
@@ -528,7 +551,7 @@ export default function ParkingMapPage() {
             next.set(
               floor.buildingId,
               list.map(fd =>
-                fd.floor.id === floor.id ? { ...fd, slots, rows, loading: false } : fd,
+                fd.floor.id === floor.id ? { ...fd, slots, rows, activeCount, loading: false } : fd,
               ),
             );
             return next;
@@ -569,9 +592,14 @@ export default function ParkingMapPage() {
           try {
             let slots: ParkingSlot[] = [];
             let rows: ParkingRowApiItem[] = [];
+            let activeCount: number | undefined;
             if (floor.vehicleType === 'car') {
               const res = await slotService.getSlots({ floorId: floor.id, limit: 200 });
               slots = res.slots;
+              if (floor.floorType === 'visitor') {
+                const active = await getActiveSessions({ floorId: floor.id, limit: 1 });
+                activeCount = active.pagination.total;
+              }
             } else {
               rows = await fetchRows(floor.id);
             }
@@ -579,7 +607,7 @@ export default function ParkingMapPage() {
               const next = new Map(prev);
               const list = next.get(floor.buildingId) ?? [];
               next.set(floor.buildingId, list.map(fd =>
-                fd.floor.id === floor.id ? { ...fd, slots, rows, loading: false, error: null } : fd
+                fd.floor.id === floor.id ? { ...fd, slots, rows, activeCount, loading: false, error: null } : fd
               ));
               return next;
             });

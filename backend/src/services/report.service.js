@@ -405,8 +405,36 @@ export const getOccupancy = async () => {
     ],
   });
 
+  // Đếm số phiên đang hoạt động theo tầng — nguồn đúng cho tầng ô tô vãng lai
+  // (check-in vãng lai không gán slot vật lý nên không thể suy ra từ trạng thái slot).
+  const activeRows = await ParkingSession.findAll({
+    where: { status: 'active' },
+    attributes: ['floorId', [fn('COUNT', col('id')), 'cnt']],
+    group: ['floorId'],
+    raw: true,
+  });
+  const activeByFloor = new Map(activeRows.map((r) => [r.floorId, Number(r.cnt)]));
+
   return floors.map((floor) => {
     if (floor.vehicleType === 'car') {
+      // Tầng vãng lai "đếm theo tầng": số xe = số phiên đang hoạt động, sức chứa = floor.totalSlots.
+      if (floor.floorType === 'visitor') {
+        const totalSlots = floor.totalSlots;
+        const occupied = activeByFloor.get(floor.id) || 0;
+        const available = Math.max(0, totalSlots - occupied);
+        return {
+          floorId: floor.id,
+          floorNumber: floor.floorNumber,
+          vehicleType: 'car',
+          floorType: floor.floorType,
+          totalSlots,
+          occupied,
+          reserved: 0,
+          available,
+          occupancyRate: totalSlots > 0 ? Math.round((occupied / totalSlots) * 10000) / 100 : 0,
+        };
+      }
+      // Tầng cư dân: mỗi xe có slot cố định → suy từ trạng thái slot vật lý.
       const totalSlots = floor.slots.length;
       const occupied = floor.slots.filter((s) => s.status === 'occupied').length;
       const reserved = floor.slots.filter((s) => s.status === 'reserved').length;
