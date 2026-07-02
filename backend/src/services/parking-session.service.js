@@ -270,10 +270,9 @@ const getActiveSessions = async ({ page = 1, limit = 10, floorId, buildingId, ve
   const slotWhere = {};
   const rowWhere = {};
   const floorWhere = {};
-  if (floorId) {
-    slotWhere.floorId = floorId;
-    rowWhere.floorId = floorId;
-  }
+  // Lọc theo tầng dựa trên session.floorId (được gán cho mọi phiên lúc check-in) thay vì
+  // qua slot/row — vì phiên ô tô vãng lai không có slot/row nên lọc qua slot.floorId sẽ bỏ sót.
+  if (floorId) where.floorId = floorId;
   if (buildingId) floorWhere.buildingId = buildingId;
 
   const { count, rows } = await ParkingSession.findAndCountAll({
