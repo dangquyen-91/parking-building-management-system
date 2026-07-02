@@ -44,6 +44,8 @@ const runMigrations = async () => {
     `ALTER TABLE users ADD COLUMN emailVerificationTokenExpires DATETIME DEFAULT NULL`,
     `ALTER TABLE users ADD COLUMN passwordResetToken VARCHAR(255) DEFAULT NULL`,
     `ALTER TABLE users ADD COLUMN passwordResetTokenExpires DATETIME DEFAULT NULL`,
+    // floorNumber chuyển sang mã chuỗi (B1/B2/A1/A2...). MODIFY về đúng kiểu nên chạy lại vô hại.
+    `ALTER TABLE floors MODIFY COLUMN floorNumber VARCHAR(20) NOT NULL`,
   ];
   for (const sql of migrations) {
     try {
