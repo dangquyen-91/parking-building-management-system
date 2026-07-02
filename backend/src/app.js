@@ -21,7 +21,6 @@ import bookingRoutes from './routes/booking.routes.js';
 import vehicleRoutes from './routes/vehicle.routes.js';
 import reportRoutes from './routes/report.routes.js';
 import errorHandler from './middlewares/error.middleware.js';
-import { apiLimiter } from './middlewares/rateLimiter.middleware.js';
 import { expireBookings } from './services/booking.service.js';
 import { expireSubscriptions } from './services/subscription.service.js';
 
@@ -47,7 +46,6 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, { explorer: true }));
 
-app.use('/api/v1', apiLimiter);
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/buildings', buildingRoutes);
