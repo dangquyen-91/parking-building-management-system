@@ -29,7 +29,7 @@ export interface BookingCreateResult {
   };
   floor: {
     id: number;
-    floorNumber: number;
+    floorNumber: string;
   };
 }
 
@@ -57,7 +57,7 @@ export interface Booking {
   updatedAt: string;
   floor?: {
     id: number;
-    floorNumber: number;
+    floorNumber: string;
     buildingId: number;
   };
   user?: {

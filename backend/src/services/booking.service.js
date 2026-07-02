@@ -120,38 +120,15 @@ const resolveCustomer = async (body, requester, t) => {
   };
 };
 
-const ensureResidentBooksOwnPlate = async (requester, plate, t) => {
-  if (!requester) return;
-  const now = new Date();
-  const subs = await ResidentSubscription.findAll({
-    where: {
-      userId: requester.id,
-      status: 'active',
-      endDate: { [Op.gt]: now },
-    },
-    attributes: ['licensePlate'],
-    transaction: t,
-  });
-  if (subs.length === 0) return;
-  const ownPlates = subs.map((s) => s.licensePlate);
-  if (!ownPlates.includes(plate)) {
-    throw new AppError(
-      `Cư dân chỉ được book cho biển số đã có gói: ${ownPlates.join(', ')}. Không thể book hộ plate khác.`,
-      403
-    );
-  }
-};
-
 export const createBooking = async ({ body, requester, ipAddr }) => {
   return sequelize
     .transaction(async (t) => {
       const plate = normalizePlate(body.licensePlate);
       validateTimeWindow(body.startTime, body.endTime);
 
-      await ensureResidentBooksOwnPlate(requester, plate, t);
-
       // Biển đã có gói cư dân (bất kỳ loại xe) → không cho booking vãng lai.
-      // Check-in tầng visitor sẽ chặn biển có sub, nên booking này là "ảo" + tiền kẹt.
+      // Áp dụng cho MỌI người đặt (guest/user/cư dân đặt hộ). Check-in tầng visitor
+      // cũng chặn biển có sub, nên booking này sẽ "ảo" + tiền kẹt.
       const subbedPlate = await ResidentSubscription.findOne({
         where: { licensePlate: plate, status: 'active', endDate: { [Op.gt]: new Date() } },
         transaction: t,
@@ -161,6 +138,15 @@ export const createBooking = async ({ body, requester, ipAddr }) => {
           `Biển ${plate} đã có gói cư dân đang hoạt động — vào thẳng tầng cư dân, không cần booking vãng lai.`,
           409
         );
+      }
+
+      // Biển đang trong bãi (đã check-in, session active) → không cho booking.
+      const parkedNow = await ParkingSession.findOne({
+        where: { licensePlate: plate, status: 'active' },
+        transaction: t,
+      });
+      if (parkedNow) {
+        throw new AppError(`Biển ${plate} đang trong bãi (session #${parkedNow.id}), không thể booking.`, 409);
       }
 
       const floor = await findVisitorCarFloor(body.floorId, t);

@@ -12,7 +12,7 @@ export interface FloorBuilding {
 export interface Floor {
   id: number;
   buildingId: number;
-  floorNumber: number;
+  floorNumber: string;
   vehicleType: VehicleType;
   floorType: FloorType;
   totalSlots: number;
@@ -25,7 +25,7 @@ export interface Floor {
 
 export interface FloorPayload {
   buildingId?: number;
-  floorNumber: number;
+  floorNumber: string;
   vehicleType: VehicleType;
   floorType: FloorType;
   totalSlots: number;

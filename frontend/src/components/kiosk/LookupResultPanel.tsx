@@ -30,6 +30,7 @@ import {
   searchBookingsByPlate,
   getAvailableSlots,
   getAvailableRows,
+  getActiveSessions,
   checkIn,
 } from '../../services/kiosk.service';
 import { floorService, type Floor } from '../../services/floor.service';
@@ -53,7 +54,7 @@ type CheckInScenario =
   | { kind: 'already_in'; lookup: LookupApiResponse }
   | { kind: 'resident'; lookup: LookupApiResponse; subscription: ActiveSubscription; availableSlots: ParkingSlotApiItem[]; availableRows: ParkingRowApiItem[]; floors: Floor[] }
   | { kind: 'booking'; lookup: LookupApiResponse; booking: BookingApiItem; bookingStatus: BookingCheckInStatus }
-  | { kind: 'walkin'; lookup: LookupApiResponse; availableSlots: ParkingSlotApiItem[]; availableRows: ParkingRowApiItem[]; floors: Floor[]; isExpiredResident?: boolean };
+  | { kind: 'walkin'; lookup: LookupApiResponse; availableSlots: ParkingSlotApiItem[]; availableRows: ParkingRowApiItem[]; floors: Floor[]; freeByFloor: Record<number, number>; isExpiredResident?: boolean };
 
 interface LookupResultPanelProps {
   lookup: LookupApiResponse;
@@ -131,25 +132,40 @@ function findDisplayBooking(bookings: BookingApiItem[]) {
 async function getAvailabilityByFloorType(vehicleType: VehicleType, floorType: 'resident' | 'visitor') {
   const floorsRes = await floorService.getFloors({ vehicleType, isActive: true, page: 1, limit: 100 });
   const floors = floorsRes.floors.filter((floor) => floor.floorType === floorType);
-  const floorIds = new Set(floors.map((floor) => floor.id));
 
   if (vehicleType === 'car') {
+    const freeByFloor: Record<number, number> = {};
+
+    if (floorType === 'visitor') {
+      // Tầng ô tô vãng lai "đếm theo tầng": chỗ trống = totalSlots − số phiên đang hoạt động,
+      // KHÔNG đếm slot vật lý (loại tầng này không gán slot cho từng xe).
+      await Promise.all(
+        floors.map(async (floor) => {
+          const active = await getActiveSessions({ floorId: floor.id, limit: 1 });
+          freeByFloor[floor.id] = Math.max(0, Number(floor.totalSlots) - active.pagination.total);
+        })
+      );
+      return { slots: [] as ParkingSlotApiItem[], rows: [] as ParkingRowApiItem[], floors, freeByFloor };
+    }
+
+    // Tầng ô tô cư dân: dùng slot vật lý cố định.
     const slotResults = await Promise.all(
       floors.map((floor) => getAvailableSlots('car', { floorId: floor.id, limit: 100 }))
     );
-
-    return {
-      slots: slotResults.flatMap((result) => result.data),
-      rows: [] as ParkingRowApiItem[],
-      floors,
-    };
+    floors.forEach((floor, idx) => { freeByFloor[floor.id] = slotResults[idx].data.length; });
+    return { slots: slotResults.flatMap((result) => result.data), rows: [] as ParkingRowApiItem[], floors, freeByFloor };
   }
 
-  const spotsRes = await getAvailableRows();
+  // Xe máy: lấy hàng trống THEO TỪNG TẦNG (tránh bị cắt bởi limit mặc định của API và
+  // tránh lọc sai khi rowCode của tầng khác xếp trước).
+  const rowResults = await Promise.all(
+    floors.map((floor) => getAvailableRows({ floorId: floor.id, limit: 100 }))
+  );
   return {
     slots: [] as ParkingSlotApiItem[],
-    rows: (spotsRes.data as ParkingRowApiItem[]).filter((row) => floorIds.has(row.floorId)),
+    rows: rowResults.flatMap((result) => result.data),
     floors,
+    freeByFloor: {} as Record<number, number>,
   };
 }
 
@@ -369,6 +385,7 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
             availableSlots: carVisitor.slots,
             availableRows: motorcycleVisitor.rows,
             floors: carVisitor.floors,
+            freeByFloor: carVisitor.freeByFloor,
             isExpiredResident,
           });
           setSelectedRowId(motorcycleVisitor.rows[0]?.id ?? null);
@@ -455,6 +472,7 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
         availableSlots: carVisitor.slots,
         availableRows: motorcycleVisitor.rows,
         floors: carVisitor.floors,
+        freeByFloor: carVisitor.freeByFloor,
       });
       setSelectedRowId(motorcycleVisitor.rows[0]?.id ?? null);
       setSelectedFloorId(carVisitor.floors[0]?.id ?? null);
@@ -794,7 +812,7 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
   }
 
   if (scenario.kind === 'walkin') {
-    const { availableSlots, availableRows, floors, isExpiredResident } = scenario;
+    const { availableSlots, availableRows, floors, freeByFloor, isExpiredResident } = scenario;
     return (
       <motion.div
         initial={{ opacity: 0, y: 12 }}
@@ -875,7 +893,7 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
               {floors.length ? (
                 <div className="grid grid-cols-2 gap-2 max-h-44 overflow-y-auto pr-1">
                   {floors.map((f) => {
-                    const availableOnFloor = availableSlots.filter(s => s.floorId === f.id).length;
+                    const availableOnFloor = freeByFloor[f.id] ?? 0;
                     return (
                       <button
                         key={f.id}

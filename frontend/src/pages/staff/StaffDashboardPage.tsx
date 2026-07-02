@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Activity,
   Car,
-  Clock3,
   LogIn,
   LogOut,
   Motorbike,
@@ -28,8 +27,7 @@ import {
   YAxis,
 } from 'recharts';
 import { KioskLayout } from '../../components/kiosk/KioskLayout';
-import { cn } from '../../lib/utils';
-import { getActiveSessions } from '../../services/kiosk.service';
+import { cn, compareFloorCode } from '../../lib/utils';
 import { floorService, type Floor } from '../../services/floor.service';
 import { slotService } from '../../services/slot.service';
 import type { ActiveSessionApiItem, ParkingRowApiItem } from '../../types/kiosk';
@@ -49,13 +47,6 @@ async function fetchRows(params?: Record<string, string>): Promise<ParkingRowApi
   return json.data as ParkingRowApiItem[];
 }
 
-const formatCurrency = (v: number) =>
-  v >= 1_000_000
-    ? `${(v / 1_000_000).toFixed(1)}M`
-    : v >= 1_000
-    ? `${(v / 1_000).toFixed(0)}K`
-    : String(v);
-
 const formatTime = (iso: string) =>
   new Date(iso).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
 
@@ -71,7 +62,7 @@ const formatDuration = (iso: string) => {
 
 interface FloorOccupancy {
   floorId: number;
-  floorNumber: number;
+  floorNumber: string;
   vehicleType: 'car' | 'motorcycle';
   floorType: 'resident' | 'visitor';
   buildingName: string;
@@ -163,7 +154,10 @@ function SectionHeader({ label, title, badge }: { label: string; title: string; 
 
 // ─── Custom Tooltips for Recharts (Ensures white text and readability on dark theme) ───
 
-const CustomTooltip = ({ active, payload }: any) => {
+type ChartTooltipEntry<P> = { value: number; name?: string; payload: P };
+type ChartTooltipProps<P> = { active?: boolean; payload?: ChartTooltipEntry<P>[] };
+
+const CustomTooltip = ({ active, payload }: ChartTooltipProps<{ fullName: string; color: string; used: number; capacity: number }>) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
     return (
@@ -182,7 +176,7 @@ const CustomTooltip = ({ active, payload }: any) => {
   return null;
 };
 
-const VehicleTooltip = ({ active, payload }: any) => {
+const VehicleTooltip = ({ active, payload }: ChartTooltipProps<{ color: string }>) => {
   if (active && payload && payload.length) {
     const data = payload[0];
     return (
@@ -200,7 +194,7 @@ const VehicleTooltip = ({ active, payload }: any) => {
   return null;
 };
 
-const PeakTooltip = ({ active, payload }: any) => {
+const PeakTooltip = ({ active, payload }: ChartTooltipProps<{ hour: string }>) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
     return (
@@ -540,7 +534,7 @@ export default function StaffDashboardPage() {
         occupancyResults
           .filter((r): r is PromiseFulfilledResult<FloorOccupancy> => r.status === 'fulfilled')
           .map(r => r.value)
-          .sort((a, b) => a.floorNumber - b.floorNumber)
+          .sort((a, b) => compareFloorCode(a.floorNumber, b.floorNumber))
       );
 
       // ── Peak hours: derive from active sessions entry times (approximation)

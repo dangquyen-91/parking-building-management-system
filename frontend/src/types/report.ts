@@ -54,7 +54,7 @@ export interface SubscriptionStats {
 
 export interface FloorOccupancy {
   floorId: number;
-  floorNumber: number;
+  floorNumber: string;
   vehicleType: VehicleType;
   floorType: string;
   occupied: number;
