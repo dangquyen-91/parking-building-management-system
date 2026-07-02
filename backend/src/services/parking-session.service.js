@@ -8,8 +8,10 @@ import Building from '../models/building.model.js';
 import User from '../models/user.model.js';
 import ResidentSubscription from '../models/resident-subscription.model.js';
 import SessionPayment from '../models/session-payment.model.js';
+import IncidentReport from '../models/incident-report.model.js';
 import AppError from '../utils/appError.js';
 import { calculateFee, calculateExcessFee } from './pricing.service.js';
+import { LOST_TICKET_PENALTY } from '../constants/pricing.js';
 import * as vnpayService from './vnpay.service.js';
 
 const slotInclude = (slotWhere, floorWhere) => ({
@@ -538,7 +540,7 @@ const previewCheckout = async (id) => {
   };
 };
 
-const checkOutCash = async (id, staffId) => {
+const checkOutCash = async (id, staffId, { lostTicket = false, lostTicketNote = null } = {}) => {
   return sequelize.transaction(async (t) => {
     const session = await ParkingSession.findByPk(id, { transaction: t, lock: t.LOCK.UPDATE });
     if (!session) throw new AppError('Session not found', 404);
@@ -550,8 +552,19 @@ const checkOutCash = async (id, staffId) => {
     const exitTime = new Date();
     const { fee, covered, coveredBy, breakdown } = await resolveFee(session, floorType, t, exitTime);
 
+    // Mất vé: chỉ áp dụng cho vãng lai. Cư dân tra lịch sử trong tài khoản / khôi phục nick.
+    if (lostTicket && floorType === 'resident') {
+      throw new AppError(
+        'Phạt mất vé chỉ áp dụng cho khách vãng lai. Cư dân tra lịch sử trong tài khoản hoặc khôi phục mật khẩu.',
+        400
+      );
+    }
+
+    const penaltyAmount = lostTicket ? LOST_TICKET_PENALTY : 0;
+    const totalFee = Number(fee) + penaltyAmount;
+
     await session.update(
-      { status: 'completed', exitTime, fee, paymentStatus: 'paid' },
+      { status: 'completed', exitTime, fee: totalFee, paymentStatus: 'paid' },
       { transaction: t }
     );
 
@@ -563,17 +576,33 @@ const checkOutCash = async (id, staffId) => {
     );
 
     let payment = null;
-    if (!(covered && coveredBy === 'subscription')) {
+    if (!(covered && coveredBy === 'subscription') || penaltyAmount > 0) {
+      const infoSuffix = penaltyAmount > 0 ? ' (phat mat ve)' : '';
       payment = await SessionPayment.create(
         {
           orderId: generateSessionOrderId(),
           provider: 'vnpay',
           paymentMethod: 'cash',
-          amount: fee,
-          orderInfo: `Phi gui xe ${session.vehicleType} ${session.licensePlate}`.replace(/[^\x20-\x7E]/g, ''),
+          amount: totalFee,
+          orderInfo: `Phi gui xe ${session.vehicleType} ${session.licensePlate}${infoSuffix}`.replace(/[^\x20-\x7E]/g, ''),
           status: 'success',
           sessionId: session.id,
           paidAt: exitTime,
+        },
+        { transaction: t }
+      );
+    }
+
+    if (lostTicket) {
+      await IncidentReport.create(
+        {
+          type: 'lost_ticket',
+          sessionId: session.id,
+          licensePlate: session.licensePlate,
+          floorId: session.floorId,
+          staffId,
+          penaltyAmount,
+          note: lostTicketNote || null,
         },
         { transaction: t }
       );
@@ -588,7 +617,10 @@ const checkOutCash = async (id, staffId) => {
       entryTime: session.entryTime,
       exitTime,
       durationMinutes,
-      fee,
+      fee: totalFee,
+      parkingFee: Number(fee),
+      penaltyAmount,
+      lostTicket,
       covered,
       coveredBy,
       paymentMethod: 'cash',
@@ -598,7 +630,10 @@ const checkOutCash = async (id, staffId) => {
   });
 };
 
-const checkOutVnpay = async (id, staffId, ipAddr) => {
+const checkOutVnpay = async (id, staffId, ipAddr, { lostTicket = false } = {}) => {
+  if (lostTicket) {
+    throw new AppError('Phạt mất vé xử lý tại quầy bằng tiền mặt, không qua VNPay.', 400);
+  }
   return sequelize.transaction(async (t) => {
     const session = await ParkingSession.findByPk(id, { transaction: t, lock: t.LOCK.UPDATE });
     if (!session) throw new AppError('Session not found', 404);

@@ -15,3 +15,5 @@ export const PRICING = {
 };
 
 export const getPricingFor = (vehicleType) => PRICING[vehicleType];
+
+export const LOST_TICKET_PENALTY = 100_000;

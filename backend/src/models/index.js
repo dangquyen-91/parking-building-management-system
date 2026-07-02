@@ -12,6 +12,7 @@ import Booking from './booking.model.js';
 import SubscriptionPayment from './subscription-payment.model.js';
 import BookingPayment from './booking-payment.model.js';
 import SessionPayment from './session-payment.model.js';
+import IncidentReport from './incident-report.model.js';
 
 Role.hasMany(User, { foreignKey: 'roleId', as: 'users', onDelete: 'RESTRICT' });
 User.belongsTo(Role, { foreignKey: 'roleId', as: 'role' });
@@ -72,3 +73,12 @@ BookingPayment.belongsTo(Booking, { foreignKey: 'bookingId', as: 'booking' });
 
 ParkingSession.hasMany(SessionPayment, { foreignKey: 'sessionId', as: 'payments', onDelete: 'CASCADE' });
 SessionPayment.belongsTo(ParkingSession, { foreignKey: 'sessionId', as: 'session' });
+
+ParkingSession.hasMany(IncidentReport, { foreignKey: 'sessionId', as: 'incidents' });
+IncidentReport.belongsTo(ParkingSession, { foreignKey: 'sessionId', as: 'session' });
+
+User.hasMany(IncidentReport, { foreignKey: 'staffId', as: 'reportedIncidents' });
+IncidentReport.belongsTo(User, { foreignKey: 'staffId', as: 'staff' });
+
+Floor.hasMany(IncidentReport, { foreignKey: 'floorId', as: 'incidents' });
+IncidentReport.belongsTo(Floor, { foreignKey: 'floorId', as: 'floor' });

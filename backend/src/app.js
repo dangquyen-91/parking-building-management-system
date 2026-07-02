@@ -20,6 +20,7 @@ import paymentRoutes from './routes/payment.routes.js';
 import bookingRoutes from './routes/booking.routes.js';
 import vehicleRoutes from './routes/vehicle.routes.js';
 import reportRoutes from './routes/report.routes.js';
+import incidentRoutes from './routes/incident.routes.js';
 import errorHandler from './middlewares/error.middleware.js';
 import { apiLimiter } from './middlewares/rateLimiter.middleware.js';
 import { expireBookings } from './services/booking.service.js';
@@ -61,6 +62,7 @@ app.use('/api/v1/payments', paymentRoutes);
 app.use('/api/v1/bookings', bookingRoutes);
 app.use('/api/v1/vehicles', vehicleRoutes);
 app.use('/api/v1/reports', reportRoutes);
+app.use('/api/v1/incidents', incidentRoutes);
 
 app.get('/health', (_req, res) =>
   res.json({ success: true, message: 'OK', data: { env: process.env.NODE_ENV } })

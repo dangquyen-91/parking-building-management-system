@@ -3934,6 +3934,18 @@ paths:
                   enum: [cash, vnpay]
                   default: cash
                   description: Hinh thuc thanh toan. Mac dinh 'cash' neu khong truyen.
+                lostTicket:
+                  type: boolean
+                  default: false
+                  description: |
+                    Khach vang lai bao MAT VE/QR. Staff ca giay xe xac minh thu cong,
+                    thu them phi phat 100.000d. CHI ho tro `paymentMethod: cash`
+                    (vnpay → 400). Ap dung cho vang lai; cu dan → 400 (tra lich su trong tai khoan).
+                lostTicketNote:
+                  type: string
+                  maxLength: 500
+                  nullable: true
+                  description: Ghi chu cua staff ve tinh huong mat ve (luu vao incident report).
       responses:
         '200':
           description: |
@@ -3956,7 +3968,10 @@ paths:
                           entryTime: { type: string, format: date-time }
                           exitTime: { type: string, format: date-time, nullable: true }
                           durationMinutes: { type: integer, nullable: true }
-                          fee: { type: integer }
+                          fee: { type: integer, description: 'Tong thu = parkingFee + penaltyAmount' }
+                          parkingFee: { type: integer, description: 'Phi gui xe (chua gom phat). Chi co o cash' }
+                          penaltyAmount: { type: integer, description: 'Phi phat mat ve (100.000 neu lostTicket, else 0). Chi co o cash' }
+                          lostTicket: { type: boolean, description: 'Co phai checkout mat ve khong. Chi co o cash' }
                           covered: { type: boolean }
                           coveredBy: { type: string, nullable: true }
                           paymentMethod: { type: string, enum: [cash, vnpay, package] }
@@ -3966,9 +3981,70 @@ paths:
                           breakdown:
                             type: object
                             description: Chi tiet pricing (baseFee, overnightFee, mode, overnightNights, ...)
-        '400': { description: 'Invalid paymentMethod (must be cash or vnpay)' }
+        '400': { description: 'Invalid paymentMethod; hoac lostTicket + vnpay; hoac lostTicket cho cu dan' }
         '404': { description: Session not found }
         '409': { description: Session is not active (already checked out?) }
+
+  /incidents:
+    get:
+      tags: [Incidents]
+      summary: List incident reports (admin, manager, staff)
+      description: |
+        Danh sach bao cao su co. Hien chi co type `lost_ticket` (khach vang lai mat ve,
+        bi phat 100.000d luc check-out — record tao tu dong trong cung transaction check-out).
+        **Phan quyen:** admin/manager xem TAT CA; staff chi xem record minh tao.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { in: query, name: type, schema: { type: string, enum: [lost_ticket] } }
+        - { in: query, name: floorId, schema: { type: integer } }
+        - { in: query, name: licensePlate, schema: { type: string } }
+        - { in: query, name: from, schema: { type: string, format: date }, description: 'Loc tu ngay (ISO)' }
+        - { in: query, name: to, schema: { type: string, format: date }, description: 'Loc den ngay (ISO)' }
+        - { in: query, name: page, schema: { type: integer, default: 1 } }
+        - { in: query, name: limit, schema: { type: integer, default: 20, maximum: 100 } }
+      responses:
+        '200':
+          description: Danh sach incident (phan trang)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id: { type: integer }
+                            type: { type: string, example: lost_ticket }
+                            licensePlate: { type: string }
+                            penaltyAmount: { type: number, example: 100000 }
+                            note: { type: string, nullable: true }
+                            createdAt: { type: string, format: date-time }
+                            session:
+                              type: object
+                              nullable: true
+                              properties:
+                                id: { type: integer }
+                                entryTime: { type: string, format: date-time }
+                                exitTime: { type: string, format: date-time, nullable: true }
+                                vehicleType: { type: string }
+                            floor:
+                              type: object
+                              nullable: true
+                              properties:
+                                id: { type: integer }
+                                floorNumber: { type: integer }
+                            staff:
+                              type: object
+                              nullable: true
+                              properties:
+                                id: { type: integer }
+                                fullName: { type: string }
+        '403': { description: Forbidden (khong du quyen) }
 
   /parking-sessions/check-in:
     post:

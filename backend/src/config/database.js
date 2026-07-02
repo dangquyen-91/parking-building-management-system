@@ -44,6 +44,21 @@ const runMigrations = async () => {
     `ALTER TABLE users ADD COLUMN emailVerificationTokenExpires DATETIME DEFAULT NULL`,
     `ALTER TABLE users ADD COLUMN passwordResetToken VARCHAR(255) DEFAULT NULL`,
     `ALTER TABLE users ADD COLUMN passwordResetTokenExpires DATETIME DEFAULT NULL`,
+    `CREATE TABLE IF NOT EXISTS incident_reports (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      type ENUM('lost_ticket') NOT NULL DEFAULT 'lost_ticket',
+      sessionId INT NULL,
+      licensePlate VARCHAR(20) NOT NULL,
+      floorId INT NULL,
+      staffId INT NULL,
+      penaltyAmount DECIMAL(10,2) NOT NULL DEFAULT 0,
+      note VARCHAR(500) NULL,
+      createdAt DATETIME NOT NULL,
+      updatedAt DATETIME NOT NULL,
+      INDEX idx_incident_type (type),
+      INDEX idx_incident_plate (licensePlate),
+      INDEX idx_incident_created (createdAt)
+    )`,
   ];
   for (const sql of migrations) {
     try {

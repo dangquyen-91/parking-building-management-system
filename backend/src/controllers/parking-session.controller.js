@@ -64,10 +64,13 @@ const checkOut = async (req, res, next) => {
       return response.error(res, "paymentMethod must be 'cash' or 'vnpay'", 400);
     }
 
+    const lostTicket = req.body?.lostTicket === true;
+    const lostTicketNote = req.body?.lostTicketNote || null;
+
     const result =
       method === 'vnpay'
-        ? await parkingSessionService.checkOutVnpay(req.params.id, req.user.id, getClientIp(req))
-        : await parkingSessionService.checkOutCash(req.params.id, req.user.id);
+        ? await parkingSessionService.checkOutVnpay(req.params.id, req.user.id, getClientIp(req), { lostTicket })
+        : await parkingSessionService.checkOutCash(req.params.id, req.user.id, { lostTicket, lostTicketNote });
 
     response.success(res, result);
   } catch (err) {

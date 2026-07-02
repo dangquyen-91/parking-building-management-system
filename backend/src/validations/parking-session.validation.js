@@ -42,4 +42,6 @@ export const lookupSchema = Joi.object({
 
 export const checkOutSchema = Joi.object({
   paymentMethod: Joi.string().valid('cash', 'vnpay').default('cash'),
+  lostTicket: Joi.boolean().default(false),
+  lostTicketNote: Joi.string().trim().max(500).allow('', null),
 });
