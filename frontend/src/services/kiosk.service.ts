@@ -102,8 +102,11 @@ export async function getAvailableSlots(
   return handleResponse<{ data: ParkingSlotApiItem[] }>(response);
 }
 
-export async function getAvailableRows(): Promise<{ data: ParkingRowApiItem[] }> {
-  const params = new URLSearchParams({ status: 'available' });
+export async function getAvailableRows(
+  options: { floorId?: number; limit?: number } = {}
+): Promise<{ data: ParkingRowApiItem[] }> {
+  const params = new URLSearchParams({ status: 'available', limit: String(options.limit ?? 100) });
+  if (options.floorId) params.set('floorId', String(options.floorId));
   const response = await fetch(
     `${API_BASE_URL}/parking-rows?${params.toString()}`,
     { headers: getAuthHeaders() }
