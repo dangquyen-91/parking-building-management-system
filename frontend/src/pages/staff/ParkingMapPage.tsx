@@ -15,7 +15,7 @@ import {
   ZoomIn,
 } from 'lucide-react';
 import { KioskLayout } from '../../components/kiosk/KioskLayout';
-import { cn } from '../../lib/utils';
+import { cn, compareFloorCode } from '../../lib/utils';
 import { buildingService, type Building } from '../../services/building.service';
 import { floorService, type Floor } from '../../services/floor.service';
 import { slotService, type ParkingSlot, type SlotStatus } from '../../services/slot.service';
@@ -57,7 +57,7 @@ interface SlotDetail {
   slotCode: string;
   status: SlotStatus;
   note: string | null;
-  floorNumber: number;
+  floorNumber: string;
   buildingName: string;
 }
 
@@ -505,7 +505,7 @@ export default function ParkingMapPage() {
       ]);
 
       const allFloors = [...carFloorRes.floors, ...motoFloorRes.floors].sort(
-        (a, b) => a.floorNumber - b.floorNumber,
+        (a, b) => compareFloorCode(a.floorNumber, b.floorNumber),
       );
 
       // Cache floors list for silent refresh

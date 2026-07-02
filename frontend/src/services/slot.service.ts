@@ -6,7 +6,7 @@ export type SlotStatus = 'empty' | 'occupied' | 'reserved' | 'maintenance';
 
 interface SlotFloor {
   id: number;
-  floorNumber: number;
+  floorNumber: string;
   vehicleType: VehicleType;
   buildingId: number;
   building: Pick<FloorBuilding, 'id' | 'name'>;

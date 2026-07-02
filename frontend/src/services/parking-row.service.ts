@@ -16,7 +16,7 @@ export interface ParkingRow {
   updatedAt: string;
   floor: {
     id: number;
-    floorNumber: number;
+    floorNumber: string;
     vehicleType: 'motorcycle';
     buildingId: number;
     building: Pick<FloorBuilding, 'id' | 'name'>;
