@@ -27,7 +27,7 @@ import {
   YAxis,
 } from 'recharts';
 import { KioskLayout } from '../../components/kiosk/KioskLayout';
-import { cn } from '../../lib/utils';
+import { cn, compareFloorCode } from '../../lib/utils';
 import { floorService, type Floor } from '../../services/floor.service';
 import { slotService } from '../../services/slot.service';
 import type { ActiveSessionApiItem, ParkingRowApiItem } from '../../types/kiosk';
@@ -534,7 +534,7 @@ export default function StaffDashboardPage() {
         occupancyResults
           .filter((r): r is PromiseFulfilledResult<FloorOccupancy> => r.status === 'fulfilled')
           .map(r => r.value)
-          .sort((a, b) => a.floorNumber.localeCompare(b.floorNumber))
+          .sort((a, b) => compareFloorCode(a.floorNumber, b.floorNumber))
       );
 
       // ── Peak hours: derive from active sessions entry times (approximation)
