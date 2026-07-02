@@ -257,7 +257,10 @@ export const getByOrderId = async (orderId, requester) => {
       payment.session?.userId ??
       payment.booking?.userId ??
       null;
-    if (!ownerId || ownerId !== requester?.id) {
+    // ownerId === null: booking khách (không gắn user) → cho xem kết quả bằng orderId
+    //   (orderId là capability, chỉ trả về cho người tạo giao dịch).
+    // ownerId có giá trị: bắt buộc đúng chủ sở hữu (sub/session luôn có userId → vẫn được bảo vệ).
+    if (ownerId && ownerId !== requester?.id) {
       throw new AppError('Access denied', 403);
     }
   }
