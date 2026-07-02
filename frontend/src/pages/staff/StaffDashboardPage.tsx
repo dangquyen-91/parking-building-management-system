@@ -62,7 +62,7 @@ const formatDuration = (iso: string) => {
 
 interface FloorOccupancy {
   floorId: number;
-  floorNumber: number;
+  floorNumber: string;
   vehicleType: 'car' | 'motorcycle';
   floorType: 'resident' | 'visitor';
   buildingName: string;
@@ -534,7 +534,7 @@ export default function StaffDashboardPage() {
         occupancyResults
           .filter((r): r is PromiseFulfilledResult<FloorOccupancy> => r.status === 'fulfilled')
           .map(r => r.value)
-          .sort((a, b) => a.floorNumber - b.floorNumber)
+          .sort((a, b) => a.floorNumber.localeCompare(b.floorNumber))
       );
 
       // ── Peak hours: derive from active sessions entry times (approximation)

@@ -57,7 +57,7 @@ interface SlotDetail {
   slotCode: string;
   status: SlotStatus;
   note: string | null;
-  floorNumber: number;
+  floorNumber: string;
   buildingName: string;
 }
 
@@ -505,7 +505,7 @@ export default function ParkingMapPage() {
       ]);
 
       const allFloors = [...carFloorRes.floors, ...motoFloorRes.floors].sort(
-        (a, b) => a.floorNumber - b.floorNumber,
+        (a, b) => a.floorNumber.localeCompare(b.floorNumber),
       );
 
       // Cache floors list for silent refresh
