@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Building2,
   Car,
+  CheckCircle2,
   ChevronDown,
   Layers3,
   Loader2,
@@ -29,12 +30,25 @@ function authHeaders() {
   return { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
 }
 
+async function updateSlotStatus(slotId: number, status: SlotStatus, note?: string): Promise<void> {
+  const body: Record<string, unknown> = { status };
+  if (note !== undefined) body.note = note;
+  const res = await fetch(`${API_BASE_URL}/parking-slots/${slotId}/status`, {
+    method: 'PATCH',
+    headers: authHeaders(),
+    body: JSON.stringify(body),
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) throw new Error(json.message ?? `Lỗi cập nhật slot (${res.status})`);
+}
+
 async function fetchRows(floorId: number): Promise<ParkingRowApiItem[]> {
   const res = await fetch(`${API_BASE_URL}/parking-rows?floorId=${floorId}&limit=200`, { headers: authHeaders() });
   const json = await res.json();
   if (!res.ok || !json.success) throw new Error(json.message ?? 'Lỗi tải hàng xe máy');
   return json.data as ParkingRowApiItem[];
 }
+
 
 const SLOT_CFG: Record<SlotStatus, { bg: string; border: string; text: string; label: string }> = {
   empty: { bg: 'bg-emerald-500/20', border: 'border-emerald-400/40', text: 'text-emerald-300', label: 'Trống' },
@@ -54,12 +68,14 @@ interface FloorData {
 }
 
 interface SlotDetail {
+  slotId: number;
   slotCode: string;
   status: SlotStatus;
   note: string | null;
   floorNumber: string;
   buildingName: string;
 }
+
 
 function Legend() {
   return (
@@ -161,6 +177,7 @@ function CarResidentFloorGrid({ slots, onSelectSlot }: {
             whileTap={{ scale: 0.97 }}
             onClick={() =>
               onSelectSlot({
+                slotId: slot.id,
                 slotCode: slot.slotCode,
                 status: slot.status,
                 note: slot.note,
@@ -182,6 +199,7 @@ function CarResidentFloorGrid({ slots, onSelectSlot }: {
     </div>
   );
 }
+
 
 function CarVisitorFloorGrid({ floor, activeCount }: { floor: Floor; activeCount: number }) {
   // Visitor car: backend đếm theo tầng (số phiên đang hoạt động), không phân slot vật lý.
@@ -363,8 +381,37 @@ function FloorPanel({
   );
 }
 
-function SlotDetailModal({ detail, onClose }: { detail: SlotDetail; onClose: () => void }) {
+function SlotDetailModal({
+  detail,
+  onClose,
+  onStatusChanged,
+}: {
+  detail: SlotDetail;
+  onClose: () => void;
+  onStatusChanged: () => void;
+}) {
   const cfg = SLOT_CFG[detail.status];
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const canToggleMaintenance = detail.status === 'empty' || detail.status === 'maintenance';
+  const isReadOnly = detail.status === 'occupied' || detail.status === 'reserved';
+
+  async function handleToggleMaintenance() {
+    const nextStatus: SlotStatus = detail.status === 'maintenance' ? 'empty' : 'maintenance';
+    setIsUpdating(true);
+    setActionError(null);
+    try {
+      await updateSlotStatus(detail.slotId, nextStatus);
+      onStatusChanged();
+      onClose();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Không thể cập nhật trạng thái.');
+    } finally {
+      setIsUpdating(false);
+    }
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -406,10 +453,54 @@ function SlotDetailModal({ detail, onClose }: { detail: SlotDetail; onClose: () 
             </div>
           )}
         </div>
+
+        {/* Thông báo với slot do hệ thống quản lý */}
+        {isReadOnly && (
+          <div className="mt-4 rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3 text-xs text-slate-500">
+            <p className="font-semibold text-slate-400 mb-1">Trạng thái hệ thống</p>
+            <p>
+              {detail.status === 'occupied'
+                ? 'Ô đang có xe. Hệ thống tự cập nhật khi xe check-out.'
+                : 'Ô đã đặt trước cho gói cư dân. Liên hệ admin để thay đổi.'}
+            </p>
+          </div>
+        )}
+
+        {/* Error */}
+        {actionError && (
+          <div className="mt-3 rounded-xl border border-red-400/20 bg-red-400/10 px-4 py-2.5 text-xs text-red-400">
+            {actionError}
+          </div>
+        )}
+
+        {/* Action buttons — chỉ hiện cho empty và maintenance */}
+        {canToggleMaintenance && (
+          <motion.button
+            whileHover={{ scale: 1.01 }}
+            whileTap={{ scale: 0.98 }}
+            disabled={isUpdating}
+            onClick={handleToggleMaintenance}
+            className={cn(
+              'mt-4 w-full rounded-xl py-3 text-sm font-semibold transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed',
+              detail.status === 'maintenance'
+                ? 'border border-emerald-400/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20'
+                : 'border border-amber-400/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20',
+            )}
+          >
+            {isUpdating ? (
+              <><Loader2 className="h-4 w-4 animate-spin" /> Đang cập nhật…</>
+            ) : detail.status === 'maintenance' ? (
+              <><CheckCircle2 className="h-4 w-4" /> Xoá Bảo Trì (trả về Trống)</>
+            ) : (
+              <><Wrench className="h-4 w-4" /> Đặt Bảo Trì</>  
+            )}
+          </motion.button>
+        )}
       </motion.div>
     </motion.div>
   );
 }
+
 
 function BuildingSection({
   building,
@@ -760,7 +851,14 @@ export default function ParkingMapPage() {
 
       <AnimatePresence>
         {selectedSlot && (
-          <SlotDetailModal detail={selectedSlot} onClose={() => setSelectedSlot(null)} />
+          <SlotDetailModal
+            detail={selectedSlot}
+            onClose={() => setSelectedSlot(null)}
+            onStatusChanged={() => {
+              setSelectedSlot(null);
+              silentRefresh();
+            }}
+          />
         )}
       </AnimatePresence>
     </KioskLayout>
