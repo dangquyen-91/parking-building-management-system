@@ -96,7 +96,6 @@ export function useBookingForm() {
         customerName: values.customerName.trim() || undefined,
         customerPhone: values.customerPhone.trim() || undefined,
         note: values.note.trim() || undefined,
-        anonymous: ownPlates.length > 0 && !ownPlates.includes(plate),
       });
       setPreviewAmount(result.amount);
       setPreviewHours(result.prepaidHours);
