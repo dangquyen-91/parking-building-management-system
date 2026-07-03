@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { authService } from '../services/auth.service';
-import type { UserProfile } from '../services/auth.service';
+import type { UserProfile, AuthTokens } from '../services/auth.service';
 
 
 interface AuthContextType {
@@ -14,6 +14,30 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+// Chống refresh trùng lặp: khi nhiều lần refresh xảy ra đồng thời (StrictMode chạy effect 2 lần
+// ở dev, timer định kỳ, nhiều tab...) tất cả dùng CHUNG một request. Backend xoay vòng refresh
+// token (1 token/user, dùng 1 lần) nên refresh 2 lần với cùng token sẽ khiến lần sau bị "revoked"
+// → xoá token → đăng xuất nhầm. Dedup đảm bảo chỉ xoay vòng đúng 1 lần.
+let refreshPromise: Promise<AuthTokens> | null = null;
+
+async function refreshSession(): Promise<AuthTokens> {
+  const refreshToken = localStorage.getItem('refreshToken');
+  if (!refreshToken) throw new Error('No refresh token');
+  if (!refreshPromise) {
+    refreshPromise = authService
+      .refresh(refreshToken)
+      .then((tokens) => {
+        localStorage.setItem('accessToken', tokens.accessToken);
+        localStorage.setItem('refreshToken', tokens.refreshToken);
+        return tokens;
+      })
+      .finally(() => {
+        refreshPromise = null;
+      });
+  }
+  return refreshPromise;
+}
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -34,10 +58,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(profile);
       } catch (err) {
         try {
-          const newTokens = await authService.refresh(refreshToken);
-          localStorage.setItem('accessToken', newTokens.accessToken);
-          localStorage.setItem('refreshToken', newTokens.refreshToken);
-          
+          const newTokens = await refreshSession();
           const profile = await authService.getProfile(newTokens.accessToken);
           setUser(profile);
         } catch (refreshErr) {
@@ -76,12 +97,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     const refreshTokens = async () => {
-      const refreshToken = localStorage.getItem('refreshToken');
-      if (!refreshToken) return;
+      if (!localStorage.getItem('refreshToken')) return;
       try {
-        const tokens = await authService.refresh(refreshToken);
-        localStorage.setItem('accessToken', tokens.accessToken);
-        localStorage.setItem('refreshToken', tokens.refreshToken);
+        await refreshSession();
       } catch {
         // Bỏ qua lỗi tạm thời (mạng chập chờn); nếu refresh token thật sự hết hạn thì
         // lần tải lại trang kế tiếp (initializeAuth) sẽ đăng xuất một cách gọn gàng.
