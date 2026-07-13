@@ -15,18 +15,26 @@ import {
   Motorbike,
   Package,
   Phone,
+  Plus,
   RefreshCw,
   Save,
   SquareParking,
+  Trash2,
   User,
   X,
   Zap,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../hooks/useAuth';
-import { profileService, type MySubscription } from '../services/profile.service';
+import {
+  profileService,
+  type MySubscription,
+  type MyVehicle,
+  type VehiclePayload,
+} from '../services/profile.service';
 import type { UserProfile } from '../services/auth.service';
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 const formatDate = (iso: string | null) =>
   iso
     ? new Date(iso).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
@@ -44,12 +52,14 @@ const SUB_STATUS: Record<string, { label: string; cls: string }> = {
 };
 
 const TABS = [
-  { id: 'info',    icon: User,    label: 'Thông tin cá nhân' },
-  { id: 'vehicles', icon: Car,   label: 'Phương tiện & Gói' },
-  { id: 'history', icon: History, label: 'Lịch sử gói' },
+  { id: 'info',     icon: User,    label: 'Thông tin cá nhân' },
+  { id: 'vehicles', icon: Car,     label: 'Xe của tôi' },
+  { id: 'packages', icon: Package, label: 'Gói tháng' },
+  { id: 'history',  icon: History, label: 'Lịch sử' },
 ] as const;
 type TabId = typeof TABS[number]['id'];
 
+// ─── Sub-components ───────────────────────────────────────────────────────────
 function InfoField({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string }) {
   return (
     <div className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-slate-50/80 px-5 py-4">
@@ -123,11 +133,21 @@ function SubscriptionCard({
         </div>
       </div>
 
-      <div className="mt-5 grid gap-3 sm:grid-cols-3">
+      <div className={`mt-5 grid gap-3 ${sub.vehicleType === 'car' ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
         {[
           { icon: Calendar, label: 'Bắt đầu',  value: renewedInto ? formatDate(renewedInto.startDate) : formatDate(sub.startDate) },
           { icon: Clock,    label: 'Kết thúc', value: renewedInto ? formatDate(renewedInto.endDate) : formatDate(sub.endDate) },
-          { icon: SquareParking, label: 'Ô đỗ xe', value: sub.slot?.slotCode ?? 'Chưa cấp' },
+          ...(sub.vehicleType === 'car'
+            ? [{
+                icon: SquareParking,
+                label: 'Ô đỗ xe',
+                value: sub.slot?.slotCode
+                  ? `Ô ${sub.slot.slotCode}`
+                  : sub.status === 'pending'
+                    ? 'Đang xử lý'
+                    : '—',
+              }]
+            : []),
         ].map(({ icon: Icon, label, value }) => (
           <div key={label} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
             <Icon className="mb-2 h-5 w-5 text-blue-600" />
@@ -140,7 +160,228 @@ function SubscriptionCard({
   );
 }
 
-function EditModal({
+// ─── VehicleCard ───────────────────────────────────────────────────────────────
+function VehicleCard({
+  vehicle,
+  onEdit,
+  onDelete,
+  deletingId,
+}: {
+  vehicle: MyVehicle;
+  onEdit: (v: MyVehicle) => void;
+  onDelete: (id: number) => void;
+  deletingId: number | null;
+}) {
+  const isCar = vehicle.vehicleType === 'car';
+  const VehicleIcon = isCar ? Car : Motorbike;
+  const isDeleting = deletingId === vehicle.id;
+
+  return (
+    <motion.article
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      className="flex items-center gap-4 rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm"
+    >
+      {/* Icon */}
+      <div className={cn(
+        'flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl',
+        isCar ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600',
+      )}>
+        <VehicleIcon className="h-6 w-6" />
+      </div>
+
+      {/* Info */}
+      <div className="flex-1 min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-lg font-black tracking-widest text-slate-950">{vehicle.licensePlate}</p>
+          <span className={cn(
+            'rounded-full border px-2.5 py-0.5 text-[11px] font-bold',
+            isCar
+              ? 'border-blue-200 bg-blue-50 text-blue-600'
+              : 'border-amber-200 bg-amber-50 text-amber-600',
+          )}>
+            {isCar ? 'Ô tô' : 'Xe máy'}
+          </span>
+        </div>
+        {vehicle.nickname ? (
+          <p className="mt-0.5 text-sm text-slate-500 truncate">📌 {vehicle.nickname}</p>
+        ) : (
+          <p className="mt-0.5 text-xs text-slate-400">Chưa đặt tên</p>
+        )}
+        <p className="mt-1 text-xs text-slate-400">Đã thêm {formatDate(vehicle.createdAt)}</p>
+      </div>
+
+      {/* Actions */}
+      <div className="flex shrink-0 gap-2">
+        <button
+          onClick={() => onEdit(vehicle)}
+          className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-400 transition hover:border-blue-300 hover:text-blue-600"
+          title="Chỉnh sửa"
+        >
+          <Edit3 className="h-4 w-4" />
+        </button>
+        <button
+          onClick={() => onDelete(vehicle.id)}
+          disabled={isDeleting}
+          className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-400 transition hover:border-red-300 hover:text-red-500 disabled:opacity-40"
+          title="Xóa xe"
+        >
+          {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+        </button>
+      </div>
+    </motion.article>
+  );
+}
+
+// ─── VehicleModal (Add / Edit) ─────────────────────────────────────────────────
+function VehicleModal({
+  initial,
+  onClose,
+  onSaved,
+}: {
+  initial?: MyVehicle;
+  onClose: () => void;
+  onSaved: (v: MyVehicle) => void;
+}) {
+  const isEdit = !!initial;
+  const [plate, setPlate] = useState(initial?.licensePlate ?? '');
+  const [type, setType] = useState<'car' | 'motorcycle'>(initial?.vehicleType ?? 'car');
+  const [nickname, setNickname] = useState(initial?.nickname ?? '');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSave = async () => {
+    const trimmedPlate = plate.trim().toUpperCase();
+    if (!trimmedPlate) { setError('Vui lòng nhập biển số xe.'); return; }
+    setSaving(true);
+    setError(null);
+    try {
+      const payload: VehiclePayload = { licensePlate: trimmedPlate, vehicleType: type, nickname: nickname.trim() || undefined };
+      const result = isEdit
+        ? await profileService.updateVehicle(initial!.id, payload)
+        : await profileService.addVehicle(payload);
+      onSaved(result);
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Lưu thất bại.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.93, y: 16 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.93, y: 16 }}
+        transition={{ duration: 0.2 }}
+        onClick={e => e.stopPropagation()}
+        className="w-full max-w-md rounded-[28px] border border-slate-200 bg-white p-7 shadow-2xl"
+      >
+        <div className="mb-6 flex items-center justify-between">
+          <h2 className="text-xl font-black text-slate-950">
+            {isEdit ? 'Chỉnh sửa xe' : 'Thêm xe mới'}
+          </h2>
+          <button
+            onClick={onClose}
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-400 transition hover:border-slate-300 hover:text-slate-700"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          {/* License plate */}
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-[0.14em] text-slate-400 mb-1.5">
+              Biển số xe <span className="text-red-400">*</span>
+            </label>
+            <input
+              value={plate}
+              onChange={e => setPlate(e.target.value.toUpperCase())}
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold uppercase tracking-widest text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              placeholder="30A-12345"
+              disabled={isEdit}
+            />
+            {isEdit && (
+              <p className="mt-1 text-xs text-slate-400">Không thể thay đổi biển số sau khi đăng ký.</p>
+            )}
+          </div>
+
+          {/* Vehicle type */}
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-[0.14em] text-slate-400 mb-1.5">
+              Loại xe
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {(['car', 'motorcycle'] as const).map(vt => (
+                <button
+                  key={vt}
+                  type="button"
+                  onClick={() => setType(vt)}
+                  className={cn(
+                    'flex items-center justify-center gap-2 rounded-2xl border py-3 text-sm font-semibold transition',
+                    type === vt
+                      ? vt === 'car'
+                        ? 'border-blue-400 bg-blue-50 text-blue-600'
+                        : 'border-amber-400 bg-amber-50 text-amber-600'
+                      : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300',
+                  )}
+                >
+                  {vt === 'car' ? <Car className="h-4 w-4" /> : <Motorbike className="h-4 w-4" />}
+                  {vt === 'car' ? 'Ô tô' : 'Xe máy'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Nickname */}
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-[0.14em] text-slate-400 mb-1.5">
+              Tên gọi <span className="text-slate-400 font-normal normal-case">(tuỳ chọn)</span>
+            </label>
+            <input
+              value={nickname}
+              onChange={e => setNickname(e.target.value)}
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              placeholder="Xe đi làm, xe gia đình…"
+            />
+          </div>
+        </div>
+
+        {error && <div className="mt-4"><ErrorAlert message={error} /></div>}
+
+        <div className="mt-6 flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 h-11 rounded-2xl border border-slate-200 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
+          >
+            Hủy
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving || !plate.trim()}
+            className="flex-1 inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-blue-600 text-sm font-bold text-white transition hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            {isEdit ? 'Lưu thay đổi' : 'Thêm xe'}
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ─── EditProfileModal ──────────────────────────────────────────────────────────
+function EditProfileModal({
   profile,
   onClose,
   onSaved,
@@ -220,11 +461,7 @@ function EditModal({
           </div>
         </div>
 
-        {error && (
-          <div className="mt-4 flex gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /> {error}
-          </div>
-        )}
+        {error && <div className="mt-4"><ErrorAlert message={error} /></div>}
 
         <div className="mt-6 flex gap-3">
           <button
@@ -249,15 +486,22 @@ function EditModal({
 
 export default function ProfilePage() {
   const navigate = useNavigate();
-  const { user: authUser, isAuthenticated, loading: authLoading } = useAuth();
+  const { user: authUser, isAuthenticated, loading: authLoading, updateUser } = useAuth();
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [vehicles, setVehicles] = useState<MyVehicle[]>([]);
   const [activeSubscriptions, setActiveSubscriptions] = useState<MySubscription[]>([]);
   const [allSubscriptions, setAllSubscriptions] = useState<MySubscription[]>([]);
+
   const [tab, setTab] = useState<TabId>('info');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [editOpen, setEditOpen] = useState(false);
+
+  // Modals
+  const [editProfileOpen, setEditProfileOpen] = useState(false);
+  const [vehicleModal, setVehicleModal] = useState<{ open: boolean; vehicle?: MyVehicle }>({ open: false });
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) navigate('/login');
@@ -268,12 +512,14 @@ export default function ProfilePage() {
     setLoading(true);
     setError(null);
     try {
-      const [me, activeSubs, allSubs] = await Promise.all([
+      const [me, myVehicles, activeSubs, allSubs] = await Promise.all([
         profileService.getMe(),
+        profileService.getMyVehicles(),
         profileService.getMySubscriptions('active'),
         profileService.getMySubscriptions(),
       ]);
       setProfile(me);
+      setVehicles(myVehicles);
       setActiveSubscriptions(activeSubs);
       setAllSubscriptions(allSubs);
     } catch (err) {
@@ -289,6 +535,26 @@ export default function ProfilePage() {
     }, 0);
     return () => window.clearTimeout(timer);
   }, [load]);
+
+  const handleDeleteVehicle = async (id: number) => {
+    setDeletingId(id);
+    setDeleteError(null);
+    try {
+      await profileService.deleteVehicle(id);
+      setVehicles(prev => prev.filter(v => v.id !== id));
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Không thể xóa xe.');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleVehicleSaved = (saved: MyVehicle) => {
+    setVehicles(prev => {
+      const exists = prev.find(v => v.id === saved.id);
+      return exists ? prev.map(v => v.id === saved.id ? saved : v) : [saved, ...prev];
+    });
+  };
 
   if (authLoading || !isAuthenticated) {
     return (
@@ -329,6 +595,11 @@ export default function ProfilePage() {
                 </h1>
                 <p className="mt-1 text-slate-500">{displayProfile?.email}</p>
                 <div className="mt-3 flex flex-wrap justify-center gap-2 sm:justify-start">
+                  {vehicles.length > 0 && (
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-600">
+                      <Car className="h-3 w-3" /> {vehicles.length} xe đã đăng ký
+                    </span>
+                  )}
                   {activeSubscriptions.length > 0 ? (
                     <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
                       <Zap className="h-3 w-3" /> {activeSubscriptions.length} gói đang hiệu lực
@@ -338,15 +609,13 @@ export default function ProfilePage() {
                       Chưa có gói tháng
                     </span>
                   )}
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-600">
-                    {uniquePlates.length} biển số đã đăng ký
-                  </span>
                 </div>
               </div>
 
+              {/* Desktop actions */}
               <div className="ml-auto hidden sm:flex items-center gap-3">
                 <button
-                  onClick={() => setEditOpen(true)}
+                  onClick={() => setEditProfileOpen(true)}
                   className="inline-flex h-10 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 text-sm font-bold text-slate-700 shadow-sm transition hover:border-blue-300 hover:text-blue-600"
                 >
                   <Edit3 className="h-4 w-4" /> Chỉnh sửa
@@ -363,7 +632,7 @@ export default function ProfilePage() {
 
             <div className="mt-5 flex gap-3 sm:hidden">
               <button
-                onClick={() => setEditOpen(true)}
+                onClick={() => setEditProfileOpen(true)}
                 className="flex-1 inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white text-sm font-bold text-slate-700 shadow-sm"
               >
                 <Edit3 className="h-4 w-4" /> Chỉnh sửa hồ sơ
@@ -372,13 +641,13 @@ export default function ProfilePage() {
           </section>
 
           <section className="mx-auto mt-10 max-w-4xl">
-            <div className="flex gap-1 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm">
+            <div className="flex gap-1 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm overflow-x-auto">
               {TABS.map(({ id, icon: Icon, label }) => (
                 <button
                   key={id}
                   onClick={() => setTab(id)}
                   className={cn(
-                    'flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition',
+                    'flex flex-1 min-w-fit items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition whitespace-nowrap',
                     tab === id
                       ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/30'
                       : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700',
@@ -408,9 +677,9 @@ export default function ProfilePage() {
                       <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
                         <h2 className="mb-5 text-lg font-black text-slate-950">Thông tin cơ bản</h2>
                         <div className="grid gap-3 sm:grid-cols-2">
-                          <InfoField icon={User}  label="Họ và tên"      value={displayProfile.fullName} />
-                          <InfoField icon={Mail}  label="Email"           value={displayProfile.email} />
-                          <InfoField icon={Phone} label="Số điện thoại"  value={displayProfile.phone ?? 'Chưa cập nhật'} />
+                          <InfoField icon={User} label="Họ và tên" value={displayProfile.fullName} />
+                          <InfoField icon={Mail} label="Email" value={displayProfile.email} />
+                          <InfoField icon={Phone} label="Số điện thoại" value={displayProfile.phone ?? 'Chưa cập nhật'} />
                           <InfoField icon={CheckCircle2} label="Trạng thái" value={displayProfile.isActive ? 'Đang hoạt động' : 'Bị khóa'} />
                         </div>
                         <p className="mt-4 text-xs text-slate-400">
@@ -420,7 +689,7 @@ export default function ProfilePage() {
 
                       <div className="flex justify-center">
                         <button
-                          onClick={() => setEditOpen(true)}
+                          onClick={() => setEditProfileOpen(true)}
                           className="inline-flex h-11 items-center gap-2 rounded-2xl bg-blue-600 px-6 text-sm font-bold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500"
                         >
                           <Edit3 className="h-4 w-4" /> Chỉnh sửa thông tin
@@ -430,6 +699,55 @@ export default function ProfilePage() {
                   )}
 
                   {tab === 'vehicles' && (
+                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+                      {/* Add button */}
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-700">{vehicles.length} xe đã đăng ký</p>
+                          <p className="text-xs text-slate-400">1 biển số = 1 chủ xe trên toàn hệ thống</p>
+                        </div>
+                        <button
+                          onClick={() => setVehicleModal({ open: true })}
+                          className="inline-flex h-10 items-center gap-2 rounded-2xl bg-blue-600 px-4 text-sm font-bold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500"
+                        >
+                          <Plus className="h-4 w-4" /> Thêm xe
+                        </button>
+                      </div>
+
+                      {deleteError && <ErrorAlert message={deleteError} />}
+
+                      {vehicles.length === 0 ? (
+                        <div className="rounded-[28px] border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
+                          <Car className="mx-auto mb-4 h-10 w-10 text-blue-400" />
+                          <h2 className="text-2xl font-black text-slate-950">Chưa có xe nào</h2>
+                          <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-slate-500">
+                            Đăng ký xe để lưu biển số và dễ dàng check-in bãi đỗ. Mỗi biển số là duy nhất trên hệ thống.
+                          </p>
+                          <button
+                            onClick={() => setVehicleModal({ open: true })}
+                            className="mt-6 inline-flex h-11 items-center gap-2 rounded-2xl bg-blue-600 px-6 text-sm font-bold text-white transition hover:bg-blue-500"
+                          >
+                            <Plus className="h-4 w-4" /> Thêm xe ngay
+                          </button>
+                        </div>
+                      ) : (
+                        <AnimatePresence>
+                          {vehicles.map(v => (
+                            <VehicleCard
+                              key={v.id}
+                              vehicle={v}
+                              onEdit={vehicle => setVehicleModal({ open: true, vehicle })}
+                              onDelete={handleDeleteVehicle}
+                              deletingId={deletingId}
+                            />
+                          ))}
+                        </AnimatePresence>
+                      )}
+                    </motion.div>
+                  )}
+
+                  {/* ── Tab: Gói tháng (active) ── */}
+                  {tab === 'packages' && (
                     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
                       {activeSubscriptions.length === 0 ? (
                         <div className="rounded-[28px] border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
@@ -473,11 +791,21 @@ export default function ProfilePage() {
       </div>
 
       <AnimatePresence>
-        {editOpen && displayProfile && (
-          <EditModal
+        {editProfileOpen && displayProfile && (
+          <EditProfileModal
             profile={displayProfile as UserProfile}
-            onClose={() => setEditOpen(false)}
-            onSaved={updated => setProfile(updated)}
+            onClose={() => setEditProfileOpen(false)}
+            onSaved={updated => {
+              setProfile(updated);
+              updateUser(updated);
+            }}
+          />
+        )}
+        {vehicleModal.open && (
+          <VehicleModal
+            initial={vehicleModal.vehicle}
+            onClose={() => setVehicleModal({ open: false })}
+            onSaved={handleVehicleSaved}
           />
         )}
       </AnimatePresence>

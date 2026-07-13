@@ -28,7 +28,7 @@ export interface BookingCreateResult {
   };
   floor: {
     id: number;
-    floorNumber: number;
+    floorNumber: string;
   };
 }
 
@@ -56,9 +56,39 @@ export interface Booking {
   updatedAt: string;
   floor?: {
     id: number;
-    floorNumber: number;
+    floorNumber: string;
     buildingId: number;
   };
+  user?: {
+    id: number;
+    fullName: string;
+    email: string;
+    phone: string | null;
+  } | null;
+}
+
+export interface BookingListParams {
+  status?: BookingStatus;
+  licensePlate?: string;
+  startDate?: string;
+  endDate?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface BookingListResult {
+  bookings: Booking[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+export interface ExpireBookingsResult {
+  pendingCancelled: number;
+  expired: number;
 }
 
 async function parseDataResponse<T>(response: Response): Promise<T> {
@@ -102,11 +132,45 @@ export const bookingService = {
     return parseDataResponse<Booking[]>(response);
   },
 
+  async getAll(params: BookingListParams = {}): Promise<BookingListResult> {
+    const query = new URLSearchParams();
+    query.set('page', String(params.page ?? 1));
+    query.set('limit', String(params.limit ?? 10));
+    if (params.status) query.set('status', params.status);
+    if (params.licensePlate) {
+      query.set('licensePlate', params.licensePlate.toUpperCase().replace(/\s/g, '').trim());
+    }
+    if (params.startDate) query.set('startDate', params.startDate);
+    if (params.endDate) query.set('endDate', params.endDate);
+
+    const response = await fetch(`${API_BASE_URL}/bookings?${query.toString()}`, {
+      method: 'GET',
+      headers: jsonHeaders(true),
+    });
+    const result = await response.json().catch(() => ({ success: false, message: 'Invalid server response' }));
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || `API error with status ${response.status}`);
+    }
+
+    return {
+      bookings: result.data as Booking[],
+      pagination: result.pagination,
+    };
+  },
+
   async cancelBooking(id: number): Promise<Booking> {
     const response = await fetch(`${API_BASE_URL}/bookings/${id}/cancel`, {
       method: 'POST',
       headers: jsonHeaders(true),
     });
     return parseDataResponse<Booking>(response);
+  },
+
+  async expireBookings(): Promise<ExpireBookingsResult> {
+    const response = await fetch(`${API_BASE_URL}/bookings/expire`, {
+      method: 'POST',
+      headers: jsonHeaders(true),
+    });
+    return parseDataResponse<ExpireBookingsResult>(response);
   },
 };

@@ -37,13 +37,35 @@ const sequelize = databaseUrl
       }
     );
 
+const runMigrations = async () => {
+  const migrations = [
+    `ALTER TABLE users ADD COLUMN isEmailVerified TINYINT(1) DEFAULT 1`,
+    `ALTER TABLE users ADD COLUMN emailVerificationToken VARCHAR(255) DEFAULT NULL`,
+    `ALTER TABLE users ADD COLUMN emailVerificationTokenExpires DATETIME DEFAULT NULL`,
+    `ALTER TABLE users ADD COLUMN passwordResetToken VARCHAR(255) DEFAULT NULL`,
+    `ALTER TABLE users ADD COLUMN passwordResetTokenExpires DATETIME DEFAULT NULL`,
+    // floorNumber chuyển sang mã chuỗi (B1/B2/A1/A2...). MODIFY về đúng kiểu nên chạy lại vô hại.
+    `ALTER TABLE floors MODIFY COLUMN floorNumber VARCHAR(20) NOT NULL`,
+  ];
+  for (const sql of migrations) {
+    try {
+      await sequelize.query(sql);
+    } catch (err) {
+      if (err.original?.errno !== 1060) throw err; // 1060 = Duplicate column — bỏ qua
+    }
+  }
+  console.log('Migrations applied');
+};
+
 const connectDB = async () => {
   await sequelize.authenticate();
-  console.log('MySQL connected');
+  const target = databaseUrl ? new URL(databaseUrl).host : `${dbHost}:${dbPort}`;
+  console.log(`MySQL connected → ${target}`);
   if (process.env.NODE_ENV !== 'production') {
     await sequelize.sync();
     console.log('Tables synced');
   }
+  await runMigrations();
 };
 
 export { sequelize, connectDB };

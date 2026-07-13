@@ -10,6 +10,9 @@ import About from '../pages/About';
 import Contact from '../pages/Contact';
 import { Login } from '../pages/auth/Login';
 import { Register } from '../pages/auth/Register';
+import { VerifyEmail } from '../pages/auth/VerifyEmail';
+import { ForgotPassword } from '../pages/auth/ForgotPassword';
+import { ResetPassword } from '../pages/auth/ResetPassword';
 import AdminDashboardPage from '../pages/admin/DashboardPage';
 import AdminUsersPage from '../pages/admin/UsersPage';
 import AdminBuildingsPage from '../pages/admin/BuildingsPage';
@@ -17,6 +20,7 @@ import AdminFloorsPage from '../pages/admin/FloorsPage';
 import AdminSlotsPage from '../pages/admin/SlotsPage';
 import AdminPackagesPage from '../pages/admin/PackagesPage';
 import AdminPaymentsPage from '../pages/admin/PaymentsPage';
+import AdminReportsPage from '../pages/admin/ReportsPage';
 import ManagerDashboardPage from '../pages/manager/DashboardPage';
 import ManagerUsersPage from '../pages/manager/UsersPage';
 import ManagerBuildingsPage from '../pages/manager/BuildingsPage';
@@ -25,6 +29,10 @@ import ManagerSlotsPage from '../pages/manager/SlotsPage';
 import ManagerPackagesPage from '../pages/manager/PackagesPage';
 import ManagerPaymentsPage from '../pages/manager/PaymentsPage';
 import ManagerStaffPage from '../pages/manager/StaffPage';
+import ManagerBookingsPage from '../pages/manager/BookingsPage';
+import ManagerParkingSessionsPage from '../pages/manager/ParkingSessionsPage';
+import ManagerParkingRowsPage from '../pages/manager/ParkingRowsPage';
+import ManagerSubscriptionsPage from '../pages/manager/SubscriptionsPage';
 import CheckInPage from '../pages/staff/CheckInPage';
 import CheckOutPage from '../pages/staff/CheckOutPage';
 import ActiveSessionsPage from '../pages/staff/ActiveSessionsPage';
@@ -70,8 +78,7 @@ function ManagerRoute({ children }: { children: ReactNode }) {
     return <Navigate to="/login" replace />;
   }
 
-  const allowed = ['manager', 'admin'];
-  if (!user?.role || !allowed.includes(user.role)) {
+  if (user?.role !== 'manager') {
     return <Navigate to="/" replace />;
   }
 
@@ -113,6 +120,9 @@ export default function AppRoutes() {
       <Route path="/profile" element={<ProfilePage />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/verify-email" element={<VerifyEmail />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/signin" element={<Navigate to="/login" replace />} />
       <Route path="/signup" element={<Navigate to="/register" replace />} />
 
@@ -124,6 +134,7 @@ export default function AppRoutes() {
       <Route path="/admin/payments" element={<AdminRoute><AdminPaymentsPage /></AdminRoute>} />
       <Route path="/admin/packages" element={<AdminRoute><AdminPackagesPage /></AdminRoute>} />
       <Route path="/admin/users" element={<AdminRoute><AdminUsersPage /></AdminRoute>} />
+      <Route path="/admin/reports" element={<AdminRoute><AdminReportsPage /></AdminRoute>} />
 
       <Route path="/manager" element={<Navigate to="/manager/dashboard" replace />} />
       <Route path="/manager/dashboard" element={<ManagerRoute><ManagerDashboardPage /></ManagerRoute>} />
@@ -131,9 +142,14 @@ export default function AppRoutes() {
       <Route path="/manager/floors" element={<ManagerRoute><ManagerFloorsPage /></ManagerRoute>} />
       <Route path="/manager/slots" element={<ManagerRoute><ManagerSlotsPage /></ManagerRoute>} />
       <Route path="/manager/payments" element={<ManagerRoute><ManagerPaymentsPage /></ManagerRoute>} />
+      <Route path="/manager/bookings" element={<ManagerRoute><ManagerBookingsPage /></ManagerRoute>} />
+      <Route path="/manager/parking-sessions" element={<ManagerRoute><ManagerParkingSessionsPage /></ManagerRoute>} />
+      <Route path="/manager/parking-rows" element={<ManagerRoute><ManagerParkingRowsPage /></ManagerRoute>} />
+      <Route path="/manager/subscriptions" element={<ManagerRoute><ManagerSubscriptionsPage /></ManagerRoute>} />
       <Route path="/manager/packages" element={<ManagerRoute><ManagerPackagesPage /></ManagerRoute>} />
       <Route path="/manager/users" element={<ManagerRoute><ManagerUsersPage /></ManagerRoute>} />
       <Route path="/manager/staff" element={<ManagerRoute><ManagerStaffPage /></ManagerRoute>} />
+      <Route path="/manager/reports" element={<ManagerRoute><AdminReportsPage /></ManagerRoute>} />
 
       <Route path="/staff" element={<Navigate to="/staff/check-in" replace />} />
       <Route path="/staff/check-in" element={<StaffRoute><CheckInPage /></StaffRoute>} />

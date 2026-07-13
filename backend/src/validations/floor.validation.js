@@ -3,7 +3,7 @@ import { VEHICLE_TYPES, FLOOR_TYPES } from '../models/floor.model.js';
 
 export const createFloorSchema = Joi.object({
   buildingId: Joi.number().integer().positive().required(),
-  floorNumber: Joi.number().integer().required(),
+  floorNumber: Joi.string().trim().uppercase().max(20).required(),
   vehicleType: Joi.string().valid(...VEHICLE_TYPES).required(),
   floorType:   Joi.string().valid(...FLOOR_TYPES).required(),
   totalSlots: Joi.number().integer().min(1).required(),
@@ -12,7 +12,7 @@ export const createFloorSchema = Joi.object({
 });
 
 export const updateFloorSchema = Joi.object({
-  floorNumber: Joi.number().integer(),
+  floorNumber: Joi.string().trim().uppercase().max(20),
   vehicleType: Joi.string().valid(...VEHICLE_TYPES),
   floorType:   Joi.string().valid(...FLOOR_TYPES),
   totalSlots: Joi.number().integer().min(1),

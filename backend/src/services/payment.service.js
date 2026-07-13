@@ -64,6 +64,8 @@ const handleSubscriptionOutcome = async (payment, success, t) => {
     endDate.setDate(endDate.getDate() + durationDays);
     await activeSub.update({ endDate }, { transaction: t });
     await sub.update({ status: 'cancelled', note: `Gia hạn cho sub #${activeSub.id}` }, { transaction: t });
+    // Trỏ payment về gói active thật (đã gia hạn), không trỏ vào pending vừa bị huỷ
+    await payment.update({ subscriptionId: activeSub.id }, { transaction: t });
   } else {
     const endDate = new Date(now);
     endDate.setDate(endDate.getDate() + durationDays);
@@ -240,7 +242,7 @@ export const getByOrderId = async (orderId, requester) => {
 
   const include =
     route.kind === 'subscription'
-      ? [{ model: ResidentSubscription, as: 'subscription', attributes: ['id', 'userId', 'status'] }]
+      ? [{ model: ResidentSubscription, as: 'subscription', attributes: ['id', 'userId', 'status', 'licensePlate', 'vehicleType', 'endDate'] }]
       : route.kind === 'session'
         ? [{ model: ParkingSession, as: 'session', attributes: ['id', 'userId', 'status'] }]
         : [{ model: Booking, as: 'booking', attributes: ['id', 'userId', 'status'] }];
@@ -255,7 +257,10 @@ export const getByOrderId = async (orderId, requester) => {
       payment.session?.userId ??
       payment.booking?.userId ??
       null;
-    if (!ownerId || ownerId !== requester?.id) {
+    // ownerId === null: booking khách (không gắn user) → cho xem kết quả bằng orderId
+    //   (orderId là capability, chỉ trả về cho người tạo giao dịch).
+    // ownerId có giá trị: bắt buộc đúng chủ sở hữu (sub/session luôn có userId → vẫn được bảo vệ).
+    if (ownerId && ownerId !== requester?.id) {
       throw new AppError('Access denied', 403);
     }
   }

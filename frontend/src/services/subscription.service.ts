@@ -48,6 +48,18 @@ export interface ResidentSubscription {
   updatedAt?: string;
   package?: ResidentSubscriptionPackage;
   slot?: ResidentSubscriptionSlot | null;
+  user?: {
+    id: number;
+    fullName: string;
+    email: string;
+    phone: string | null;
+  };
+}
+
+export interface ExpireSubscriptionsResult {
+  pendingCancelled: number;
+  activeExpired: number;
+  orphanSlotsFreed: number;
 }
 
 async function parseResponse<T>(response: Response): Promise<T> {
@@ -82,6 +94,14 @@ export const subscriptionService = {
     return parseResponse<BuyPackageResult>(response);
   },
 
+  async getById(id: number): Promise<ResidentSubscription> {
+    const response = await fetch(`${API_BASE_URL}/subscriptions/${id}`, {
+      method: 'GET',
+      headers: authHeaders(),
+    });
+    return parseResponse<ResidentSubscription>(response);
+  },
+
   async getMine(status?: SubscriptionStatus): Promise<ResidentSubscription[]> {
     const query = new URLSearchParams();
     if (status) query.set('status', status);
@@ -91,5 +111,22 @@ export const subscriptionService = {
       headers: authHeaders(),
     });
     return parseResponse<ResidentSubscription[]>(response);
+  },
+
+  async getAll(params: { status?: SubscriptionStatus; licensePlate?: string } = {}): Promise<ResidentSubscription[]> {
+    const query = new URLSearchParams();
+    if (params.status) query.set('status', params.status);
+    if (params.licensePlate) query.set('licensePlate', params.licensePlate.toUpperCase().replace(/\s/g, '').trim());
+    const response = await fetch(`${API_BASE_URL}/subscriptions?${query.toString()}`, {
+      method: 'GET', headers: authHeaders(),
+    });
+    return parseResponse<ResidentSubscription[]>(response);
+  },
+
+  async expireSubscriptions(): Promise<ExpireSubscriptionsResult> {
+    const response = await fetch(`${API_BASE_URL}/subscriptions/expire`, {
+      method: 'POST', headers: authHeaders(),
+    });
+    return parseResponse<ExpireSubscriptionsResult>(response);
   },
 };

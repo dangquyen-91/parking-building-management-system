@@ -1,17 +1,21 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useFormik } from 'formik';
 import { motion, type Variants } from 'framer-motion';
-import { User, Mail, Lock, ArrowRight, AlertTriangle } from 'lucide-react';
+import { User, Mail, Lock, ArrowRight, AlertTriangle, MailCheck } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { authService } from '../../services/auth.service';
 import { registerSchema } from '../../validation/authSchema';
 import { AuthLayout } from '../../components/auth/AuthLayout';
 import { Input } from '../../components/ui/Input';
+import { useCooldown } from '../../hooks/useCooldown';
 
 export const Register: React.FC = () => {
   const { register } = useAuth();
-  const navigate = useNavigate();
   const [apiError, setApiError] = useState<string | null>(null);
+  const [registeredEmail, setRegisteredEmail] = useState<string | null>(null);
+  const [resendMsg, setResendMsg] = useState<string | null>(null);
+  const cooldown = useCooldown('cooldown:verify', 60);
 
   const formik = useFormik({
     initialValues: {
@@ -31,13 +35,53 @@ export const Register: React.FC = () => {
           password: values.password,
         });
 
-        navigate('/login', { state: { registerSuccess: true } });
+        sessionStorage.setItem('pendingEmail', values.email);
+        setRegisteredEmail(values.email);
+        cooldown.start();
       } catch (err: any) {
         setApiError(err.message || 'Đăng ký thất bại. Vui lòng kiểm tra lại thông tin.');
         setSubmitting(false);
       }
     },
   });
+
+  const handleResend = async () => {
+    if (!registeredEmail || cooldown.active) return;
+    setResendMsg(null);
+    try {
+      const res = await authService.resendVerification(registeredEmail);
+      setResendMsg(res.message);
+      cooldown.start();
+    } catch (err) {
+      setResendMsg(err instanceof Error ? err.message : 'Không gửi được email.');
+    }
+  };
+
+  if (registeredEmail) {
+    return (
+      <AuthLayout title="Kiểm tra email của bạn" subtitle="Chỉ còn một bước nữa để kích hoạt tài khoản.">
+        <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col items-center gap-5 text-center" aria-live="polite">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-blue-500/10 text-blue-400 shadow-[0_0_24px_rgba(59,130,246,0.3)]">
+            <MailCheck size={32} />
+          </div>
+          <div>
+            <p className="text-sm text-slate-300">Đã gửi link xác minh tới <b className="text-white">{registeredEmail}</b>.</p>
+            <p className="mt-1 text-sm text-slate-400">Mở email và bấm "Xác minh" để kích hoạt tài khoản (link hiệu lực 24 giờ).</p>
+            <p className="mt-2 text-xs text-slate-500">Không thấy mail? Kiểm tra mục Spam hoặc gửi lại.</p>
+          </div>
+          <button
+            onClick={handleResend}
+            disabled={cooldown.active}
+            className="w-full rounded-xl border border-white/10 bg-white/[0.04] py-3 font-semibold text-white transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {cooldown.active ? `Gửi lại sau ${cooldown.remaining}s` : 'Gửi lại email xác minh'}
+          </button>
+          {resendMsg && <p className="text-xs text-slate-400">{resendMsg}</p>}
+          <Link to="/login" className="text-sm font-medium text-blue-400 transition hover:text-blue-300">Quay lại đăng nhập</Link>
+        </motion.div>
+      </AuthLayout>
+    );
+  }
 
   const containerVariants: Variants = {
     hidden: { opacity: 0 },

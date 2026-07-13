@@ -30,6 +30,7 @@ import {
   searchBookingsByPlate,
   getAvailableSlots,
   getAvailableRows,
+  getActiveSessions,
   checkIn,
 } from '../../services/kiosk.service';
 import { floorService, type Floor } from '../../services/floor.service';
@@ -40,7 +41,7 @@ type CheckInScenario =
   | { kind: 'already_in'; lookup: LookupApiResponse }
   | { kind: 'resident'; lookup: LookupApiResponse; subscription: ActiveSubscription; availableSlots: ParkingSlotApiItem[]; availableRows: ParkingRowApiItem[]; floors: Floor[] }
   | { kind: 'booking'; lookup: LookupApiResponse; booking: BookingApiItem }
-  | { kind: 'walkin'; lookup: LookupApiResponse; availableSlots: ParkingSlotApiItem[]; availableRows: ParkingRowApiItem[]; isExpiredResident?: boolean };
+  | { kind: 'walkin'; lookup: LookupApiResponse; availableSlots: ParkingSlotApiItem[]; availableRows: ParkingRowApiItem[]; floors: Floor[]; freeByFloor: Record<number, number>; isExpiredResident?: boolean };
 
 interface LookupResultPanelProps {
   lookup: LookupApiResponse;
@@ -98,25 +99,40 @@ function findDisplayBooking(bookings: BookingApiItem[]) {
 async function getAvailabilityByFloorType(vehicleType: VehicleType, floorType: 'resident' | 'visitor') {
   const floorsRes = await floorService.getFloors({ vehicleType, isActive: true, page: 1, limit: 100 });
   const floors = floorsRes.floors.filter((floor) => floor.floorType === floorType);
-  const floorIds = new Set(floors.map((floor) => floor.id));
 
   if (vehicleType === 'car') {
+    const freeByFloor: Record<number, number> = {};
+
+    if (floorType === 'visitor') {
+      // Tầng ô tô vãng lai "đếm theo tầng": chỗ trống = totalSlots − số phiên đang hoạt động,
+      // KHÔNG đếm slot vật lý (loại tầng này không gán slot cho từng xe).
+      await Promise.all(
+        floors.map(async (floor) => {
+          const active = await getActiveSessions({ floorId: floor.id, limit: 1 });
+          freeByFloor[floor.id] = Math.max(0, Number(floor.totalSlots) - active.pagination.total);
+        })
+      );
+      return { slots: [] as ParkingSlotApiItem[], rows: [] as ParkingRowApiItem[], floors, freeByFloor };
+    }
+
+    // Tầng ô tô cư dân: dùng slot vật lý cố định.
     const slotResults = await Promise.all(
       floors.map((floor) => getAvailableSlots('car', { floorId: floor.id, limit: 100 }))
     );
-
-    return {
-      slots: slotResults.flatMap((result) => result.data),
-      rows: [] as ParkingRowApiItem[],
-      floors,
-    };
+    floors.forEach((floor, idx) => { freeByFloor[floor.id] = slotResults[idx].data.length; });
+    return { slots: slotResults.flatMap((result) => result.data), rows: [] as ParkingRowApiItem[], floors, freeByFloor };
   }
 
-  const spotsRes = await getAvailableRows();
+  // Xe máy: lấy hàng trống THEO TỪNG TẦNG (tránh bị cắt bởi limit mặc định của API và
+  // tránh lọc sai khi rowCode của tầng khác xếp trước).
+  const rowResults = await Promise.all(
+    floors.map((floor) => getAvailableRows({ floorId: floor.id, limit: 100 }))
+  );
   return {
     slots: [] as ParkingSlotApiItem[],
-    rows: (spotsRes.data as ParkingRowApiItem[]).filter((row) => floorIds.has(row.floorId)),
+    rows: rowResults.flatMap((result) => result.data),
     floors,
+    freeByFloor: {} as Record<number, number>,
   };
 }
 
@@ -265,6 +281,7 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
   const [walkinVehicleType, setWalkinVehicleType] = useState<VehicleType>('car');
   const [selectedSlotId, setSelectedSlotId] = useState<number | null>(null);
   const [selectedRowId, setSelectedRowId] = useState<number | null>(null);
+  const [selectedFloorId, setSelectedFloorId] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -274,6 +291,7 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
       setSubmitError(null);
       setSelectedSlotId(null);
       setSelectedRowId(null);
+      setSelectedFloorId(null);
 
       if ((lookup.status === 'already_active' || lookup.status === 'active') && lookup.activeSession) {
         if (!cancelled) setScenario({ kind: 'already_in', lookup });
@@ -332,9 +350,12 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
             lookup,
             availableSlots: carVisitor.slots,
             availableRows: motorcycleVisitor.rows,
+            floors: carVisitor.floors,
+            freeByFloor: carVisitor.freeByFloor,
             isExpiredResident,
           });
           setSelectedRowId(motorcycleVisitor.rows[0]?.id ?? null);
+          setSelectedFloorId(carVisitor.floors[0]?.id ?? null);
         }
       } catch (err) {
         if (!cancelled) {
@@ -411,13 +432,8 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
       const walkinScenario = scenario.kind === 'walkin' ? scenario : null;
       let payload: Parameters<typeof checkIn>[0];
       if (walkinVehicleType === 'car') {
-        if (!selectedSlotId) { setSubmitError('Vui lòng chọn ô đỗ xe.'); return; }
-        const selectedSlot = walkinScenario?.availableSlots.find((slot) => slot.id === selectedSlotId);
-        if (!selectedSlot) {
-          setSubmitError('Vui lòng chọn ô thuộc tầng vãng lai.');
-          return;
-        }
-        payload = { vehicleType: 'car', licensePlate: lookup.licensePlate, floorId: selectedSlot.floorId };
+        if (!selectedFloorId) { setSubmitError('Vui lòng chọn tầng đỗ xe.'); return; }
+        payload = { vehicleType: 'car', licensePlate: lookup.licensePlate, floorId: selectedFloorId };
       } else {
         const selectedRow = walkinScenario?.availableRows.find((row) => row.id === selectedRowId);
         if (!selectedRow) {
@@ -678,7 +694,7 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
   }
 
   if (scenario.kind === 'walkin') {
-    const { availableSlots, availableRows, isExpiredResident } = scenario;
+    const { availableSlots, availableRows, floors, freeByFloor, isExpiredResident } = scenario;
     return (
       <motion.div
         initial={{ opacity: 0, y: 12 }}
@@ -736,6 +752,7 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
                   setWalkinVehicleType(vt);
                   setSelectedSlotId(null);
                   setSelectedRowId(vt === 'motorcycle' ? availableRows[0]?.id ?? null : null);
+                  setSelectedFloorId(vt === 'car' ? floors[0]?.id ?? null : null);
                 }}
                 className={cn(
                   'flex-1 flex items-center justify-center gap-2 rounded-xl border py-3 text-sm font-semibold transition-all',
@@ -752,16 +769,45 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
         </div>
 
         <div className="mb-5">
-          <SlotPicker
-            vehicleType={walkinVehicleType}
-            slots={availableSlots}
-            rows={availableRows}
-            selectedSlotId={selectedSlotId}
-            selectedRowId={selectedRowId}
-            onSelectSlot={setSelectedSlotId}
-            onSelectRow={setSelectedRowId}
-            motorcycleLabel="Chỗ xe máy vãng lai còn trống"
-          />
+          {walkinVehicleType === 'car' ? (
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Chọn tầng vãng lai</p>
+              {floors.length ? (
+                <div className="grid grid-cols-2 gap-2 max-h-44 overflow-y-auto pr-1">
+                  {floors.map((f) => {
+                    const availableOnFloor = freeByFloor[f.id] ?? 0;
+                    return (
+                      <button
+                        key={f.id}
+                        type="button"
+                        onClick={() => setSelectedFloorId(f.id)}
+                        className={cn(
+                          'rounded-xl border px-3 py-2.5 text-sm font-bold transition-all text-left',
+                          selectedFloorId === f.id ? 'border-blue-400/60 bg-blue-500/20 text-blue-300' : 'border-white/10 bg-white/[0.03] text-slate-300 hover:border-blue-400/30'
+                        )}
+                      >
+                        <div className="font-bold">Tầng {f.floorNumber}</div>
+                        <div className="text-[10px] font-normal text-slate-500">{availableOnFloor} chỗ trống</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-slate-500 py-2">Không còn tầng vãng lai cho ô tô.</p>
+              )}
+            </div>
+          ) : (
+            <SlotPicker
+              vehicleType={walkinVehicleType}
+              slots={availableSlots}
+              rows={availableRows}
+              selectedSlotId={selectedSlotId}
+              selectedRowId={selectedRowId}
+              onSelectSlot={setSelectedSlotId}
+              onSelectRow={setSelectedRowId}
+              motorcycleLabel="Chỗ xe máy vãng lai còn trống"
+            />
+          )}
         </div>
 
         {submitError && <ErrorAlert message={submitError} />}
@@ -769,7 +815,7 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
         <motion.button
           whileHover={{ scale: 1.01 }}
           whileTap={{ scale: 0.98 }}
-          disabled={isSubmitting || (walkinVehicleType === 'car' ? !selectedSlotId : !selectedRowId)}
+          disabled={isSubmitting || (walkinVehicleType === 'car' ? !selectedFloorId : !selectedRowId)}
           onClick={handleWalkinCheckIn}
           className="w-full rounded-xl bg-gradient-to-r from-slate-600 to-slate-700 py-3.5 font-semibold text-white shadow-[0_4px_20px_rgba(0,0,0,0.3)] transition-all hover:from-slate-500 hover:to-slate-600 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >

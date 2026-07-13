@@ -52,6 +52,173 @@ components:
         default: DESC
 
   schemas:
+    # -- REPORT --
+    ReportDashboard:
+      type: object
+      properties:
+        activeSessions:
+          type: object
+          properties:
+            total: { type: integer, example: 42 }
+            motorcycle: { type: integer, example: 28 }
+            car: { type: integer, example: 14 }
+        completedSessionsToday:
+          type: integer
+          example: 135
+        revenueToday:
+          type: object
+          properties:
+            total: { type: number, example: 4750000 }
+            fromSessions: { type: number, example: 3200000 }
+            fromBookings: { type: number, example: 1050000 }
+            fromSubscriptions: { type: number, example: 500000 }
+        bookingsToday:
+          type: object
+          properties:
+            pending: { type: integer, example: 5 }
+            confirmed: { type: integer, example: 12 }
+
+    ReportRevenuePeriod:
+      type: object
+      properties:
+        period: { type: string, example: '2025-06' }
+        total: { type: number, example: 12500000 }
+        session: { type: number, example: 8000000 }
+        booking: { type: number, example: 3000000 }
+        subscription: { type: number, example: 1500000 }
+
+    ReportRevenueByVehiclePeriod:
+      type: object
+      properties:
+        period: { type: string, example: '2025-06-01' }
+        motorcycle: { type: number, example: 3500000 }
+        car: { type: number, example: 9000000 }
+        total: { type: number, example: 12500000 }
+
+    ReportRevenueComparison:
+      type: object
+      properties:
+        period: { type: string, enum: [week, month, year], example: month }
+        current:
+          type: object
+          properties:
+            from: { type: string, format: date-time }
+            to: { type: string, format: date-time }
+            revenue: { type: number, example: 45000000 }
+        previous:
+          type: object
+          properties:
+            from: { type: string, format: date-time }
+            to: { type: string, format: date-time }
+            revenue: { type: number, example: 38000000 }
+        changePercent:
+          type: number
+          nullable: true
+          example: 18.42
+
+    ReportSessionStats:
+      type: object
+      properties:
+        total: { type: integer, example: 520 }
+        byVehicleType:
+          type: object
+          properties:
+            motorcycle: { type: integer, example: 340 }
+            car: { type: integer, example: 180 }
+        byStatus:
+          type: object
+          properties:
+            active: { type: integer, example: 42 }
+            completed: { type: integer, example: 465 }
+            cancelled: { type: integer, example: 13 }
+        avgDurationMinutes: { type: integer, example: 87 }
+
+    ReportBookingStats:
+      type: object
+      properties:
+        total: { type: integer, example: 80 }
+        byStatus:
+          type: object
+          properties:
+            pending: { type: integer, example: 5 }
+            confirmed: { type: integer, example: 60 }
+            cancelled: { type: integer, example: 10 }
+            expired: { type: integer, example: 5 }
+        conversionRate: { type: number, example: 75.0, description: '% pending -> confirmed' }
+        noShowRate: { type: number, example: 8.33, description: '% confirmed chua check-in' }
+        checkedIn: { type: integer, example: 55 }
+
+    ReportSubscriptionStats:
+      type: object
+      properties:
+        activeByPlan:
+          type: array
+          items:
+            type: object
+            properties:
+              packageId: { type: integer }
+              packageName: { type: string, example: 'Goi thang xe may' }
+              vehicleType: { type: string, enum: [motorcycle, car] }
+              count: { type: integer, example: 45 }
+        expiringIn7Days: { type: integer, example: 8 }
+        newSubscriptionsDaily:
+          type: array
+          items:
+            type: object
+            properties:
+              date: { type: string, format: date, example: '2025-06-01' }
+              count: { type: integer, example: 3 }
+
+    ReportOccupancyFloor:
+      type: object
+      properties:
+        floorId: { type: integer, example: 1 }
+        floorNumber: { type: integer, example: 1 }
+        vehicleType: { type: string, enum: [motorcycle, car] }
+        floorType: { type: string, enum: [resident, visitor] }
+        occupancyRate: { type: number, example: 72.5, description: 'Phan tram ly so' }
+
+    ReportOccupancyTrendItem:
+      type: object
+      properties:
+        date: { type: string, format: date, example: '2025-06-01' }
+        floorId: { type: integer, example: 2 }
+        checkIns: { type: integer, example: 38 }
+
+    ReportPeakHourItem:
+      type: object
+      properties:
+        hour: { type: integer, minimum: 0, maximum: 23, example: 8 }
+        count: { type: integer, example: 47 }
+
+    ReportPeakDayItem:
+      type: object
+      properties:
+        dayOfWeek: { type: integer, minimum: 1, maximum: 7, example: 2, description: '1=Sunday ... 7=Saturday' }
+        dayName: { type: string, example: Monday }
+        isWeekend: { type: boolean, example: false }
+        count: { type: integer, example: 312 }
+
+    ReportTopVehicleItem:
+      type: object
+      properties:
+        rank: { type: integer, example: 1 }
+        licensePlate: { type: string, example: '51A-123.45' }
+        vehicleType: { type: string, enum: [motorcycle, car] }
+        sessionCount: { type: integer, example: 48 }
+        totalFee: { type: number, example: 840000 }
+        lastSeen: { type: string, format: date-time }
+
+    ReportStaffItem:
+      type: object
+      properties:
+        staffId: { type: integer, example: 3 }
+        staffName: { type: string, example: 'Tran Van B' }
+        totalSessions: { type: integer, example: 120 }
+        completedSessions: { type: integer, example: 115 }
+        paidSessions: { type: integer, example: 110 }
+        cashCollected: { type: number, example: 2750000 }
+
     # -- COMMON --
     SuccessResponse:
       type: object
@@ -156,6 +323,34 @@ components:
             $ref: '#/components/schemas/User'
         pagination:
           $ref: '#/components/schemas/Pagination'
+
+    # -- VEHICLE --
+    Vehicle:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        userId:
+          type: integer
+          example: 5
+        licensePlate:
+          type: string
+          example: '30A-12345'
+        vehicleType:
+          type: string
+          enum: [motorcycle, car]
+          example: car
+        nickname:
+          type: string
+          nullable: true
+          example: Xe di lam
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
 
     # -- BUILDING --
     Building:
@@ -1026,7 +1221,10 @@ paths:
     post:
       tags: [Auth]
       summary: Register a new account
-      description: Creates a new account with role `user` by default.
+      description: |
+        Tạo tài khoản mới với role `user` mặc định.
+        Sau khi đăng ký, một email xác minh sẽ được gửi đến địa chỉ email đã cung cấp.
+        Tài khoản chỉ có thể đăng nhập sau khi xác minh email thành công qua `GET /auth/verify-email`.
       requestBody:
         required: true
         content:
@@ -1047,15 +1245,15 @@ paths:
                 password:
                   type: string
                   minLength: 8
-                  maxLength: 72
-                  description: Must contain at least one uppercase letter, one lowercase letter, and one digit
+                  maxLength: 128
                   example: Password1
                 phone:
                   type: string
+                  pattern: '^[0-9]{9,11}$'
                   example: '0901234567'
       responses:
         '201':
-          description: Registered successfully
+          description: Đăng ký thành công, email xác minh đã được gửi
           content:
             application/json:
               schema:
@@ -1064,7 +1262,11 @@ paths:
                   - type: object
                     properties:
                       data:
-                        $ref: '#/components/schemas/User'
+                        type: object
+                        properties:
+                          message:
+                            type: string
+                            example: Đăng ký thành công. Vui lòng kiểm tra email để xác minh tài khoản.
         '400':
           description: Validation error
           content:
@@ -1073,6 +1275,12 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '409':
           description: Email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Quá nhiều lần đăng ký (10 lần/giờ)
           content:
             application/json:
               schema:
@@ -1110,13 +1318,25 @@ paths:
                       data:
                         $ref: '#/components/schemas/Tokens'
         '401':
-          description: Invalid credentials or account inactive
+          description: Sai email hoặc mật khẩu, hoặc tài khoản bị vô hiệu hóa
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Email chưa được xác minh
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ErrorResponse'
+                  - type: object
+                    properties:
+                      message:
+                        type: string
+                        example: Vui lòng xác minh email trước khi đăng nhập. Kiểm tra hộp thư của bạn.
         '429':
-          description: Too many login attempts
+          description: Quá nhiều lần đăng nhập sai (15 lần/15 phút)
           content:
             application/json:
               schema:
@@ -1233,6 +1453,221 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/verify-email:
+    get:
+      tags: [Auth]
+      summary: Xác minh email
+      description: |
+        Xác minh địa chỉ email của tài khoản bằng token nhận được qua email.
+        Token có hiệu lực trong **24 giờ** kể từ thời điểm đăng ký hoặc gửi lại.
+        Sau khi xác minh thành công, tài khoản có thể đăng nhập bình thường.
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+            example: a3f2c1d4e5b6a7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2
+          description: Token 64 ký tự hex nhận được qua email xác minh
+      responses:
+        '200':
+          description: Xác minh email thành công
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          message:
+                            type: string
+                            example: Xác minh email thành công. Bạn có thể đăng nhập ngay bây giờ.
+        '400':
+          description: Token không hợp lệ, đã sử dụng, hoặc đã hết hạn
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalid:
+                  summary: Token không hợp lệ
+                  value: { success: false, message: Token không hợp lệ hoặc đã được sử dụng }
+                expired:
+                  summary: Token hết hạn
+                  value: { success: false, message: Token đã hết hạn. Vui lòng yêu cầu gửi lại email xác minh. }
+                alreadyVerified:
+                  summary: Email đã được xác minh
+                  value: { success: false, message: Email đã được xác minh trước đó }
+
+  /auth/resend-verification:
+    post:
+      tags: [Auth]
+      summary: Gửi lại email xác minh
+      description: |
+        Gửi lại email xác minh cho tài khoản chưa được xác minh.
+        Token cũ sẽ bị thay thế bằng token mới, có hiệu lực trong 24 giờ.
+        Để tránh lộ thông tin tài khoản, response luôn trả về thông báo chung dù email có tồn tại hay không.
+        Rate limit: **5 lần/giờ** mỗi IP.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+      responses:
+        '200':
+          description: Đã xử lý yêu cầu (thông báo chung để tránh lộ thông tin tài khoản)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          message:
+                            type: string
+                            example: Nếu email tồn tại và chưa xác minh, chúng tôi đã gửi lại email xác minh.
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Quá nhiều yêu cầu (5 lần/giờ)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/forgot-password:
+    post:
+      tags: [Auth]
+      summary: Quên mật khẩu — gửi email đặt lại
+      description: |
+        Gửi email chứa link đặt lại mật khẩu đến địa chỉ email đã đăng ký.
+        Token có hiệu lực trong **1 giờ**.
+        Để tránh lộ thông tin tài khoản, response luôn trả về thông báo chung.
+        Rate limit: **5 lần/giờ** mỗi IP.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+      responses:
+        '200':
+          description: Đã xử lý yêu cầu (thông báo chung để tránh lộ thông tin tài khoản)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          message:
+                            type: string
+                            example: Nếu email tồn tại trong hệ thống, chúng tôi đã gửi hướng dẫn đặt lại mật khẩu.
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Quá nhiều yêu cầu (5 lần/giờ)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/reset-password:
+    post:
+      tags: [Auth]
+      summary: Đặt lại mật khẩu bằng token
+      description: |
+        Đặt mật khẩu mới bằng token nhận được qua email.
+        Token phải còn hiệu lực (trong vòng 1 giờ kể từ khi yêu cầu).
+        Sau khi đặt lại thành công, **tất cả session đang đăng nhập sẽ bị vô hiệu hoá** (refreshToken bị xóa).
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+            example: a3f2c1d4e5b6a7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2
+          description: Token 64 ký tự hex nhận được qua email đặt lại mật khẩu
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [newPassword, confirmPassword]
+              properties:
+                newPassword:
+                  type: string
+                  minLength: 8
+                  maxLength: 128
+                  example: NewPassword123
+                confirmPassword:
+                  type: string
+                  description: Phải khớp với newPassword
+                  example: NewPassword123
+      responses:
+        '200':
+          description: Đặt lại mật khẩu thành công
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          message:
+                            type: string
+                            example: Đặt lại mật khẩu thành công. Vui lòng đăng nhập lại.
+        '400':
+          description: Token không hợp lệ / hết hạn, mật khẩu không khớp, hoặc trùng mật khẩu cũ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalidToken:
+                  summary: Token không hợp lệ
+                  value: { success: false, message: Token không hợp lệ hoặc đã được sử dụng }
+                expiredToken:
+                  summary: Token hết hạn
+                  value: { success: false, message: Token đã hết hạn. Vui lòng yêu cầu đặt lại mật khẩu mới. }
+                samePassword:
+                  summary: Trùng mật khẩu cũ
+                  value: { success: false, message: Mật khẩu mới không được trùng với mật khẩu hiện tại }
 
   # -- USERS --
   /users/me:
@@ -1596,6 +2031,132 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+
+  # -- VEHICLES --
+  /vehicles:
+    post:
+      tags: [Vehicles]
+      summary: Dang ky xe moi (bien so cua toi)
+      description: |
+        Luu bien so xe vao danh sach "xe cua toi", doc lap voi viec mua goi/booking.
+        Bien so la duy nhat tren toan he thong (1 bien so = 1 chu xe).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [licensePlate, vehicleType]
+              properties:
+                licensePlate:
+                  type: string
+                  pattern: '^[A-Z0-9\\-]+$'
+                  minLength: 4
+                  maxLength: 20
+                  example: '30A-12345'
+                vehicleType:
+                  type: string
+                  enum: [motorcycle, car]
+                  example: car
+                nickname:
+                  type: string
+                  maxLength: 50
+                  example: Xe di lam
+      responses:
+        '201':
+          description: Vehicle da duoc dang ky
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Vehicle'
+        '400': { description: 'Validation error' }
+        '401': { description: 'Unauthorized' }
+        '409': { description: 'Bien so da duoc dang ky boi tai khoan khac' }
+
+  /vehicles/me:
+    get:
+      tags: [Vehicles]
+      summary: Danh sach xe cua user dang dang nhap
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List vehicles
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Vehicle'
+        '401': { description: 'Unauthorized' }
+
+  /vehicles/{id}:
+    patch:
+      tags: [Vehicles]
+      summary: Cap nhat xe cua toi (owner only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/pathId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                licensePlate:
+                  type: string
+                  pattern: '^[A-Z0-9\\-]+$'
+                  minLength: 4
+                  maxLength: 20
+                vehicleType:
+                  type: string
+                  enum: [motorcycle, car]
+                nickname:
+                  type: string
+                  maxLength: 50
+      responses:
+        '200':
+          description: Vehicle updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Vehicle'
+        '400': { description: 'Validation error' }
+        '403': { description: 'Not the owner' }
+        '404': { description: 'Vehicle not found' }
+        '409': { description: 'Bien so da duoc dang ky boi tai khoan khac' }
+
+    delete:
+      tags: [Vehicles]
+      summary: Xoa xe cua toi (owner only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/pathId'
+      responses:
+        '204': { description: 'Da xoa' }
+        '403': { description: 'Not the owner' }
+        '404': { description: 'Vehicle not found' }
 
   # -- BUILDINGS --
   /buildings:
@@ -4196,3 +4757,384 @@ paths:
               schema:
                 $ref: '#/components/schemas/SuccessResponse'
         '403': { description: 'Forbidden' }
+
+  # ── REPORTS ─────────────────────────────────────────────────────────────────
+
+  /reports/dashboard:
+    get:
+      tags: [Reports]
+      summary: Snapshot hoat dong hom nay
+      description: |
+        Tra ve tong quan hoat dong trong ngay: so xe dang gui, doanh thu hom nay
+        (chia theo loai giao dich), va booking hom nay. Khong can query params.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Dashboard data
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ReportDashboard'
+        '401': { description: Unauthorized }
+        '403': { description: 'Chi admin/manager' }
+
+  /reports/revenue:
+    get:
+      tags: [Reports]
+      summary: Doanh thu theo loai giao dich (session / booking / subscription)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          schema: { type: string, format: date, example: '2025-01-01' }
+        - name: to
+          in: query
+          schema: { type: string, format: date, example: '2025-06-30' }
+        - name: groupBy
+          in: query
+          schema: { type: string, enum: [day, week, month], default: day }
+      responses:
+        '200':
+          description: Mang cac period, moi period co total + session + booking + subscription
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ReportRevenuePeriod'
+        '400': { description: 'Invalid date / groupBy' }
+        '403': { description: 'Chi admin/manager' }
+
+  /reports/revenue/by-vehicle:
+    get:
+      tags: [Reports]
+      summary: Doanh thu chia theo loai xe (motorcycle / car)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          schema: { type: string, format: date, example: '2025-01-01' }
+        - name: to
+          in: query
+          schema: { type: string, format: date, example: '2025-06-30' }
+        - name: groupBy
+          in: query
+          schema: { type: string, enum: [day, week, month], default: day }
+      responses:
+        '200':
+          description: Mang cac period, moi period co motorcycle + car + total
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ReportRevenueByVehiclePeriod'
+        '400': { description: 'Invalid date / groupBy' }
+        '403': { description: 'Chi admin/manager' }
+
+  /reports/revenue/comparison:
+    get:
+      tags: [Reports]
+      summary: So sanh doanh thu ky nay vs ky truoc + % tang/giam
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: period
+          in: query
+          schema: { type: string, enum: [week, month, year], default: month }
+      responses:
+        '200':
+          description: current vs previous revenue + changePercent
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ReportRevenueComparison'
+        '400': { description: 'Invalid period' }
+        '403': { description: 'Chi admin/manager' }
+
+  /reports/sessions:
+    get:
+      tags: [Reports]
+      summary: Thong ke phien gui xe (tong, loai xe, trang thai, avg duration)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          schema: { type: string, format: date, example: '2025-06-01' }
+        - name: to
+          in: query
+          schema: { type: string, format: date, example: '2025-06-30' }
+      responses:
+        '200':
+          description: Session stats
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ReportSessionStats'
+        '400': { description: 'Invalid date range' }
+        '403': { description: 'Chi admin/manager' }
+
+  /reports/bookings:
+    get:
+      tags: [Reports]
+      summary: Booking funnel — conversion rate, no-show rate
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          schema: { type: string, format: date, example: '2025-06-01' }
+        - name: to
+          in: query
+          schema: { type: string, format: date, example: '2025-06-30' }
+      responses:
+        '200':
+          description: Booking funnel stats
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ReportBookingStats'
+        '400': { description: 'Invalid date range' }
+        '403': { description: 'Chi admin/manager' }
+
+  /reports/subscriptions:
+    get:
+      tags: [Reports]
+      summary: Subscription analytics — active by plan, sap het han, daily new
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          schema: { type: string, format: date, example: '2025-06-01' }
+        - name: to
+          in: query
+          schema: { type: string, format: date, example: '2025-06-30' }
+      responses:
+        '200':
+          description: Subscription stats
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ReportSubscriptionStats'
+        '400': { description: 'Invalid date range' }
+        '403': { description: 'Chi admin/manager' }
+
+  /reports/occupancy:
+    get:
+      tags: [Reports]
+      summary: Real-time occupancy snapshot theo tung tang
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Danh sach tang voi occupancy rate hien tai
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ReportOccupancyFloor'
+        '403': { description: 'Chi admin/manager' }
+
+  /reports/occupancy/trend:
+    get:
+      tags: [Reports]
+      summary: Lich su check-in theo ngay (theo tang tuy chon)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          schema: { type: string, format: date, example: '2025-06-01' }
+        - name: to
+          in: query
+          schema: { type: string, format: date, example: '2025-06-30' }
+        - name: floorId
+          in: query
+          description: Loc theo tang cu the (optional)
+          schema: { type: integer, example: 2 }
+      responses:
+        '200':
+          description: Mang (date, floorId, checkIns)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ReportOccupancyTrendItem'
+        '400': { description: 'Invalid params' }
+        '403': { description: 'Chi admin/manager' }
+
+  /reports/peak-hours:
+    get:
+      tags: [Reports]
+      summary: Phan bo gio cao diem check-in (0-23h)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: days
+          in: query
+          description: Tinh trong N ngay gan nhat (1-365, default 30)
+          schema: { type: integer, default: 30, minimum: 1, maximum: 365, example: 30 }
+      responses:
+        '200':
+          description: Mang 24 phan tu (hour 0..23, count)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ReportPeakHourItem'
+        '400': { description: 'Invalid days param' }
+        '403': { description: 'Chi admin/manager' }
+
+  /reports/peak-days:
+    get:
+      tags: [Reports]
+      summary: Phan bo luot check-in theo thu trong tuan (biet cuoi tuan vs ngay thuong)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: days
+          in: query
+          description: Tinh trong N ngay gan nhat (1-365, default 30)
+          schema: { type: integer, default: 30, minimum: 1, maximum: 365, example: 30 }
+      responses:
+        '200':
+          description: Mang 7 phan tu (dayOfWeek 1..7, dayName, isWeekend, count)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ReportPeakDayItem'
+        '400': { description: 'Invalid days param' }
+        '403': { description: 'Chi admin/manager' }
+
+  /reports/top-vehicles:
+    get:
+      tags: [Reports]
+      summary: Top phuong tien quay lai nhieu nhat (huu ich cho marketing / khuyen mai sub)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          schema: { type: string, format: date, example: '2025-01-01' }
+        - name: to
+          in: query
+          schema: { type: string, format: date, example: '2025-06-30' }
+        - name: limit
+          in: query
+          description: So luong tra ve (1-100, default 10)
+          schema: { type: integer, default: 10, minimum: 1, maximum: 100 }
+        - name: vehicleType
+          in: query
+          description: Loc theo loai xe (optional)
+          schema: { type: string, enum: [motorcycle, car] }
+      responses:
+        '200':
+          description: Danh sach bien so xe sap xep giam dan theo so luot gui
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ReportTopVehicleItem'
+        '400': { description: 'Invalid params' }
+        '403': { description: 'Chi admin/manager' }
+
+  /reports/staff:
+    get:
+      tags: [Reports]
+      summary: Hieu suat staff — check-in/out, tien mat thu duoc
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          schema: { type: string, format: date, example: '2025-06-01' }
+        - name: to
+          in: query
+          schema: { type: string, format: date, example: '2025-06-30' }
+      responses:
+        '200':
+          description: Danh sach staff voi thong ke hoat dong
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ReportStaffItem'
+        '400': { description: 'Invalid date range' }
+        '403': { description: 'Chi admin/manager' }

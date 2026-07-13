@@ -102,8 +102,11 @@ export async function getAvailableSlots(
   return handleResponse<{ data: ParkingSlotApiItem[] }>(response);
 }
 
-export async function getAvailableRows(): Promise<{ data: ParkingRowApiItem[] }> {
-  const params = new URLSearchParams({ status: 'available' });
+export async function getAvailableRows(
+  options: { floorId?: number; limit?: number } = {}
+): Promise<{ data: ParkingRowApiItem[] }> {
+  const params = new URLSearchParams({ status: 'available', limit: String(options.limit ?? 100) });
+  if (options.floorId) params.set('floorId', String(options.floorId));
   const response = await fetch(
     `${API_BASE_URL}/parking-rows?${params.toString()}`,
     { headers: getAuthHeaders() }
@@ -126,12 +129,18 @@ export async function getActiveSessions(params?: {
   page?: number;
   limit?: number;
   search?: string;
+  buildingId?: number;
+  floorId?: number;
+  vehicleType?: 'car' | 'motorcycle';
 }): Promise<PaginatedResponse<ActiveSessionApiItem>> {
   const query = new URLSearchParams({
     status: 'active',
     page: String(params?.page ?? 1),
     limit: String(params?.limit ?? 20),
     ...(params?.search ? { search: params.search } : {}),
+    ...(params?.buildingId ? { buildingId: String(params.buildingId) } : {}),
+    ...(params?.floorId ? { floorId: String(params.floorId) } : {}),
+    ...(params?.vehicleType ? { vehicleType: params.vehicleType } : {}),
   });
   const response = await fetch(
     `${API_BASE_URL}/parking-sessions?${query.toString()}`,

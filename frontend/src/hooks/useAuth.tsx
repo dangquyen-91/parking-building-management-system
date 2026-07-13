@@ -9,6 +9,7 @@ interface AuthContextType {
   login: (credentials: { email: string; password: string }) => Promise<UserProfile>;
   register: (userData: { fullName: string; email: string; password: string; phone?: string }) => Promise<void>;
   logout: () => Promise<void>;
+  updateUser: (user: UserProfile) => void;
   isAuthenticated: boolean;
 }
 
@@ -51,6 +52,64 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     initializeAuth();
   }, []);
+
+  // Tự động làm mới access token trước khi hết hạn để tránh bị đăng xuất khi đang dùng.
+  // Trước đây token chỉ được refresh lúc tải lại trang, nên khi access token hết hạn giữa
+  // phiên làm việc thì các request kế tiếp trả về 401 và người dùng bị "tự động logout".
+  useEffect(() => {
+    if (!user) return;
+
+    const REFRESH_MARGIN_MS = 5 * 60 * 1000; // làm mới khi access token còn dưới 5 phút
+
+    // Lấy thời điểm hết hạn (ms) từ payload của access token, không phụ thuộc TTL cấu hình.
+    const getAccessTokenExpiry = (): number | null => {
+      const token = localStorage.getItem('accessToken');
+      if (!token) return null;
+      try {
+        const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+        const pad = base64.length % 4 ? '='.repeat(4 - (base64.length % 4)) : '';
+        const payload = JSON.parse(atob(base64 + pad));
+        return typeof payload.exp === 'number' ? payload.exp * 1000 : null;
+      } catch {
+        return null;
+      }
+    };
+
+    const refreshTokens = async () => {
+      const refreshToken = localStorage.getItem('refreshToken');
+      if (!refreshToken) return;
+      try {
+        const tokens = await authService.refresh(refreshToken);
+        localStorage.setItem('accessToken', tokens.accessToken);
+        localStorage.setItem('refreshToken', tokens.refreshToken);
+      } catch {
+        // Bỏ qua lỗi tạm thời (mạng chập chờn); nếu refresh token thật sự hết hạn thì
+        // lần tải lại trang kế tiếp (initializeAuth) sẽ đăng xuất một cách gọn gàng.
+      }
+    };
+
+    const maybeRefresh = () => {
+      const expiry = getAccessTokenExpiry();
+      if (expiry === null || Date.now() > expiry - REFRESH_MARGIN_MS) {
+        refreshTokens();
+      }
+    };
+
+    // Kiểm tra mỗi phút (chỉ thực sự gọi refresh khi gần hết hạn) và khi người dùng
+    // quay lại tab — xử lý trường hợp máy ngủ / trình duyệt điều tiết timer ở tab nền.
+    const intervalId = window.setInterval(maybeRefresh, 60 * 1000);
+    const onFocus = () => {
+      if (document.visibilityState === 'visible') maybeRefresh();
+    };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onFocus);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onFocus);
+    };
+  }, [user]);
 
   const login = async (credentials: { email: string; password: string }) => {
     setLoading(true);
@@ -97,6 +156,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(false);
   };
 
+  const updateUser = (updatedProfile: UserProfile) => {
+    setUser(updatedProfile);
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -105,6 +168,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         login,
         register,
         logout,
+        updateUser,
         isAuthenticated: !!user,
       }}
     >

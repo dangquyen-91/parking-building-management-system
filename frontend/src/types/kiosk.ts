@@ -31,7 +31,7 @@ export interface LookupActiveSession {
     floorId?: number;
     floor?: {
       id: number;
-      floorNumber: number;
+      floorNumber: string;
       building?: { id: number; name: string };
     };
   } | null;
@@ -41,7 +41,7 @@ export interface LookupActiveSession {
     floorId?: number;
     floor?: {
       id: number;
-      floorNumber: number;
+      floorNumber: string;
       building?: { id: number; name: string };
     };
   } | null;
@@ -100,7 +100,7 @@ export interface SubscriptionApiResponse {
 
 export interface BookingFloor {
   id: number;
-  floorNumber: number;
+  floorNumber: string;
   buildingId?: number;
   floorType?: FloorType;
   vehicleType?: VehicleType;
@@ -149,7 +149,7 @@ export interface ParkingSlotApiItem {
   note: string | null;
   floor?: {
     id: number;
-    floorNumber: number;
+    floorNumber: string;
     floorType: FloorType;
     vehicleType: VehicleType;
     building?: { id: number; name: string };
@@ -166,7 +166,7 @@ export interface ParkingRowApiItem {
   note: string | null;
   floor?: {
     id: number;
-    floorNumber: number;
+    floorNumber: string;
     floorType: FloorType;
     vehicleType: VehicleType;
     building?: { id: number; name: string };
@@ -202,12 +202,12 @@ export interface CheckInApiResponse {
   slot: {
     id: number;
     slotCode: string;
-    floor: { id: number; floorNumber: number; building: { id: number; name: string } };
+    floor: { id: number; floorNumber: string; building: { id: number; name: string } };
   } | null;
   row: {
     id: number;
     rowCode: string;
-    floor: { id: number; floorNumber: number; building: { id: number; name: string } };
+    floor: { id: number; floorNumber: string; building: { id: number; name: string } };
   } | null;
   staffId: number;
   userId: number | null;
@@ -234,8 +234,14 @@ export interface ActiveSessionApiItem {
   userId: number | null;
   slotId: number | null;
   rowId: number | null;
-  slot?: { id: number; slotCode: string; floor?: { floorNumber: number; building?: { id: number; name: string } } } | null;
-  row?: { id: number; rowCode: string; floor?: { floorNumber: number; building?: { id: number; name: string } } } | null;
+  floorId?: number | null;
+  paymentStatus?: 'paid' | 'unpaid';
+  prepaidHours?: number | null;
+  prepaidAmount?: string | number | null;
+  bookingId?: number | null;
+  note?: string | null;
+  slot?: { id: number; slotCode: string; floor?: { floorNumber: string; building?: { id: number; name: string } } } | null;
+  row?: { id: number; rowCode: string; floor?: { floorNumber: string; building?: { id: number; name: string } } } | null;
   user?: { id: number; fullName: string; email: string } | null;
   staff?: { id: number; fullName: string } | null;
 }
@@ -298,7 +304,7 @@ export interface CheckOutApiResponse {
 export interface FloorApiItem {
   id: number;
   buildingId: number;
-  floorNumber: number;
+  floorNumber: string;
   vehicleType: VehicleType;
   floorType: FloorType;
   totalSlots: number;
