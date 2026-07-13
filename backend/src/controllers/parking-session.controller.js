@@ -21,14 +21,16 @@ const checkIn = async (req, res, next) => {
   }
 };
 
-const getActiveSessions = async (req, res, next) => {
+const getSessions = async (req, res, next) => {
   try {
-    const result = await parkingSessionService.getActiveSessions(req.query);
+    const result = await parkingSessionService.getSessions(req.query);
     response.paginated(res, result.sessions, result.pagination);
   } catch (err) {
     next(err);
   }
 };
+
+const getActiveSessions = getSessions;
 
 const getOne = async (req, res, next) => {
   try {
@@ -75,4 +77,4 @@ const checkOut = async (req, res, next) => {
   }
 };
 
-export { checkIn, getActiveSessions, getOne, lookup, previewCheckout, checkOut };
+export { checkIn, getSessions, getActiveSessions, getOne, lookup, previewCheckout, checkOut };

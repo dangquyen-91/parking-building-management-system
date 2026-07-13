@@ -6,6 +6,7 @@ import ParkingRow from '../models/parking-row.model.js';
 import Floor from '../models/floor.model.js';
 import Building from '../models/building.model.js';
 import User from '../models/user.model.js';
+import Booking from '../models/booking.model.js';
 import ResidentSubscription from '../models/resident-subscription.model.js';
 import SessionPayment from '../models/session-payment.model.js';
 import AppError from '../utils/appError.js';
@@ -258,37 +259,93 @@ const checkIn = async ({ floorId, rowId, licensePlate, vehicleType, userId, note
   });
 };
 
-const getActiveSessions = async ({ page = 1, limit = 10, floorId, buildingId, vehicleType, search } = {}) => {
+const getSessions = async ({
+  page = 1,
+  limit = 10,
+  status = 'active',
+  floorId,
+  buildingId,
+  vehicleType,
+  paymentStatus,
+  customerType,
+  startDate,
+  endDate,
+  search,
+} = {}) => {
   const pageNum = Math.max(1, parseInt(page));
   const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
   const offset = (pageNum - 1) * limitNum;
 
-  const where = { status: 'active' };
+  const where = {};
+  if (status !== 'all') where.status = status;
   if (vehicleType) where.vehicleType = vehicleType;
-  if (search) where.licensePlate = { [Op.like]: `%${search}%` };
+  if (paymentStatus) where.paymentStatus = paymentStatus;
+  if (search) {
+    const normalizedSearch = search.toUpperCase().replace(/\s/g, '');
+    where.licensePlate = { [Op.like]: `%${normalizedSearch}%` };
+  }
+  if (startDate || endDate) {
+    const dateField = status === 'completed' ? 'exitTime' : 'entryTime';
+    where[dateField] = {};
+    if (startDate) where[dateField][Op.gte] = startDate;
+    if (endDate) where[dateField][Op.lte] = endDate;
+  }
+  if (customerType === 'booking') where.bookingId = { [Op.not]: null };
+  if (customerType === 'resident' || customerType === 'visitor') where.bookingId = null;
 
   const slotWhere = {};
   const rowWhere = {};
   const floorWhere = {};
+  const directFloorWhere = {};
   // Lọc theo tầng dựa trên session.floorId (được gán cho mọi phiên lúc check-in) thay vì
   // qua slot/row — vì phiên ô tô vãng lai không có slot/row nên lọc qua slot.floorId sẽ bỏ sót.
   if (floorId) where.floorId = floorId;
-  if (buildingId) floorWhere.buildingId = buildingId;
+  if (buildingId) directFloorWhere.buildingId = buildingId;
+  if (customerType === 'resident') directFloorWhere.floorType = 'resident';
+  if (customerType === 'visitor') directFloorWhere.floorType = 'visitor';
+
+  const orderField = status === 'completed' ? 'exitTime' : status === 'all' ? 'updatedAt' : 'entryTime';
 
   const { count, rows } = await ParkingSession.findAndCountAll({
     where,
     include: [
       slotInclude(slotWhere, floorWhere),
       rowInclude(rowWhere, floorWhere),
+      {
+        model: Floor,
+        as: 'floor',
+        required: Object.keys(directFloorWhere).length > 0,
+        where: Object.keys(directFloorWhere).length > 0 ? directFloorWhere : undefined,
+        attributes: ['id', 'floorNumber', 'floorType', 'vehicleType', 'buildingId'],
+        include: [{ model: Building, as: 'building', attributes: ['id', 'name'] }],
+      },
       { model: User, as: 'staff', attributes: ['id', 'fullName'] },
+      { model: User, as: 'user', attributes: ['id', 'fullName', 'phone', 'email'] },
+      {
+        model: Booking,
+        as: 'booking',
+        required: false,
+        attributes: ['id', 'customerName', 'customerPhone', 'customerEmail', 'status', 'startTime', 'endTime'],
+      },
     ],
-    order: [['entryTime', 'DESC']],
+    distinct: true,
+    order: [[orderField, 'DESC']],
     limit: limitNum,
     offset,
   });
 
+  const sessions = rows.map((row) => {
+    const session = row.get({ plain: true });
+    const resolvedCustomerType = session.bookingId
+      ? 'booking'
+      : session.floor?.floorType === 'resident'
+        ? 'resident'
+        : 'visitor';
+    return { ...session, customerType: resolvedCustomerType };
+  });
+
   return {
-    sessions: rows,
+    sessions,
     pagination: {
       page: pageNum,
       limit: limitNum,
@@ -297,6 +354,9 @@ const getActiveSessions = async ({ page = 1, limit = 10, floorId, buildingId, ve
     },
   };
 };
+
+// Compatibility wrapper for code that explicitly requests active sessions.
+const getActiveSessions = (filters = {}) => getSessions({ ...filters, status: 'active' });
 
 const getById = async (id) => {
   const session = await ParkingSession.findByPk(id, {
@@ -695,6 +755,7 @@ const finalizeSessionPayment = async (sessionId, amount, t) => {
 
 export {
   checkIn,
+  getSessions,
   getActiveSessions,
   getById,
   lookup,
