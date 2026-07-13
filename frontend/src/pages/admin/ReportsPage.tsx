@@ -18,6 +18,13 @@ const PRESETS: Array<{ key: RangePreset; label: string }> = [
 
 const TABS = ['Doanh thu', 'Lưu lượng & Bãi', 'Đặt chỗ & Thuê bao', 'Nhân viên'];
 
+const FILTER_HINTS = [
+  'Bộ lọc áp dụng cho các giao dịch trong khoảng thời gian đã chọn.',
+  'Bộ lọc áp dụng theo thời gian xe vào bãi và tình trạng lấp đầy hiện tại.',
+  'Bộ lọc áp dụng theo ngày tạo booking/gói; no-show chỉ tính booking đã qua giờ kết thúc.',
+  'Bộ lọc áp dụng cho các phiên nhân viên xử lý trong kỳ; tiền mặt thu không bao gồm VNPay.',
+];
+
 export default function ReportsPage() {
   const range = useDateRange('month');
   const [tab, setTab] = useState(0);
@@ -26,10 +33,9 @@ export default function ReportsPage() {
     <AdminLayout
       eyebrow="Phân tích"
       title="Báo cáo thống kê"
-      subtitle="Phân tích theo khoảng thời gian — doanh thu, lưu lượng, đặt chỗ và hiệu suất nhân viên."
+      subtitle="Phân tích theo khoảng thời gian: doanh thu, lưu lượng, đặt chỗ và hiệu suất nhân viên."
     >
-      {/* Toolbar filter dùng chung */}
-      <div className="mb-5 flex flex-wrap items-center gap-3">
+      <div className="mb-3 flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-slate-300">
           <CalendarRange className="h-4 w-4 text-slate-500" />
           <span className="text-slate-500">Từ</span>
@@ -52,7 +58,10 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      {/* Tabs */}
+      <p className="mb-5 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-slate-400">
+        {FILTER_HINTS[tab]}
+      </p>
+
       <div className="mb-5 flex gap-1 overflow-x-auto border-b border-white/10">
         {TABS.map((label, i) => (
           <button

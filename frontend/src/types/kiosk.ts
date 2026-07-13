@@ -240,6 +240,24 @@ export interface ActiveSessionApiItem {
   prepaidAmount?: string | number | null;
   bookingId?: number | null;
   note?: string | null;
+  customerType?: 'resident' | 'visitor' | 'booking';
+  floor?: {
+    id: number;
+    floorNumber: string;
+    floorType: FloorType;
+    vehicleType: VehicleType;
+    buildingId: number;
+    building?: { id: number; name: string };
+  } | null;
+  booking?: {
+    id: number;
+    customerName: string | null;
+    customerPhone: string | null;
+    customerEmail: string;
+    status: string;
+    startTime: string | null;
+    endTime: string | null;
+  } | null;
   slot?: { id: number; slotCode: string; floor?: { floorNumber: string; building?: { id: number; name: string } } } | null;
   row?: { id: number; rowCode: string; floor?: { floorNumber: string; building?: { id: number; name: string } } } | null;
   user?: { id: number; fullName: string; email: string } | null;
