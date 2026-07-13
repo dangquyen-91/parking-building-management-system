@@ -17,6 +17,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { AdminLayout } from '../../components/dashboard/AdminLayout';
+import { useAuth } from '../../hooks/useAuth';
 import { cn } from '../../lib/utils';
 import {
   bookingService,
@@ -79,6 +80,8 @@ const formatDateTime = (value: string) =>
   });
 
 export default function BookingsPage() {
+  const { user } = useAuth();
+  const canManage = user?.role === 'manager';
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, totalPages: 1 });
   const [licensePlate, setLicensePlate] = useState('');
@@ -193,19 +196,27 @@ export default function BookingsPage() {
 
   return (
     <AdminLayout
-      eyebrow="Vận hành đặt chỗ"
-      title="Quản lý booking"
-      subtitle="Theo dõi, lọc và xử lý các booking ô tô trong hệ thống."
+      eyebrow={canManage ? 'Vận hành đặt chỗ' : 'Giám sát đặt chỗ'}
+      title={canManage ? 'Quản lý booking' : 'Lịch sử booking'}
+      subtitle={canManage
+        ? 'Theo dõi, lọc và xử lý các booking ô tô trong hệ thống.'
+        : 'Tra cứu booking, trạng thái thanh toán và lịch sử khách đặt chỗ.'}
       meta={
-        <button
-          type="button"
-          onClick={handleExpire}
-          disabled={expiring}
-          className="inline-flex items-center justify-center gap-2 rounded-2xl border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-sm font-semibold text-amber-200 transition hover:border-amber-300/50 hover:bg-amber-400/15 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <TimerOff className={cn('h-4 w-4', expiring && 'animate-pulse')} />
-          {expiring ? 'Đang quét...' : 'Quét quá hạn'}
-        </button>
+        canManage ? (
+          <button
+            type="button"
+            onClick={handleExpire}
+            disabled={expiring}
+            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-sm font-semibold text-amber-200 transition hover:border-amber-300/50 hover:bg-amber-400/15 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <TimerOff className={cn('h-4 w-4', expiring && 'animate-pulse')} />
+            {expiring ? 'Đang quét...' : 'Quét quá hạn'}
+          </button>
+        ) : (
+          <span className="inline-flex items-center gap-2 rounded-2xl border border-blue-400/20 bg-blue-400/10 px-4 py-3 text-sm font-semibold text-blue-200">
+            <Eye className="h-4 w-4" /> Chỉ xem
+          </span>
+        )
       }
     >
       <div className="space-y-6">
@@ -385,7 +396,7 @@ export default function BookingsPage() {
                           >
                             <Eye className="h-4 w-4" />
                           </button>
-                          {['pending', 'confirmed'].includes(booking.status) && (
+                          {canManage && ['pending', 'confirmed'].includes(booking.status) && (
                             <button
                               type="button"
                               onClick={() => handleCancel(booking)}
@@ -501,7 +512,7 @@ export default function BookingsPage() {
                 <span className={cn('inline-flex rounded-full border px-3 py-1 text-xs font-semibold', statusClasses[selectedBooking.status])}>
                   {statusLabels[selectedBooking.status]}
                 </span>
-                {['pending', 'confirmed'].includes(selectedBooking.status) && (
+                {canManage && ['pending', 'confirmed'].includes(selectedBooking.status) && (
                   <button
                     type="button"
                     onClick={() => handleCancel(selectedBooking)}

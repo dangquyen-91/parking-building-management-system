@@ -15,7 +15,7 @@ const menuItems = [
   { label: 'Tổng quan', icon: LayoutDashboard, to: '/staff/dashboard', shortcut: null },
   { label: 'Check-in', icon: LogIn, to: '/staff/check-in', shortcut: 'F1' },
   { label: 'Check-out', icon: LogOut, to: '/staff/check-out', shortcut: 'F2' },
-  { label: 'Phiên đang gửi', icon: Clock3, to: '/staff/sessions', shortcut: 'F3' },
+  { label: 'Phiên gửi xe', icon: Clock3, to: '/staff/sessions', shortcut: 'F3' },
   { label: 'Sơ đồ bãi xe', icon: MapPinned, to: '/staff/map', shortcut: 'F4' },
 ];
 

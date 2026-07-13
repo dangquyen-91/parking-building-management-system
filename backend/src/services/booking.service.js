@@ -320,7 +320,7 @@ export const cancelBooking = async (id, requester) => {
     const booking = await Booking.findByPk(id, { transaction: t, lock: t.LOCK.UPDATE });
     if (!booking) throw new AppError('Booking not found', 404);
 
-    const privileged = ['admin', 'manager', 'staff'].includes(requester.role);
+    const privileged = requester.role === 'manager';
     if (!privileged && booking.userId !== requester.id) {
       throw new AppError('Access denied', 403);
     }

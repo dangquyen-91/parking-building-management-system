@@ -15,14 +15,17 @@ import {
   RefreshCw,
   Search,
   UserRound,
+  WalletCards,
   X,
 } from 'lucide-react';
 import { KioskLayout } from '../../components/kiosk/KioskLayout';
 import { useKioskHotkeys } from '../../hooks/useKioskHotkeys';
-import { getActiveSessions, checkOut } from '../../services/kiosk.service';
+import { getSessions, checkOut } from '../../services/kiosk.service';
 import { floorService, type Floor } from '../../services/floor.service';
 import { cn } from '../../lib/utils';
 import type { ActiveSessionApiItem, PaymentMethod } from '../../types/kiosk';
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 const formatDateTime = (iso: string) =>
   new Date(iso).toLocaleString('vi-VN', {
@@ -33,8 +36,32 @@ const formatDateTime = (iso: string) =>
     minute: '2-digit',
   });
 
-const formatDuration = (iso: string) => {
-  const minutes = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60000));
+type StatusFilter = 'active' | 'completed' | 'all';
+
+const statusTabs: Array<{ value: StatusFilter; label: string }> = [
+  { value: 'active', label: 'Đang trong bãi' },
+  { value: 'completed', label: 'Đã checkout' },
+  { value: 'all', label: 'Tất cả' },
+];
+
+const formatCurrency = (value: string | number | null | undefined) =>
+  new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(value ?? 0));
+
+const formatVND = (amount: number | string) =>
+  Number(amount).toLocaleString('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 });
+
+const getCustomerName = (session: ActiveSessionApiItem) =>
+  session.booking?.customerName ?? session.user?.fullName ?? 'Khách vãng lai';
+
+const getCustomerTypeLabel = (session: ActiveSessionApiItem) => {
+  if (session.customerType === 'booking' || session.bookingId) return 'Khách có booking';
+  if (session.customerType === 'resident' || session.userId) return 'Cư dân';
+  return 'Khách vãng lai';
+};
+
+const formatDuration = (entryTime: string, exitTime?: string | null) => {
+  const endTime = exitTime ? new Date(exitTime).getTime() : Date.now();
+  const minutes = Math.max(0, Math.floor((endTime - new Date(entryTime).getTime()) / 60000));
   const hours = Math.floor(minutes / 60);
   const remainingMinutes = minutes % 60;
   if (!hours) return `${remainingMinutes} phút`;
@@ -74,9 +101,6 @@ const formatLocation = (
 
   return { label: '--' };
 };
-
-const formatVND = (amount: number | string) =>
-  Number(amount).toLocaleString('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 });
 
 // ── Checkout Modal ────────────────────────────────────────────────────────────
 
@@ -257,6 +281,7 @@ function SuccessToast({ data, onDismiss }: { data: ToastData | null; onDismiss: 
 
 export default function ActiveSessionsPage() {
   const [sessions, setSessions] = useState<ActiveSessionApiItem[]>([]);
+  const [status, setStatus] = useState<StatusFilter>('active');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
@@ -286,7 +311,8 @@ export default function ActiveSessionsPage() {
     setLoading(true);
     setError(null);
     try {
-      const result = await getActiveSessions({
+      const result = await getSessions({
+        status,
         page,
         limit: 20,
         search: search.trim() || undefined,
@@ -295,11 +321,11 @@ export default function ActiveSessionsPage() {
       setTotal(result.pagination.total);
       setTotalPages(result.pagination.totalPages || 1);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Không tải được danh sách xe đang gửi.');
+      setError(err instanceof Error ? err.message : 'Không tải được danh sách phiên gửi xe.');
     } finally {
       setLoading(false);
     }
-  }, [page, search]);
+  }, [page, search, status]);
 
   useEffect(() => {
     loadSessions();
@@ -312,6 +338,18 @@ export default function ActiveSessionsPage() {
     const motorcycles = sessions.filter((item) => item.vehicleType === 'motorcycle').length;
     return { cars, motorcycles };
   }, [sessions]);
+
+  const emptyTitle = status === 'active'
+    ? 'Chưa có xe đang trong bãi'
+    : status === 'completed'
+      ? 'Chưa có lịch sử checkout'
+      : 'Chưa có phiên gửi xe';
+
+  const resultLabel = status === 'active'
+    ? 'phiên đang trong bãi'
+    : status === 'completed'
+      ? 'phiên đã checkout'
+      : 'phiên gửi xe';
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -360,8 +398,8 @@ export default function ActiveSessionsPage() {
   return (
     <KioskLayout
       eyebrow="Staff Kiosk"
-      title="Phiên Đang Hoạt Động"
-      subtitle="Theo dõi xe đang trong bãi · Phím F3 mở trang này nhanh"
+      title="Phiên Gửi Xe"
+      subtitle="Theo dõi xe đang trong bãi và lịch sử check-in/checkout · Phím F3 mở trang này nhanh"
       headerRight={
         <button
           type="button"
@@ -378,7 +416,7 @@ export default function ActiveSessionsPage() {
         {[
           { key: 'F1', label: 'Check-in' },
           { key: 'F2', label: 'Check-out' },
-          { key: 'F3', label: 'Phiên đang gửi' },
+          { key: 'F3', label: 'Phiên gửi xe' },
           { key: 'F4', label: 'Sơ đồ bãi' },
         ].map(({ key, label }) => (
           <span key={key} className="flex items-center gap-1">
@@ -387,6 +425,28 @@ export default function ActiveSessionsPage() {
             </kbd>
             <span className="text-slate-700">{label}</span>
           </span>
+        ))}
+      </div>
+
+      {/* Status filter tabs */}
+      <div className="mb-4 inline-flex max-w-full gap-1 overflow-x-auto rounded-2xl border border-white/10 bg-[#0F172A]/80 p-1.5">
+        {statusTabs.map((tab) => (
+          <button
+            key={tab.value}
+            type="button"
+            onClick={() => {
+              setStatus(tab.value);
+              setPage(1);
+            }}
+            className={cn(
+              'h-10 whitespace-nowrap rounded-xl px-4 text-sm font-bold transition',
+              status === tab.value
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
+                : 'text-slate-400 hover:bg-white/[0.06] hover:text-white',
+            )}
+          >
+            {tab.label}
+          </button>
         ))}
       </div>
 
@@ -408,7 +468,7 @@ export default function ActiveSessionsPage() {
         </form>
 
         {[
-          { label: 'Tổng phiên', value: total, icon: Activity, tone: 'text-blue-300 bg-blue-500/15' },
+          { label: 'Tổng kết quả', value: total, icon: Activity, tone: 'text-blue-300 bg-blue-500/15' },
           { label: 'Ô tô trang này', value: stats.cars, icon: Car, tone: 'text-emerald-300 bg-emerald-500/15' },
           { label: 'Xe máy trang này', value: stats.motorcycles, icon: Motorbike, tone: 'text-amber-300 bg-amber-500/15' },
         ].map((item) => (
@@ -455,7 +515,7 @@ export default function ActiveSessionsPage() {
             <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/[0.04] text-slate-500">
               <Clock3 className="h-7 w-7" />
             </div>
-            <p className="text-lg font-bold text-white">Chưa có phiên đang hoạt động</p>
+            <p className="text-lg font-bold text-white">{emptyTitle}</p>
             <p className="mt-1 text-sm text-slate-500">Thử đổi biển số tìm kiếm hoặc làm mới dữ liệu.</p>
           </div>
         ) : (
@@ -467,14 +527,21 @@ export default function ActiveSessionsPage() {
               const isResidentCar = isCar && !!session.slot;
               const isVisitorCar = isCar && !session.slot && !session.row;
               const isMoto = session.vehicleType === 'motorcycle';
+              const isActive = session.status === 'active';
 
               const labelColor = isResidentCar
                 ? 'text-emerald-300 bg-emerald-400/10 border-emerald-400/30'
                 : isMoto
-                ? 'text-amber-300 bg-amber-400/10 border-amber-400/30'
-                : 'text-blue-300 bg-blue-400/10 border-blue-400/30';
+                  ? 'text-amber-300 bg-amber-400/10 border-amber-400/30'
+                  : 'text-blue-300 bg-blue-400/10 border-blue-400/30';
               const labelText = isResidentCar ? 'Slot cư dân' : isMoto ? 'Hàng xe máy' : 'Tầng vãng lai';
               const iconColor = isResidentCar ? 'text-emerald-300' : isMoto ? 'text-amber-300' : 'text-blue-300';
+
+              const statusLabel = isActive
+                ? 'Đang trong bãi'
+                : session.status === 'completed'
+                  ? 'Đã checkout'
+                  : 'Đã hủy';
 
               return (
                 <motion.article
@@ -484,16 +551,35 @@ export default function ActiveSessionsPage() {
                   transition={{ delay: index * 0.03 }}
                   className="grid gap-4 rounded-2xl border border-white/10 bg-white/[0.035] p-4 transition hover:border-blue-400/30 hover:bg-white/[0.055] lg:grid-cols-[minmax(180px,1.1fr)_minmax(180px,1fr)_minmax(160px,0.9fr)_auto]"
                 >
-                  {/* License plate */}
+                  {/* License plate + customer info */}
                   <div className="flex items-center gap-3">
                     <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500/15 text-blue-300">
                       <VehicleIcon className="h-5 w-5" />
                     </div>
                     <div>
                       <p className="text-xl font-black tracking-widest text-white">{session.licensePlate}</p>
-                      <p className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                      <p className="mt-0.5 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                         {session.vehicleType === 'car' ? 'Ô tô' : 'Xe máy'}
                       </p>
+                      <span className={cn(
+                        'mt-1 inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase',
+                        isActive
+                          ? 'border-emerald-400/30 bg-emerald-500/10 text-emerald-300'
+                          : session.status === 'completed'
+                            ? 'border-blue-400/30 bg-blue-500/10 text-blue-300'
+                            : 'border-slate-400/20 bg-slate-500/10 text-slate-400',
+                      )}>
+                        {statusLabel}
+                      </span>
+                      <div className="mt-1.5 flex items-start gap-2">
+                        <UserRound className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-300" />
+                        <div className="min-w-0">
+                          <p className="truncate text-xs font-semibold text-slate-200">
+                            {getCustomerName(session)}
+                          </p>
+                          <p className="text-[10px] text-slate-500">{getCustomerTypeLabel(session)}</p>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
@@ -521,31 +607,61 @@ export default function ActiveSessionsPage() {
                       <div>
                         <p className="text-xs text-slate-500">Giờ vào</p>
                         <p className="font-semibold text-slate-100">{formatDateTime(session.entryTime)}</p>
-                        <p className="text-xs text-slate-500">{formatDuration(session.entryTime)}</p>
+                        <p className="text-xs text-slate-500">
+                          {formatDuration(session.entryTime, session.exitTime)}
+                        </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <UserRound className="h-4 w-4 text-emerald-300" />
-                      <div>
-                        <p className="text-xs text-slate-500">Nhân viên</p>
-                        <p className="font-semibold text-slate-100">{session.staff?.fullName ?? '--'}</p>
+                    {session.exitTime ? (
+                      <div className="flex items-center gap-3">
+                        <LogOut className="h-4 w-4 text-blue-300" />
+                        <div>
+                          <p className="text-xs text-slate-500">Thời gian checkout</p>
+                          <p className="font-semibold text-slate-100">{formatDateTime(session.exitTime)}</p>
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="flex items-center gap-3">
+                        <UserRound className="h-4 w-4 text-emerald-300" />
+                        <div>
+                          <p className="text-xs text-slate-500">Nhân viên check-in</p>
+                          <p className="font-semibold text-slate-100">{session.staff?.fullName ?? '--'}</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
-                  {/* Checkout button */}
+                  {/* Action column */}
                   <div className="flex items-center lg:justify-end">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCheckoutError(null);
-                        setCheckoutTarget(session);
-                      }}
-                      className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-orange-600 to-red-600 px-4 text-sm font-bold text-white shadow-lg shadow-orange-600/20 transition hover:from-orange-500 hover:to-red-500"
-                    >
-                      <LogOut className="h-4 w-4" />
-                      Checkout
-                    </button>
+                    {isActive ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCheckoutError(null);
+                          setCheckoutTarget(session);
+                        }}
+                        className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-orange-600 to-red-600 px-4 text-sm font-bold text-white shadow-lg shadow-orange-600/20 transition hover:from-orange-500 hover:to-red-500"
+                      >
+                        <LogOut className="h-4 w-4" />
+                        Checkout
+                      </button>
+                    ) : session.status === 'completed' ? (
+                      <div className="min-w-36 rounded-2xl border border-white/10 bg-white/[0.035] px-4 py-3 lg:text-right">
+                        <div className="flex items-center gap-2 lg:justify-end">
+                          <WalletCards className="h-4 w-4 text-amber-300" />
+                          <span className="text-xs text-slate-500">
+                            {session.paymentStatus === 'paid'
+                              ? 'Đã thanh toán'
+                              : session.paymentStatus === 'unpaid'
+                                ? 'Chưa thanh toán'
+                                : '--'}
+                          </span>
+                        </div>
+                        <p className="mt-1 font-black text-white">{formatCurrency(session.fee)}</p>
+                      </div>
+                    ) : (
+                      <span className="text-sm font-semibold text-slate-500">Không có thao tác</span>
+                    )}
                   </div>
                 </motion.article>
               );
@@ -556,7 +672,7 @@ export default function ActiveSessionsPage() {
         {/* Pagination */}
         <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4 text-sm text-slate-500">
           <span>
-            Trang {page}/{totalPages} · {total} phiên đang hoạt động
+            Trang {page}/{totalPages} · {total} {resultLabel}
           </span>
           <div className="flex gap-2">
             <button

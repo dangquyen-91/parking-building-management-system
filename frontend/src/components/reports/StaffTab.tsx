@@ -10,7 +10,10 @@ export default function StaffTab({ from, to }: { from: string; to: string }) {
   const rows = [...(staff.data ?? [])].sort((a, b) => b.cashCollected - a.cashCollected);
 
   return (
-    <ReportCard title="Hiệu suất nhân viên" hint="Đối soát ca trực & tiền mặt thu được trong kỳ">
+    <ReportCard
+      title="Hiệu suất nhân viên"
+      hint="Đối soát ca trực. Tiền mặt thu chỉ tính session payment thành công bằng cash trong kỳ."
+    >
       {staff.loading ? <ChartSkeleton height={220} /> : staff.error ? <ErrorBox message={staff.error} /> : rows.length === 0 ? <EmptyState /> : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
