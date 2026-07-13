@@ -53,7 +53,7 @@ async function fetchRows(floorId: number): Promise<ParkingRowApiItem[]> {
 const SLOT_CFG: Record<SlotStatus, { bg: string; border: string; text: string; label: string }> = {
   empty: { bg: 'bg-emerald-500/20', border: 'border-emerald-400/40', text: 'text-emerald-300', label: 'Trống' },
   occupied: { bg: 'bg-blue-500/20', border: 'border-blue-400/40', text: 'text-blue-300', label: 'Đang dùng' },
-  reserved: { bg: 'bg-purple-500/20', border: 'border-purple-400/40', text: 'text-purple-300', label: 'Đặt trước' },
+  reserved: { bg: 'bg-purple-500/20', border: 'border-purple-400/40', text: 'text-purple-300', label: 'Đã đặt' },
   maintenance: { bg: 'bg-amber-500/20', border: 'border-amber-400/40', text: 'text-amber-300', label: 'Bảo trì' },
 };
 
@@ -135,7 +135,7 @@ function FloorStats({ slots, rows, floor, activeCount }: {
         <span className="text-slate-500">{total} ô</span>
         <span className="text-emerald-400">●&nbsp;{empty} trống</span>
         <span className="text-blue-400">●&nbsp;{occupied} đang dùng</span>
-        {reserved > 0 && <span className="text-purple-400">●&nbsp;{reserved} đặt trước</span>}
+        {reserved > 0 && <span className="text-purple-400">●&nbsp;{reserved} đã đặt</span>}
         {maint > 0 && <span className="text-amber-400">●&nbsp;{maint} bảo trì</span>}
         <span className={cn('ml-auto font-bold', pct >= 90 ? 'text-red-400' : pct >= 60 ? 'text-amber-400' : 'text-emerald-400')}>
           {pct}% lấp đầy
@@ -370,8 +370,8 @@ function FloorPanel({
                 isResidentCar
                   ? <CarResidentFloorGrid slots={slots} onSelectSlot={onSelectSlot} />
                   : isVisitorCar
-                  ? <CarVisitorFloorGrid floor={floor} activeCount={activeCount ?? 0} />
-                  : <MotoFloorGrid rows={rows} />
+                    ? <CarVisitorFloorGrid floor={floor} activeCount={activeCount ?? 0} />
+                    : <MotoFloorGrid rows={rows} />
               )}
             </div>
           </motion.div>
@@ -461,7 +461,7 @@ function SlotDetailModal({
             <p>
               {detail.status === 'occupied'
                 ? 'Ô đang có xe. Hệ thống tự cập nhật khi xe check-out.'
-                : 'Ô đã đặt trước cho gói cư dân. Liên hệ admin để thay đổi.'}
+                : 'Ô cho gói cư dân. Liên hệ admin để thay đổi.'}
             </p>
           </div>
         )}
@@ -492,7 +492,7 @@ function SlotDetailModal({
             ) : detail.status === 'maintenance' ? (
               <><CheckCircle2 className="h-4 w-4" /> Xoá Bảo Trì (trả về Trống)</>
             ) : (
-              <><Wrench className="h-4 w-4" /> Đặt Bảo Trì</>  
+              <><Wrench className="h-4 w-4" /> Đặt Bảo Trì</>
             )}
           </motion.button>
         )}
