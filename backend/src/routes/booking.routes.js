@@ -15,7 +15,7 @@ const router = Router();
 
 router.post('/', optionalAuthenticate, validate(createBookingSchema), bookingController.create);
 
-router.post('/expire', authenticate, authorize('admin', 'manager'), bookingController.expire);
+router.post('/expire', authenticate, authorize('manager'), bookingController.expire);
 
 router.get('/me', authenticate, bookingController.getMine);
 

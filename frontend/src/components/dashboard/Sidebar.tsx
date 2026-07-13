@@ -52,7 +52,10 @@ export function Sidebar() {
   const dashboardRole: DashboardRole = user?.role === 'manager' ? 'manager' : 'admin';
   const basePath = dashboardRole === 'manager' ? '/manager' : '/admin';
   const roleLabel = dashboardRole === 'manager' ? 'Quản lý bãi đỗ' : 'Quản trị hệ thống';
-  const visibleMenuItems = menuItems.filter((item) => item.roles.includes(dashboardRole));
+  const adminHistoryPaths = new Set(['bookings', 'parking-sessions']);
+  const visibleMenuItems = menuItems.filter(
+    (item) => item.roles.includes(dashboardRole) || (dashboardRole === 'admin' && adminHistoryPaths.has(item.path)),
+  );
 
   return (
     <aside className="fixed inset-y-0 left-0 z-40 hidden w-[280px] border-r border-white/10 bg-[#070B14]/85 backdrop-blur-2xl lg:block">
