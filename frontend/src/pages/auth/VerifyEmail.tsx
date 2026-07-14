@@ -23,7 +23,7 @@ export const VerifyEmail: React.FC = () => {
 
   useEffect(() => {
     if (!token || ran.current) return;
-    ran.current = true; // chặn gọi 2 lần (StrictMode), nhưng vẫn nhận kết quả của lần gọi này
+    ran.current = true;
     authService
       .verifyEmail(token)
       .then((res) => {
@@ -39,11 +39,9 @@ export const VerifyEmail: React.FC = () => {
           setMessage(err.message || 'Xác minh thất bại.');
         }
       })
-      // Xoá token khỏi URL (tránh lọt vào lịch sử trình duyệt)
       .finally(() => window.history.replaceState({}, '', '/verify-email'));
   }, [token]);
 
-  // Tự chuyển sang đăng nhập sau khi xác minh thành công
   useEffect(() => {
     if (status !== 'success') return;
     const id = setTimeout(() => navigate('/login', { state: { verified: true } }), 3000);

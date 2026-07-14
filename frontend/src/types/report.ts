@@ -1,4 +1,4 @@
-// Kiểu dữ liệu cho toàn bộ API báo cáo (/api/v1/reports/*)
+
 
 export type VehicleType = 'motorcycle' | 'car';
 
@@ -60,10 +60,8 @@ export interface FloorOccupancy {
   occupied: number;
   available: number;
   occupancyRate: number;
-  // car floors
   totalSlots?: number;
   reserved?: number;
-  // motorcycle floors
   totalCapacity?: number;
 }
 

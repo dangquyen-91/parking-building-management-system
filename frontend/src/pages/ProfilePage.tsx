@@ -34,7 +34,6 @@ import {
 } from '../services/profile.service';
 import type { UserProfile } from '../services/auth.service';
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 const formatDate = (iso: string | null) =>
   iso
     ? new Date(iso).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
@@ -42,6 +41,15 @@ const formatDate = (iso: string | null) =>
 
 const formatCurrency = (v: string | number) =>
   Number(v).toLocaleString('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 });
+
+function ErrorAlert({ message }: { message: string }) {
+  return (
+    <div className="flex gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+      <span>{message}</span>
+    </div>
+  );
+}
 
 const SUB_STATUS: Record<string, { label: string; cls: string }> = {
   active:    { label: 'Đang hiệu lực', cls: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
@@ -59,7 +67,6 @@ const TABS = [
 ] as const;
 type TabId = typeof TABS[number]['id'];
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
 function InfoField({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string }) {
   return (
     <div className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-slate-50/80 px-5 py-4">
@@ -160,7 +167,6 @@ function SubscriptionCard({
   );
 }
 
-// ─── VehicleCard ───────────────────────────────────────────────────────────────
 function VehicleCard({
   vehicle,
   onEdit,
@@ -183,7 +189,6 @@ function VehicleCard({
       exit={{ opacity: 0, scale: 0.95 }}
       className="flex items-center gap-4 rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm"
     >
-      {/* Icon */}
       <div className={cn(
         'flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl',
         isCar ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600',
@@ -191,7 +196,6 @@ function VehicleCard({
         <VehicleIcon className="h-6 w-6" />
       </div>
 
-      {/* Info */}
       <div className="flex-1 min-w-0">
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-lg font-black tracking-widest text-slate-950">{vehicle.licensePlate}</p>
@@ -212,7 +216,6 @@ function VehicleCard({
         <p className="mt-1 text-xs text-slate-400">Đã thêm {formatDate(vehicle.createdAt)}</p>
       </div>
 
-      {/* Actions */}
       <div className="flex shrink-0 gap-2">
         <button
           onClick={() => onEdit(vehicle)}
@@ -234,7 +237,6 @@ function VehicleCard({
   );
 }
 
-// ─── VehicleModal (Add / Edit) ─────────────────────────────────────────────────
 function VehicleModal({
   initial,
   onClose,
@@ -299,7 +301,6 @@ function VehicleModal({
         </div>
 
         <div className="space-y-4">
-          {/* License plate */}
           <div>
             <label className="block text-xs font-semibold uppercase tracking-[0.14em] text-slate-400 mb-1.5">
               Biển số xe <span className="text-red-400">*</span>
@@ -316,7 +317,6 @@ function VehicleModal({
             )}
           </div>
 
-          {/* Vehicle type */}
           <div>
             <label className="block text-xs font-semibold uppercase tracking-[0.14em] text-slate-400 mb-1.5">
               Loại xe
@@ -343,7 +343,6 @@ function VehicleModal({
             </div>
           </div>
 
-          {/* Nickname */}
           <div>
             <label className="block text-xs font-semibold uppercase tracking-[0.14em] text-slate-400 mb-1.5">
               Tên gọi <span className="text-slate-400 font-normal normal-case">(tuỳ chọn)</span>
@@ -380,7 +379,6 @@ function VehicleModal({
   );
 }
 
-// ─── EditProfileModal ──────────────────────────────────────────────────────────
 function EditProfileModal({
   profile,
   onClose,
@@ -497,7 +495,6 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Modals
   const [editProfileOpen, setEditProfileOpen] = useState(false);
   const [vehicleModal, setVehicleModal] = useState<{ open: boolean; vehicle?: MyVehicle }>({ open: false });
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -568,7 +565,7 @@ export default function ProfilePage() {
   const initials = displayProfile?.fullName
     ?.split(' ').map(n => n[0]).slice(-2).join('').toUpperCase() ?? '??';
 
-  const uniquePlates = [...new Map(activeSubscriptions.map(s => [s.licensePlate, s])).values()];
+
 
   return (
     <>
@@ -612,7 +609,6 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              {/* Desktop actions */}
               <div className="ml-auto hidden sm:flex items-center gap-3">
                 <button
                   onClick={() => setEditProfileOpen(true)}
@@ -700,7 +696,6 @@ export default function ProfilePage() {
 
                   {tab === 'vehicles' && (
                     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
-                      {/* Add button */}
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-sm font-semibold text-slate-700">{vehicles.length} xe đã đăng ký</p>
@@ -746,7 +741,6 @@ export default function ProfilePage() {
                     </motion.div>
                   )}
 
-                  {/* ── Tab: Gói tháng (active) ── */}
                   {tab === 'packages' && (
                     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
                       {activeSubscriptions.length === 0 ? (

@@ -4,7 +4,6 @@ import {
   Clock3,
   LayoutDashboard,
   LogIn,
-  LogOut,
   MapPinned,
   Zap,
 } from 'lucide-react';
@@ -12,10 +11,9 @@ import { NavLink } from 'react-router-dom';
 import { cn } from '../../lib/utils';
 
 const menuItems = [
-  { label: 'Tổng quan', icon: LayoutDashboard, to: '/staff/dashboard', shortcut: null },
-  { label: 'Check-in', icon: LogIn, to: '/staff/check-in', shortcut: 'F1' },
-  { label: 'Check-out', icon: LogOut, to: '/staff/check-out', shortcut: 'F2' },
-  { label: 'Phiên gửi xe', icon: Clock3, to: '/staff/sessions', shortcut: 'F3' },
+  { label: 'Tổng quan', icon: LayoutDashboard, to: '/staff/dashboard', shortcut: 'F1' },
+  { label: 'Check-in', icon: LogIn, to: '/staff/check-in', shortcut: 'F2' },
+  { label: 'Phiên gửi / Checkout', icon: Clock3, to: '/staff/sessions', shortcut: 'F3' },
   { label: 'Sơ đồ bãi xe', icon: MapPinned, to: '/staff/map', shortcut: 'F4' },
 ];
 
@@ -52,7 +50,7 @@ export function StaffSidebar() {
                     'group relative flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium text-slate-400 transition-colors',
                     'hover:bg-white/[0.06] hover:text-white',
                     isActive &&
-                      'border border-blue-400/30 bg-gradient-to-r from-blue-500/20 to-purple-500/10 text-white shadow-[0_0_28px_rgba(59,130,246,0.18)]',
+                    'border border-blue-400/30 bg-gradient-to-r from-blue-500/20 to-purple-500/10 text-white shadow-[0_0_28px_rgba(59,130,246,0.18)]',
                   )}
                 >
                   {isActive && (

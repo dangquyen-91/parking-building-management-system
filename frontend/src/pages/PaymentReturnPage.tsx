@@ -47,16 +47,12 @@ export default function PaymentReturnPage() {
   const isSubscription = paymentType === 'subscription';
   const isSession = paymentType === 'session';
 
-  // #3 — Tin trạng thái từ server, không tin URL:
-  // đã đăng nhập → chỉ "thành công" khi payment.status === 'success'.
-  // chưa đăng nhập → không gọi được API nên tạm theo tham số URL.
   const resolvedSuccess = payment?.status === 'success';
   const resolvedFailed = payment?.status === 'failed' || payment?.status === 'cancelled';
   const isSuccess = resolvedSuccess || (!isAuthenticated && optimisticSuccess);
   const isChecking = isAuthenticated && !resolvedSuccess && !resolvedFailed && (loading || payment?.status === 'pending');
   const isFailed = !isSuccess && !isChecking && resolvedFailed;
 
-  // #3 — Tải + poll trạng thái cho tới khi IPN của VNPay cập nhật xong
   useEffect(() => {
     if (!orderId || !isAuthenticated) {
       setPayment(null);
@@ -93,7 +89,6 @@ export default function PaymentReturnPage() {
     };
   }, [isAuthenticated, orderId, optimisticSuccess]);
 
-  // #4 (cách B) — lấy chi tiết gói thật để hiện hạn dùng/biển số/tên gói
   useEffect(() => {
     const isSub = payment?.paymentType === 'subscription' || payment?.orderId?.startsWith('SUB-');
     if (!isAuthenticated || !payment || !isSub || payment.status !== 'success' || !payment.subscriptionId) {
@@ -117,7 +112,6 @@ export default function PaymentReturnPage() {
     return 'Kết quả thanh toán';
   }, [orderId, isChecking, isSuccess, isFailed]);
 
-  // #2 — Mô tả thân thiện với người dùng (bỏ ngôn ngữ kỹ thuật)
   const description = useMemo(() => {
     if (isChecking) return 'Chúng tôi đang xác nhận giao dịch với VNPay, vui lòng đợi trong giây lát…';
     if (!isAuthenticated) {
@@ -131,7 +125,6 @@ export default function PaymentReturnPage() {
     return 'Giao dịch đã hoàn tất.';
   }, [isChecking, isAuthenticated, isFailed, isBooking, isSubscription]);
 
-  // #1 — CTA theo đúng ngữ cảnh (bỏ nút "Sang check-in")
   const ctas = useMemo<{ primary: { to: string; label: string }; secondary: { to: string; label: string } | null }>(() => {
     if (!isAuthenticated) {
       return {
@@ -217,7 +210,6 @@ export default function PaymentReturnPage() {
                   <p className="mt-1 font-bold text-slate-950">{formatCurrency(payment.amount)}</p>
                 </div>
 
-                {/* #4 — chi tiết gói cư dân thật (cách B) */}
                 {isSubscription && (
                   <>
                     {(() => {

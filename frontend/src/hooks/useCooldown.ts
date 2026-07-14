@@ -1,9 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
 
-/**
- * Đếm ngược cooldown lưu trong localStorage → không bị reset khi F5,
- * không spam được bằng cách refresh trang. Dùng cho các nút "Gửi lại email".
- */
 export function useCooldown(storageKey: string, durationSec = 60) {
   const compute = useCallback(() => {
     const until = Number(localStorage.getItem(storageKey) || 0);

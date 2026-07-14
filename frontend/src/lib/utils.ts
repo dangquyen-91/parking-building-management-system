@@ -5,8 +5,6 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-// Thứ tự hiển thị các tầng gửi xe theo mã: nhóm B (hầm vãng lai) trước, rồi A (cư dân),
-// trong mỗi nhóm sắp theo số tăng dần → B1, B2, A1, A2. Mã khác (G, số...) xếp sau.
 const FLOOR_GROUP_ORDER = ['B', 'A']
 
 export function compareFloorCode(a: string, b: string): number {
