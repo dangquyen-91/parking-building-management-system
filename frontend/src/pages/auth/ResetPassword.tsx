@@ -16,12 +16,10 @@ export const ResetPassword: React.FC = () => {
   const [apiError, setApiError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
-  // Xoá token khỏi URL sau khi đọc (tránh lọt vào lịch sử)
   useEffect(() => {
     if (token) window.history.replaceState({}, '', '/reset-password');
   }, [token]);
 
-  // Chuyển về đăng nhập sau khi đổi mật khẩu thành công
   useEffect(() => {
     if (!done) return;
     const id = setTimeout(() => navigate('/login', { state: { passwordReset: true } }), 2000);

@@ -4,11 +4,8 @@ import { TrendingDown, TrendingUp, Inbox } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import type { GroupBy } from '../../types/report';
 
-// ---- điền ngày/kỳ trống để biểu đồ chạy liên tục từ from→to ----
 const pad = (n: number) => String(n).padStart(2, '0');
 
-/** Danh sách key kỳ liên tục giữa from→to, khớp định dạng DATE_FORMAT của backend.
- *  Trả [] cho 'week' (định dạng %Y-%u của MySQL khó tái tạo chính xác → không fill). */
 export function periodKeys(from: string, to: string, groupBy: GroupBy): string[] {
   const keys: string[] = [];
   const start = new Date(`${from}T00:00:00`);
@@ -24,14 +21,12 @@ export function periodKeys(from: string, to: string, groupBy: GroupBy): string[]
   return keys;
 }
 
-/** Ghép dữ liệu thật vào dải key liên tục; key thiếu được điền bằng `empty(key)`. */
 export function fillSeries<T>(rows: T[], keys: string[], keyOf: (r: T) => string, empty: (key: string) => T): T[] {
   if (keys.length === 0) return rows;
   const map = new Map(rows.map((r) => [keyOf(r), r]));
   return keys.map((k) => map.get(k) ?? empty(k));
 }
 
-// ---- bảng màu dùng chung cho biểu đồ (đồng bộ với design system tối) ----
 export const COLORS = {
   session: '#34D399',
   booking: '#60A5FA',
@@ -45,7 +40,6 @@ export const COLORS = {
   axis: '#64748B',
 };
 
-// ---- formatters ----
 export const fmtNum = (n: number) => (n ?? 0).toLocaleString('vi-VN');
 
 export const fmtVND = (n: number) => `${(n ?? 0).toLocaleString('vi-VN')} ₫`;
@@ -60,7 +54,6 @@ export const fmtShort = (n: number) => {
 
 export const fmtDateTime = (v: string | null) => (v ? new Date(v).toLocaleString('vi-VN') : '--');
 
-// ---- hook fetch đơn giản, hủy khi unmount/đổi deps ----
 export function useAsync<T>(fn: () => Promise<T>, deps: unknown[]) {
   const [state, setState] = useState<{ data?: T; loading: boolean; error?: string }>({ loading: true });
   useEffect(() => {
@@ -72,12 +65,10 @@ export function useAsync<T>(fn: () => Promise<T>, deps: unknown[]) {
     return () => {
       alive = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
   return state;
 }
 
-// ---- card khung biểu đồ ----
 export function ReportCard({
   title,
   hint,
@@ -155,7 +146,6 @@ export function StatCard({
   );
 }
 
-// ---- trạng thái loading / lỗi / rỗng ----
 export function ChartSkeleton({ height = 240 }: { height?: number }) {
   return <div className="animate-pulse rounded-2xl bg-white/[0.04]" style={{ height }} />;
 }
@@ -177,7 +167,6 @@ export function EmptyState({ label = 'Chưa có dữ liệu trong khoảng thờ
   );
 }
 
-// ---- tooltip tối dùng chung cho recharts ----
 export function DarkTooltip({
   active,
   payload,

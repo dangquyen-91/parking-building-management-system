@@ -61,7 +61,6 @@ interface FloorData {
   floor: Floor;
   slots: ParkingSlot[];
   rows: ParkingRowApiItem[];
-  // Số phiên đang hoạt động của tầng — dùng cho tầng ô tô vãng lai (đếm theo tầng).
   activeCount?: number;
   loading: boolean;
   error: string | null;
@@ -105,7 +104,6 @@ function FloorStats({ slots, rows, floor, activeCount }: {
   activeCount?: number;
 }) {
   if (floor.vehicleType === 'car') {
-    // Tầng vãng lai "đếm theo tầng": đang dùng = số phiên active, không theo trạng thái slot.
     if (floor.floorType === 'visitor') {
       const total = floor.totalSlots;
       const occupied = activeCount ?? 0;
@@ -123,7 +121,6 @@ function FloorStats({ slots, rows, floor, activeCount }: {
       );
     }
 
-    // Tầng cư dân: mỗi xe có slot cố định → theo trạng thái slot vật lý.
     const total = slots.length;
     const empty = slots.filter(s => s.status === 'empty').length;
     const occupied = slots.filter(s => s.status === 'occupied').length;
@@ -202,7 +199,7 @@ function CarResidentFloorGrid({ slots, onSelectSlot }: {
 
 
 function CarVisitorFloorGrid({ floor, activeCount }: { floor: Floor; activeCount: number }) {
-  // Visitor car: backend đếm theo tầng (số phiên đang hoạt động), không phân slot vật lý.
+
   const total = floor.totalSlots;
   const used = activeCount;
   const empty = Math.max(0, total - used);
@@ -454,7 +451,6 @@ function SlotDetailModal({
           )}
         </div>
 
-        {/* Thông báo với slot do hệ thống quản lý */}
         {isReadOnly && (
           <div className="mt-4 rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3 text-xs text-slate-500">
             <p className="font-semibold text-slate-400 mb-1">Trạng thái hệ thống</p>
@@ -466,14 +462,14 @@ function SlotDetailModal({
           </div>
         )}
 
-        {/* Error */}
+
         {actionError && (
           <div className="mt-3 rounded-xl border border-red-400/20 bg-red-400/10 px-4 py-2.5 text-xs text-red-400">
             {actionError}
           </div>
         )}
 
-        {/* Action buttons — chỉ hiện cho empty và maintenance */}
+
         {canToggleMaintenance && (
           <motion.button
             whileHover={{ scale: 1.01 }}
@@ -599,7 +595,7 @@ export default function ParkingMapPage() {
         (a, b) => compareFloorCode(a.floorNumber, b.floorNumber),
       );
 
-      // Cache floors list for silent refresh
+
       allFloorsRef.current = allFloors;
 
       setBuildings(buildingRes.buildings);
@@ -627,7 +623,6 @@ export default function ParkingMapPage() {
           if (floor.vehicleType === 'car') {
             const res = await slotService.getSlots({ floorId: floor.id, limit: 200 });
             slots = res.slots;
-            // Tầng ô tô vãng lai đếm theo số phiên đang hoạt động, không theo trạng thái slot.
             if (floor.floorType === 'visitor') {
               const active = await getActiveSessions({ floorId: floor.id, limit: 1 });
               activeCount = active.pagination.total;
@@ -672,7 +667,6 @@ export default function ParkingMapPage() {
     }
   }, []);
 
-  /** Silent refresh: only reload slot/row data for already-known floors, no full spinner */
   const silentRefresh = useCallback(async () => {
     const floors = allFloorsRef.current;
     if (!floors.length) return;
@@ -703,7 +697,6 @@ export default function ParkingMapPage() {
               return next;
             });
           } catch {
-            // keep stale data on transient errors
           }
         })
       );
@@ -749,7 +742,7 @@ export default function ParkingMapPage() {
     };
   }, [startPolling, resetCountdown]);
 
-  // Pause/resume polling when tab visibility changes
+
   useEffect(() => {
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {

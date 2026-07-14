@@ -24,7 +24,6 @@ export const ForgotPassword: React.FC = () => {
         setSent(true);
         cooldown.start();
       } catch (err) {
-        // Backend luôn trả message chung; nếu lỗi mạng thì vẫn hiện màn xác nhận chung
         setServerMsg(err instanceof Error ? err.message : 'Đã xảy ra lỗi, vui lòng thử lại.');
         setSent(true);
       } finally {

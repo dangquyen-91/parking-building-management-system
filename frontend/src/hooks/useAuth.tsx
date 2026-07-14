@@ -15,10 +15,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Chống refresh trùng lặp: khi nhiều lần refresh xảy ra đồng thời (StrictMode chạy effect 2 lần
-// ở dev, timer định kỳ, nhiều tab...) tất cả dùng CHUNG một request. Backend xoay vòng refresh
-// token (1 token/user, dùng 1 lần) nên refresh 2 lần với cùng token sẽ khiến lần sau bị "revoked"
-// → xoá token → đăng xuất nhầm. Dedup đảm bảo chỉ xoay vòng đúng 1 lần.
 let refreshPromise: Promise<AuthTokens> | null = null;
 
 async function refreshSession(): Promise<AuthTokens> {
@@ -74,15 +70,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     initializeAuth();
   }, []);
 
-  // Tự động làm mới access token trước khi hết hạn để tránh bị đăng xuất khi đang dùng.
-  // Trước đây token chỉ được refresh lúc tải lại trang, nên khi access token hết hạn giữa
-  // phiên làm việc thì các request kế tiếp trả về 401 và người dùng bị "tự động logout".
   useEffect(() => {
     if (!user) return;
 
-    const REFRESH_MARGIN_MS = 5 * 60 * 1000; // làm mới khi access token còn dưới 5 phút
+    const REFRESH_MARGIN_MS = 5 * 60 * 1000;
 
-    // Lấy thời điểm hết hạn (ms) từ payload của access token, không phụ thuộc TTL cấu hình.
     const getAccessTokenExpiry = (): number | null => {
       const token = localStorage.getItem('accessToken');
       if (!token) return null;
@@ -101,8 +93,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         await refreshSession();
       } catch {
-        // Bỏ qua lỗi tạm thời (mạng chập chờn); nếu refresh token thật sự hết hạn thì
-        // lần tải lại trang kế tiếp (initializeAuth) sẽ đăng xuất một cách gọn gàng.
       }
     };
 
@@ -113,8 +103,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     };
 
-    // Kiểm tra mỗi phút (chỉ thực sự gọi refresh khi gần hết hạn) và khi người dùng
-    // quay lại tab — xử lý trường hợp máy ngủ / trình duyệt điều tiết timer ở tab nền.
     const intervalId = window.setInterval(maybeRefresh, 60 * 1000);
     const onFocus = () => {
       if (document.visibilityState === 'visible') maybeRefresh();

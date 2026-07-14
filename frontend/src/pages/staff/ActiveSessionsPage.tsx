@@ -25,7 +25,7 @@ import { floorService, type Floor } from '../../services/floor.service';
 import { cn } from '../../lib/utils';
 import type { ActiveSessionApiItem, PaymentMethod } from '../../types/kiosk';
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+
 
 const formatDateTime = (iso: string) =>
   new Date(iso).toLocaleString('vi-VN', {
@@ -102,7 +102,7 @@ const formatLocation = (
   return { label: '--' };
 };
 
-// ── Checkout Modal ────────────────────────────────────────────────────────────
+
 
 interface CheckoutModalProps {
   session: ActiveSessionApiItem | null;
@@ -143,7 +143,7 @@ function CheckoutModal({ session, locationLabel, onConfirm, onCancel, isSubmitti
               <X className="h-4 w-4" />
             </button>
 
-            {/* Header */}
+
             <div className="mb-5 flex items-center gap-3">
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-500/20">
                 <LogOut className="h-6 w-6 text-orange-400" />
@@ -154,7 +154,7 @@ function CheckoutModal({ session, locationLabel, onConfirm, onCancel, isSubmitti
               </div>
             </div>
 
-            {/* Vehicle info */}
+
             <div className="mb-5 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
               <p className="text-2xl font-black tracking-widest text-white mb-1">{session.licensePlate}</p>
               <div className="flex flex-wrap gap-2 text-xs">
@@ -170,7 +170,7 @@ function CheckoutModal({ session, locationLabel, onConfirm, onCancel, isSubmitti
               </div>
             </div>
 
-            {/* Payment method */}
+
             <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-slate-500">
               Hình thức thanh toán
             </p>
@@ -200,7 +200,7 @@ function CheckoutModal({ session, locationLabel, onConfirm, onCancel, isSubmitti
               ))}
             </div>
 
-            {/* Action buttons */}
+
             <div className="flex gap-3">
               <button
                 type="button"
@@ -234,7 +234,7 @@ function CheckoutModal({ session, locationLabel, onConfirm, onCancel, isSubmitti
   );
 }
 
-// ── Success Toast ─────────────────────────────────────────────────────────────
+
 
 interface ToastData {
   licensePlate: string;
@@ -277,7 +277,7 @@ function SuccessToast({ data, onDismiss }: { data: ToastData | null; onDismiss: 
   );
 }
 
-// ── Main Page ─────────────────────────────────────────────────────────────────
+
 
 export default function ActiveSessionsPage() {
   const [sessions, setSessions] = useState<ActiveSessionApiItem[]>([]);
@@ -290,13 +290,13 @@ export default function ActiveSessionsPage() {
   const [error, setError] = useState<string | null>(null);
   const [floorMap, setFloorMap] = useState<Map<number, Floor>>(new Map());
 
-  // Checkout modal state
+
   const [checkoutTarget, setCheckoutTarget] = useState<ActiveSessionApiItem | null>(null);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [successToast, setSuccessToast] = useState<ToastData | null>(null);
 
-  // Load floor lookup map once on mount
+
   useEffect(() => {
     floorService.getFloors({ limit: 200, isActive: true })
       .then(res => {
@@ -304,7 +304,7 @@ export default function ActiveSessionsPage() {
         res.floors.forEach(f => map.set(f.id, f));
         setFloorMap(map);
       })
-      .catch(() => { /* non-critical */ });
+      .catch(() => {});
   }, []);
 
   const loadSessions = useCallback(async () => {
@@ -366,13 +366,11 @@ export default function ActiveSessionsPage() {
     try {
       const result = await checkOut(checkoutTarget.id, { paymentMethod: method });
 
-      // VNPay redirect
       if (result.paymentMethod === 'vnpay' && result.paymentUrl) {
         window.location.href = result.paymentUrl;
         return;
       }
 
-      // Success
       setCheckoutTarget(null);
       setSuccessToast({
         licensePlate: result.licensePlate,
@@ -380,7 +378,6 @@ export default function ActiveSessionsPage() {
         durationMinutes: result.durationMinutes,
       });
 
-      // Remove session từ danh sách ngay lập tức
       setSessions(prev => prev.filter(s => s.id !== checkoutTarget.id));
       setTotal(prev => Math.max(0, prev - 1));
     } catch (err) {
@@ -411,7 +408,7 @@ export default function ActiveSessionsPage() {
         </button>
       }
     >
-      {/* Hotkey hints */}
+
       <div className="mb-5 flex flex-wrap items-center gap-2 text-xs text-slate-600">
         {[
           { key: 'F1', label: 'Check-in' },
@@ -428,7 +425,7 @@ export default function ActiveSessionsPage() {
         ))}
       </div>
 
-      {/* Status filter tabs */}
+
       <div className="mb-4 inline-flex max-w-full gap-1 overflow-x-auto rounded-2xl border border-white/10 bg-[#0F172A]/80 p-1.5">
         {statusTabs.map((tab) => (
           <button
@@ -450,7 +447,7 @@ export default function ActiveSessionsPage() {
         ))}
       </div>
 
-      {/* Search + Stats */}
+
       <div className="mb-6 grid gap-4 lg:grid-cols-[minmax(0,1fr)_180px_180px_180px]">
         <form
           onSubmit={handleSubmit}
@@ -482,7 +479,7 @@ export default function ActiveSessionsPage() {
         ))}
       </div>
 
-      {/* Checkout error banner */}
+
       {checkoutError && (
         <div className="mb-5 flex gap-2 rounded-2xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-200">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -551,7 +548,7 @@ export default function ActiveSessionsPage() {
                   transition={{ delay: index * 0.03 }}
                   className="grid gap-4 rounded-2xl border border-white/10 bg-white/[0.035] p-4 transition hover:border-blue-400/30 hover:bg-white/[0.055] lg:grid-cols-[minmax(180px,1.1fr)_minmax(180px,1fr)_minmax(160px,0.9fr)_auto]"
                 >
-                  {/* License plate + customer info */}
+
                   <div className="flex items-center gap-3">
                     <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500/15 text-blue-300">
                       <VehicleIcon className="h-5 w-5" />
@@ -583,7 +580,7 @@ export default function ActiveSessionsPage() {
                     </div>
                   </div>
 
-                  {/* Location */}
+
                   <div className="flex items-center gap-3">
                     <MapPin className={cn('h-5 w-5 shrink-0', iconColor)} />
                     <div>
@@ -600,7 +597,7 @@ export default function ActiveSessionsPage() {
                     </div>
                   </div>
 
-                  {/* Time info */}
+
                   <div className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-1">
                     <div className="flex items-center gap-3">
                       <Clock3 className="h-4 w-4 text-purple-300" />
@@ -631,7 +628,7 @@ export default function ActiveSessionsPage() {
                     )}
                   </div>
 
-                  {/* Action column */}
+
                   <div className="flex items-center lg:justify-end">
                     {isActive ? (
                       <button
@@ -669,7 +666,7 @@ export default function ActiveSessionsPage() {
           </div>
         )}
 
-        {/* Pagination */}
+
         <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4 text-sm text-slate-500">
           <span>
             Trang {page}/{totalPages} · {total} {resultLabel}
@@ -695,7 +692,7 @@ export default function ActiveSessionsPage() {
         </div>
       </motion.section>
 
-      {/* Checkout modal */}
+
       <CheckoutModal
         session={checkoutTarget}
         locationLabel={checkoutTargetLocation}
@@ -704,7 +701,7 @@ export default function ActiveSessionsPage() {
         isSubmitting={isCheckingOut}
       />
 
-      {/* Success toast */}
+
       <SuccessToast data={successToast} onDismiss={() => setSuccessToast(null)} />
     </KioskLayout>
   );

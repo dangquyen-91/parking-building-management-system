@@ -82,7 +82,6 @@ export default function CheckOutPage() {
   const [focusTrigger, setFocusTrigger] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Auto-focus khi focusTrigger thay đổi
   useEffect(() => {
     inputRef.current?.focus();
   }, [focusTrigger]);
@@ -102,7 +101,6 @@ export default function CheckOutPage() {
     setError(null);
 
     try {
-      // Bước 1: lookup để lấy sessionId
       const lookup = await lookupVehicle(trimmed);
 
       if (!lookup.activeSession) {
@@ -112,16 +110,13 @@ export default function CheckOutPage() {
 
       const sessionId = lookup.activeSession.id;
 
-      // Bước 2: checkout ngay lập tức
       const result: CheckOutApiResponse = await checkOut(sessionId, { paymentMethod });
 
-      // Nếu VNPay → redirect sang cổng thanh toán
       if (result.paymentMethod === 'vnpay' && result.paymentUrl) {
         window.location.href = result.paymentUrl;
         return;
       }
 
-      // Lấy thông tin vị trí từ activeSession
       const activeSession = lookup.activeSession;
       const spotCode =
         activeSession.slot?.slotCode ??
@@ -171,7 +166,7 @@ export default function CheckOutPage() {
       title="Xe Ra Bãi"
       subtitle="Nhập biển số, chọn thanh toán và checkout ngay"
     >
-      {/* Hotkey hints */}
+
       <div className="mb-5 flex flex-wrap items-center gap-2 text-xs text-slate-600">
         {[
           { key: 'F1', label: 'Check-In' },
@@ -189,15 +184,15 @@ export default function CheckOutPage() {
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.6fr)]">
-        {/* ── Left: Form ── */}
+
         <div className="space-y-5">
-          {/* All-in-one card: input + payment + checkout button */}
+
           <motion.section
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             className="rounded-[28px] border border-white/10 bg-[#0F172A]/80 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl"
           >
-            {/* Header */}
+
             <div className="mb-5 flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-500/20">
                 <LogOut className="h-5 w-5 text-orange-400" />
@@ -208,7 +203,7 @@ export default function CheckOutPage() {
               </div>
             </div>
 
-            {/* Plate input */}
+
             <div className="relative mb-4">
               <input
                 ref={inputRef}
@@ -239,7 +234,7 @@ export default function CheckOutPage() {
               )}
             </div>
 
-            {/* Payment method */}
+
             <p className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
               Hình thức thanh toán
             </p>
@@ -262,7 +257,7 @@ export default function CheckOutPage() {
               />
             </div>
 
-            {/* Error */}
+
             {error && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
@@ -274,7 +269,7 @@ export default function CheckOutPage() {
               </motion.div>
             )}
 
-            {/* Single checkout button */}
+
             <button
               type="button"
               onClick={handleCheckout}
@@ -301,7 +296,7 @@ export default function CheckOutPage() {
           </motion.section>
         </div>
 
-        {/* ── Right: Hướng dẫn ── */}
+
         <aside className="space-y-5">
           <div className="rounded-[28px] border border-white/10 bg-[#0F172A]/80 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl">
             <div className="mb-4 flex items-center gap-2">
