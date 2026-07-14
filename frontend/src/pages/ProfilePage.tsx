@@ -42,6 +42,15 @@ const formatDate = (iso: string | null) =>
 const formatCurrency = (v: string | number) =>
   Number(v).toLocaleString('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 });
 
+function ErrorAlert({ message }: { message: string }) {
+  return (
+    <div className="flex gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+      <span>{message}</span>
+    </div>
+  );
+}
+
 const SUB_STATUS: Record<string, { label: string; cls: string }> = {
   active:    { label: 'Đang hiệu lực', cls: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
   pending:   { label: 'Chờ xử lý',    cls: 'bg-amber-100  text-amber-700  border-amber-200'  },
@@ -556,7 +565,7 @@ export default function ProfilePage() {
   const initials = displayProfile?.fullName
     ?.split(' ').map(n => n[0]).slice(-2).join('').toUpperCase() ?? '??';
 
-  const uniquePlates = [...new Map(activeSubscriptions.map(s => [s.licensePlate, s])).values()];
+
 
   return (
     <>

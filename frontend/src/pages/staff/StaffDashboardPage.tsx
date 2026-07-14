@@ -9,7 +9,6 @@ import {
   Motorbike,
   RefreshCw,
   TrendingUp,
-  Users,
   Zap,
 } from 'lucide-react';
 import {
