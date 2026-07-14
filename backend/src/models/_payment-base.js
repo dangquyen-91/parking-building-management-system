@@ -23,4 +23,7 @@ export const paymentBaseFields = {
   rawIpn: { type: DataTypes.TEXT, allowNull: true },
 };
 
-export const paymentBaseIndexes = [{ fields: ['status'] }];
+export const paymentBaseIndexes = [
+  { fields: ['status'] },
+  { fields: ['status', 'paidAt'] },
+];

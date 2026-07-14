@@ -15,6 +15,12 @@ export interface RevenuePoint {
   session: number;
   booking: number;
   subscription: number;
+  count: number;
+  sessionCount: number;
+  bookingCount: number;
+  subscriptionCount: number;
+  cash: number;
+  vnpay: number;
 }
 
 export interface RevenueByVehiclePoint {
@@ -25,7 +31,8 @@ export interface RevenueByVehiclePoint {
 }
 
 export interface RevenueComparison {
-  period: 'week' | 'month' | 'year';
+  period: 'day' | 'week' | 'month' | 'quarter' | 'year';
+  compare: ComparisonMode;
   current: { from: string; to: string; revenue: number };
   previous: { from: string; to: string; revenue: number };
   changePercent: number | null;
@@ -113,5 +120,6 @@ export interface StaffStat {
   cashCollected: number;
 }
 
-export type GroupBy = 'day' | 'week' | 'month';
+export type GroupBy = 'day' | 'week' | 'month' | 'quarter' | 'year';
+export type ComparisonMode = 'previous_period' | 'previous_year';
 export type DayType = 'weekday' | 'weekend';

@@ -13,20 +13,36 @@ import ParkingRow from '../models/parking-row.model.js';
 import User from '../models/user.model.js';
 import AppError from '../utils/appError.js';
 
+const parseLocalDate = (value, endOfDay = false) => {
+  if (!value) {
+    const now = new Date();
+    now.setHours(endOfDay ? 23 : 0, endOfDay ? 59 : 0, endOfDay ? 59 : 0, endOfDay ? 999 : 0);
+    return now;
+  }
+
+  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  const date = match
+    ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+    : new Date(value);
+  if (Number.isNaN(date.getTime())) throw new AppError('Invalid date format', 400);
+  date.setHours(endOfDay ? 23 : 0, endOfDay ? 59 : 0, endOfDay ? 59 : 0, endOfDay ? 999 : 0);
+  return date;
+};
+
 const parseDateRange = (from, to) => {
-  const start = from ? new Date(from) : new Date(new Date().setHours(0, 0, 0, 0));
-  const end = to ? new Date(to) : new Date(new Date().setHours(23, 59, 59, 999));
-  if (isNaN(start) || isNaN(end)) throw new AppError('Invalid date format', 400);
+  const start = parseLocalDate(from);
+  const end = parseLocalDate(to, true);
   if (start > end) throw new AppError('from must be before to', 400);
-  end.setHours(23, 59, 59, 999);
   return { start, end };
 };
 
-const groupByFormat = (groupBy) => {
+const groupBySql = (columnName, groupBy) => {
   switch (groupBy) {
-    case 'week': return '%Y-%u';
-    case 'month': return '%Y-%m';
-    default: return '%Y-%m-%d';
+    case 'week': return `DATE_FORMAT(${columnName}, '%x-%v')`;
+    case 'month': return `DATE_FORMAT(${columnName}, '%Y-%m')`;
+    case 'quarter': return `CONCAT(YEAR(${columnName}), '-Q', QUARTER(${columnName}))`;
+    case 'year': return `DATE_FORMAT(${columnName}, '%Y')`;
+    default: return `DATE_FORMAT(${columnName}, '%Y-%m-%d')`;
   }
 };
 
@@ -35,7 +51,7 @@ export const getDashboard = async () => {
   todayStart.setHours(0, 0, 0, 0);
   const todayEnd = new Date();
   todayEnd.setHours(23, 59, 59, 999);
-  const dateWhere = { createdAt: { [Op.between]: [todayStart, todayEnd] } };
+  const paymentDateWhere = { paidAt: { [Op.between]: [todayStart, todayEnd] } };
 
   const [
     activeTotal,
@@ -51,15 +67,18 @@ export const getDashboard = async () => {
     ParkingSession.count({ where: { status: 'active' } }),
     ParkingSession.count({ where: { status: 'active', vehicleType: 'motorcycle' } }),
     ParkingSession.count({ where: { status: 'active', vehicleType: 'car' } }),
-    ParkingSession.count({ where: { status: 'completed', ...dateWhere } }),
-    SessionPayment.sum('amount', { where: { status: 'success', ...dateWhere } }),
-    BookingPayment.sum('amount', { where: { status: 'success', ...dateWhere } }),
-    SubscriptionPayment.sum('amount', { where: { status: 'success', ...dateWhere } }),
-    Booking.count({ where: { status: 'pending', ...dateWhere } }),
-    Booking.count({ where: { status: 'confirmed', ...dateWhere } }),
+    ParkingSession.count({ where: { status: 'completed', exitTime: { [Op.between]: [todayStart, todayEnd] } } }),
+    SessionPayment.sum('amount', { where: { status: 'success', ...paymentDateWhere } }),
+    BookingPayment.sum('amount', { where: { status: 'success', ...paymentDateWhere } }),
+    SubscriptionPayment.sum('amount', { where: { status: 'success', ...paymentDateWhere } }),
+    Booking.count({ where: { status: 'pending', createdAt: { [Op.between]: [todayStart, todayEnd] } } }),
+    Booking.count({ where: { status: 'confirmed', createdAt: { [Op.between]: [todayStart, todayEnd] } } }),
   ]);
 
-  const totalRevenue = (sessionRevToday || 0) + (bookingRevToday || 0) + (subRevToday || 0);
+  const sessionRevenue = Number(sessionRevToday) || 0;
+  const bookingRevenue = Number(bookingRevToday) || 0;
+  const subscriptionRevenue = Number(subRevToday) || 0;
+  const totalRevenue = sessionRevenue + bookingRevenue + subscriptionRevenue;
 
   return {
     activeSessions: {
@@ -70,9 +89,9 @@ export const getDashboard = async () => {
     completedSessionsToday: completedToday,
     revenueToday: {
       total: totalRevenue,
-      fromSessions: sessionRevToday || 0,
-      fromBookings: bookingRevToday || 0,
-      fromSubscriptions: subRevToday || 0,
+      fromSessions: sessionRevenue,
+      fromBookings: bookingRevenue,
+      fromSubscriptions: subscriptionRevenue,
     },
     bookingsToday: {
       pending: pendingBookings,
@@ -83,58 +102,66 @@ export const getDashboard = async () => {
 
 export const getRevenue = async ({ from, to, groupBy = 'day' }) => {
   const { start, end } = parseDateRange(from, to);
-  const fmt = groupByFormat(groupBy);
-  const dateWhere = { status: 'success', createdAt: { [Op.between]: [start, end] } };
-  const groupExpr = fn('DATE_FORMAT', col('createdAt'), fmt);
+  const periodSql = groupBySql('paidAt', groupBy);
+  const dateWhere = { status: 'success', paidAt: { [Op.between]: [start, end] } };
+
+  const revenueAttributes = [
+    [literal(periodSql), 'period'],
+    [fn('SUM', col('amount')), 'revenue'],
+    [fn('COUNT', col('id')), 'count'],
+    [fn('SUM', literal("CASE WHEN paymentMethod = 'cash' THEN amount ELSE 0 END")), 'cash'],
+    [fn('SUM', literal("CASE WHEN paymentMethod = 'vnpay' THEN amount ELSE 0 END")), 'vnpay'],
+  ];
+
+  const queryOptions = {
+    where: dateWhere,
+    attributes: revenueAttributes,
+    group: [literal(periodSql)],
+    order: [[literal(periodSql), 'ASC']],
+    raw: true,
+  };
 
   const [sessions, bookings, subscriptions] = await Promise.all([
-    SessionPayment.findAll({
-      where: dateWhere,
-      attributes: [
-        [groupExpr, 'period'],
-        [fn('SUM', col('amount')), 'revenue'],
-        [fn('COUNT', col('id')), 'count'],
-      ],
-      group: [literal(`DATE_FORMAT(createdAt, '${fmt}')`)],
-      order: [[literal(`DATE_FORMAT(createdAt, '${fmt}')`), 'ASC']],
-      raw: true,
-    }),
-    BookingPayment.findAll({
-      where: dateWhere,
-      attributes: [
-        [groupExpr, 'period'],
-        [fn('SUM', col('amount')), 'revenue'],
-        [fn('COUNT', col('id')), 'count'],
-      ],
-      group: [literal(`DATE_FORMAT(createdAt, '${fmt}')`)],
-      order: [[literal(`DATE_FORMAT(createdAt, '${fmt}')`), 'ASC']],
-      raw: true,
-    }),
-    SubscriptionPayment.findAll({
-      where: dateWhere,
-      attributes: [
-        [groupExpr, 'period'],
-        [fn('SUM', col('amount')), 'revenue'],
-        [fn('COUNT', col('id')), 'count'],
-      ],
-      group: [literal(`DATE_FORMAT(createdAt, '${fmt}')`)],
-      order: [[literal(`DATE_FORMAT(createdAt, '${fmt}')`), 'ASC']],
-      raw: true,
-    }),
+    SessionPayment.findAll(queryOptions),
+    BookingPayment.findAll(queryOptions),
+    SubscriptionPayment.findAll(queryOptions),
   ]);
 
   const merge = (rows, source) =>
-    rows.map((r) => ({ period: r.period, source, revenue: parseFloat(r.revenue) || 0, count: parseInt(r.count) || 0 }));
+    rows.map((r) => ({
+      period: r.period,
+      source,
+      revenue: parseFloat(r.revenue) || 0,
+      count: parseInt(r.count, 10) || 0,
+      cash: parseFloat(r.cash) || 0,
+      vnpay: parseFloat(r.vnpay) || 0,
+    }));
 
   const allRows = [...merge(sessions, 'session'), ...merge(bookings, 'booking'), ...merge(subscriptions, 'subscription')];
 
   const periodMap = {};
   for (const row of allRows) {
     if (!periodMap[row.period]) {
-      periodMap[row.period] = { period: row.period, total: 0, session: 0, booking: 0, subscription: 0 };
+      periodMap[row.period] = {
+        period: row.period,
+        total: 0,
+        session: 0,
+        booking: 0,
+        subscription: 0,
+        count: 0,
+        sessionCount: 0,
+        bookingCount: 0,
+        subscriptionCount: 0,
+        cash: 0,
+        vnpay: 0,
+      };
     }
     periodMap[row.period][row.source] += row.revenue;
+    periodMap[row.period][`${row.source}Count`] += row.count;
     periodMap[row.period].total += row.revenue;
+    periodMap[row.period].count += row.count;
+    periodMap[row.period].cash += row.cash;
+    periodMap[row.period].vnpay += row.vnpay;
   }
 
   return Object.values(periodMap).sort((a, b) => a.period.localeCompare(b.period));
@@ -142,34 +169,35 @@ export const getRevenue = async ({ from, to, groupBy = 'day' }) => {
 
 export const getRevenueByVehicle = async ({ from, to, groupBy = 'day' }) => {
   const { start, end } = parseDateRange(from, to);
-  const fmt = groupByFormat(groupBy);
-  const dateWhere = { status: 'success', createdAt: { [Op.between]: [start, end] } };
-  const groupExpr = fn('DATE_FORMAT', col('SessionPayment.createdAt'), fmt);
+  const dateWhere = { status: 'success', paidAt: { [Op.between]: [start, end] } };
+  const sessionPeriodSql = groupBySql('SessionPayment.paidAt', groupBy);
+  const bookingPeriodSql = groupBySql('BookingPayment.paidAt', groupBy);
+  const subscriptionPeriodSql = groupBySql('SubscriptionPayment.paidAt', groupBy);
 
   const sessionRows = await SessionPayment.findAll({
     where: dateWhere,
     include: [{ model: ParkingSession, as: 'session', attributes: ['vehicleType'] }],
     attributes: [
-      [groupExpr, 'period'],
+      [literal(sessionPeriodSql), 'period'],
       [fn('SUM', col('SessionPayment.amount')), 'revenue'],
       [col('session.vehicleType'), 'vehicleType'],
     ],
     group: [
-      literal(`DATE_FORMAT(SessionPayment.createdAt, '${fmt}')`),
+      literal(sessionPeriodSql),
       col('session.vehicleType'),
     ],
-    order: [[literal(`DATE_FORMAT(SessionPayment.createdAt, '${fmt}')`), 'ASC']],
+    order: [[literal(sessionPeriodSql), 'ASC']],
     raw: true,
   });
 
   const bookingRows = await BookingPayment.findAll({
     where: dateWhere,
     attributes: [
-      [fn('DATE_FORMAT', col('BookingPayment.createdAt'), fmt), 'period'],
+      [literal(bookingPeriodSql), 'period'],
       [fn('SUM', col('BookingPayment.amount')), 'revenue'],
     ],
-    group: [literal(`DATE_FORMAT(BookingPayment.createdAt, '${fmt}')`)],
-    order: [[literal(`DATE_FORMAT(BookingPayment.createdAt, '${fmt}')`), 'ASC']],
+    group: [literal(bookingPeriodSql)],
+    order: [[literal(bookingPeriodSql), 'ASC']],
     raw: true,
   });
 
@@ -177,15 +205,15 @@ export const getRevenueByVehicle = async ({ from, to, groupBy = 'day' }) => {
     where: dateWhere,
     include: [{ model: ResidentSubscription, as: 'subscription', attributes: ['vehicleType'] }],
     attributes: [
-      [fn('DATE_FORMAT', col('SubscriptionPayment.createdAt'), fmt), 'period'],
+      [literal(subscriptionPeriodSql), 'period'],
       [fn('SUM', col('SubscriptionPayment.amount')), 'revenue'],
       [col('subscription.vehicleType'), 'vehicleType'],
     ],
     group: [
-      literal(`DATE_FORMAT(SubscriptionPayment.createdAt, '${fmt}')`),
+      literal(subscriptionPeriodSql),
       col('subscription.vehicleType'),
     ],
-    order: [[literal(`DATE_FORMAT(SubscriptionPayment.createdAt, '${fmt}')`), 'ASC']],
+    order: [[literal(subscriptionPeriodSql), 'ASC']],
     raw: true,
   });
 
@@ -219,53 +247,130 @@ export const getRevenueByVehicle = async ({ from, to, groupBy = 'day' }) => {
   return Object.values(periodMap).sort((a, b) => a.period.localeCompare(b.period));
 };
 
-const buildComparisonRange = (period) => {
+const buildCurrentPeriodRange = (period) => {
   const now = new Date();
-  let curStart, prevStart;
+  let curStart;
 
   if (period === 'week') {
     curStart = new Date(now);
-    curStart.setDate(now.getDate() - now.getDay()); // về Chủ nhật đầu tuần
+    const mondayOffset = (now.getDay() + 6) % 7;
+    curStart.setDate(now.getDate() - mondayOffset);
     curStart.setHours(0, 0, 0, 0);
-    prevStart = new Date(curStart);
-    prevStart.setDate(curStart.getDate() - 7);
+  } else if (period === 'quarter') {
+    curStart = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
   } else if (period === 'year') {
     curStart = new Date(now.getFullYear(), 0, 1);
-    prevStart = new Date(now.getFullYear() - 1, 0, 1);
   } else {
     curStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    prevStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   }
 
-  // So sánh "cùng khoảng thời gian đã trôi qua" (period-to-date):
-  // kỳ trước được cắt đúng bằng lượng thời gian đã trôi của kỳ này,
-  // nên 26/06 so với 01–26/05, và tự xử lý lệch số ngày giữa các tháng.
-  const elapsed = now.getTime() - curStart.getTime();
-  const curEnd = now;
-  const prevEnd = new Date(prevStart.getTime() + elapsed);
+  return { start: curStart, end: now };
+};
 
-  return { curStart, curEnd, prevStart, prevEnd };
+const shiftOneYearBack = (value) => {
+  const month = value.getMonth();
+  const day = value.getDate();
+  const targetYear = value.getFullYear() - 1;
+  const lastDay = new Date(targetYear, month + 1, 0).getDate();
+  const shifted = new Date(value);
+  shifted.setFullYear(targetYear, month, Math.min(day, lastDay));
+  return shifted;
+};
+
+const shiftMonthsBack = (value, months) => {
+  const sourceYear = value.getFullYear();
+  const sourceMonth = value.getMonth();
+  const sourceDay = value.getDate();
+  const isLastDayOfMonth = sourceDay === new Date(sourceYear, sourceMonth + 1, 0).getDate();
+  const targetMonthStart = new Date(sourceYear, sourceMonth - months, 1);
+  const targetLastDay = new Date(
+    targetMonthStart.getFullYear(),
+    targetMonthStart.getMonth() + 1,
+    0,
+  ).getDate();
+  const shifted = new Date(value);
+  shifted.setFullYear(
+    targetMonthStart.getFullYear(),
+    targetMonthStart.getMonth(),
+    isLastDayOfMonth ? targetLastDay : Math.min(sourceDay, targetLastDay),
+  );
+  return shifted;
+};
+
+const buildComparisonRange = (current, compare, period) => {
+  if (compare === 'previous_year') {
+    return {
+      start: shiftOneYearBack(current.start),
+      end: shiftOneYearBack(current.end),
+    };
+  }
+
+  if (period) {
+    const shift = (value) => {
+      if (period === 'day') {
+        const shifted = new Date(value);
+        shifted.setDate(shifted.getDate() - 1);
+        return shifted;
+      }
+      if (period === 'week') {
+        const shifted = new Date(value);
+        shifted.setDate(shifted.getDate() - 7);
+        return shifted;
+      }
+      if (period === 'month') return shiftMonthsBack(value, 1);
+      if (period === 'quarter') return shiftMonthsBack(value, 3);
+      return shiftOneYearBack(value);
+    };
+    return { start: shift(current.start), end: shift(current.end) };
+  }
+
+  const currentStartDay = new Date(current.start);
+  currentStartDay.setHours(0, 0, 0, 0);
+  const currentEndDay = new Date(current.end);
+  currentEndDay.setHours(0, 0, 0, 0);
+  const days = Math.round((currentEndDay - currentStartDay) / 86_400_000) + 1;
+  const previousEnd = new Date(currentStartDay);
+  previousEnd.setMilliseconds(-1);
+  const previousStart = new Date(currentStartDay);
+  previousStart.setDate(previousStart.getDate() - days);
+
+  return { start: previousStart, end: previousEnd };
 };
 
 const sumRevenue = async (start, end) => {
-  const where = { status: 'success', createdAt: { [Op.between]: [start, end] } };
+  const where = { status: 'success', paidAt: { [Op.between]: [start, end] } };
   const [s, b, sub] = await Promise.all([
     SessionPayment.sum('amount', { where }),
     BookingPayment.sum('amount', { where }),
     SubscriptionPayment.sum('amount', { where }),
   ]);
-  return (s || 0) + (b || 0) + (sub || 0);
+  return (Number(s) || 0) + (Number(b) || 0) + (Number(sub) || 0);
 };
 
-export const getRevenueComparison = async ({ period = 'month' }) => {
-  if (!['week', 'month', 'year'].includes(period)) throw new AppError('period must be week|month|year', 400);
-  const { curStart, curEnd, prevStart, prevEnd } = buildComparisonRange(period);
-  const [current, previous] = await Promise.all([sumRevenue(curStart, curEnd), sumRevenue(prevStart, prevEnd)]);
+export const getRevenueComparison = async ({
+  from,
+  to,
+  compare = 'previous_period',
+  period,
+}) => {
+  if (!['previous_period', 'previous_year'].includes(compare)) {
+    throw new AppError('compare must be previous_period|previous_year', 400);
+  }
+
+  const currentRange = from || to
+    ? parseDateRange(from, to)
+    : buildCurrentPeriodRange(period ?? 'month');
+  const comparisonRange = buildComparisonRange(currentRange, compare, from || to ? period : undefined);
+  const [current, previous] = await Promise.all([
+    sumRevenue(currentRange.start, currentRange.end),
+    sumRevenue(comparisonRange.start, comparisonRange.end),
+  ]);
   const change = previous === 0 ? null : ((current - previous) / previous) * 100;
   return {
-    period,
-    current: { from: curStart, to: curEnd, revenue: current },
-    previous: { from: prevStart, to: prevEnd, revenue: previous },
+    period: period ?? 'month',
+    compare,
+    current: { from: currentRange.start, to: currentRange.end, revenue: current },
+    previous: { from: comparisonRange.start, to: comparisonRange.end, revenue: previous },
     changePercent: change !== null ? Math.round(change * 100) / 100 : null,
   };
 };
@@ -632,7 +737,7 @@ export const getStaffStats = async ({ from, to }) => {
   });
 
   const cashRows = await SessionPayment.findAll({
-    where: { status: 'success', paymentMethod: 'cash', createdAt: { [Op.between]: [start, end] } },
+    where: { status: 'success', paymentMethod: 'cash', paidAt: { [Op.between]: [start, end] } },
     include: [{ model: ParkingSession, as: 'session', attributes: ['staffId'] }],
     attributes: [
       [col('session.staffId'), 'staffId'],

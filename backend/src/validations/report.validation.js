@@ -7,7 +7,7 @@ const dateRangeFields = {
   }),
 };
 
-const groupByField = Joi.string().valid('day', 'week', 'month').default('day');
+const groupByField = Joi.string().valid('day', 'week', 'month', 'quarter', 'year').default('day');
 
 export const revenueSchema = Joi.object({
   ...dateRangeFields,
@@ -20,7 +20,9 @@ export const revenueByVehicleSchema = Joi.object({
 });
 
 export const revenueComparisonSchema = Joi.object({
-  period: Joi.string().valid('week', 'month', 'year').default('month'),
+  ...dateRangeFields,
+  compare: Joi.string().valid('previous_period', 'previous_year').default('previous_period'),
+  period: Joi.string().valid('day', 'week', 'month', 'quarter', 'year'),
 });
 
 export const dateRangeSchema = Joi.object({

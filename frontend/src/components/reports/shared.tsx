@@ -17,6 +17,14 @@ export function periodKeys(from: string, to: string, groupBy: GroupBy): string[]
   if (groupBy === 'month') {
     const d = new Date(start.getFullYear(), start.getMonth(), 1);
     while (d <= end) { keys.push(`${d.getFullYear()}-${pad(d.getMonth() + 1)}`); d.setMonth(d.getMonth() + 1); }
+  } else if (groupBy === 'quarter') {
+    const d = new Date(start.getFullYear(), Math.floor(start.getMonth() / 3) * 3, 1);
+    while (d <= end) {
+      keys.push(`${d.getFullYear()}-Q${Math.floor(d.getMonth() / 3) + 1}`);
+      d.setMonth(d.getMonth() + 3);
+    }
+  } else if (groupBy === 'year') {
+    for (let year = start.getFullYear(); year <= end.getFullYear(); year += 1) keys.push(String(year));
   } else if (groupBy === 'day') {
     const d = new Date(start);
     while (d <= end) { keys.push(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`); d.setDate(d.getDate() + 1); }

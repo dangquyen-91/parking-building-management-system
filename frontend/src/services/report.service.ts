@@ -14,6 +14,7 @@ import type {
   TopUser,
   StaffStat,
   GroupBy,
+  ComparisonMode,
   DayType,
   VehicleType,
 } from '../types/report';
@@ -66,8 +67,9 @@ export const reportService = {
   getRevenueByVehicle: (params: DateRange & { groupBy?: GroupBy } = {}) =>
     get<RevenueByVehiclePoint[]>('revenue/by-vehicle', params),
 
-  getRevenueComparison: (period: 'week' | 'month' | 'year' = 'month') =>
-    get<RevenueComparison>('revenue/comparison', { period }),
+  getRevenueComparison: (
+    params: DateRange & { compare?: ComparisonMode; period?: 'day' | 'week' | 'month' | 'quarter' | 'year' } = {},
+  ) => get<RevenueComparison>('revenue/comparison', params),
 
   getSessionStats: (params: DateRange = {}) => get<SessionStats>('sessions', params),
 

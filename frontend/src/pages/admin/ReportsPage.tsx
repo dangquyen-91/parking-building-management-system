@@ -13,6 +13,7 @@ const PRESETS: Array<{ key: RangePreset; label: string }> = [
   { key: 'today', label: 'Hôm nay' },
   { key: '7d', label: '7 ngày' },
   { key: 'month', label: 'Tháng này' },
+  { key: 'quarter', label: 'Quý này' },
   { key: 'year', label: 'Năm nay' },
 ];
 
@@ -28,6 +29,11 @@ const FILTER_HINTS = [
 export default function ReportsPage() {
   const range = useDateRange('month');
   const [tab, setTab] = useState(0);
+  const comparisonPeriod = range.preset === 'today'
+    ? 'day'
+    : range.preset === '7d'
+      ? 'week'
+      : range.preset ?? undefined;
 
   return (
     <AdminLayout
@@ -56,6 +62,22 @@ export default function ReportsPage() {
             </button>
           ))}
         </div>
+        {tab === 0 && (
+          <label className="flex h-10 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 text-xs text-slate-500">
+            Nhóm theo
+            <select
+              value={range.groupBy}
+              onChange={(event) => range.setGroupBy(event.target.value as typeof range.groupBy)}
+              className="bg-[#111827] text-sm font-semibold text-white outline-none"
+            >
+              <option value="day">Ngày</option>
+              <option value="week">Tuần</option>
+              <option value="month">Tháng</option>
+              <option value="quarter">Quý</option>
+              <option value="year">Năm</option>
+            </select>
+          </label>
+        )}
       </div>
 
       <p className="mb-5 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-slate-400">
@@ -76,7 +98,14 @@ export default function ReportsPage() {
       </div>
 
       <motion.div key={tab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-        {tab === 0 && <RevenueTab from={range.from} to={range.to} groupBy={range.groupBy} />}
+        {tab === 0 && (
+          <RevenueTab
+            from={range.from}
+            to={range.to}
+            groupBy={range.groupBy}
+            comparisonPeriod={comparisonPeriod}
+          />
+        )}
         {tab === 1 && <TrafficTab from={range.from} to={range.to} />}
         {tab === 2 && <BookingsTab from={range.from} to={range.to} />}
         {tab === 3 && <StaffTab from={range.from} to={range.to} />}

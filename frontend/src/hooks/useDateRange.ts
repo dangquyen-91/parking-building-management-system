@@ -1,9 +1,14 @@
 import { useMemo, useState } from 'react';
 import type { GroupBy } from '../types/report';
 
-export type RangePreset = 'today' | '7d' | 'month' | 'year';
+export type RangePreset = 'today' | '7d' | 'month' | 'quarter' | 'year';
 
-const toISODate = (d: Date) => d.toISOString().slice(0, 10);
+const toISODate = (d: Date) => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
 function rangeForPreset(preset: RangePreset): { from: string; to: string } {
   const now = new Date();
@@ -16,6 +21,10 @@ function rangeForPreset(preset: RangePreset): { from: string; to: string } {
   }
   if (preset === 'year') {
     return { from: toISODate(new Date(now.getFullYear(), 0, 1)), to };
+  }
+  if (preset === 'quarter') {
+    const quarterStartMonth = Math.floor(now.getMonth() / 3) * 3;
+    return { from: toISODate(new Date(now.getFullYear(), quarterStartMonth, 1)), to };
   }
   // month (default)
   return { from: toISODate(new Date(now.getFullYear(), now.getMonth(), 1)), to };
@@ -34,6 +43,7 @@ export interface DateRangeState {
   to: string;
   preset: RangePreset | null;
   groupBy: GroupBy;
+  setGroupBy: (v: GroupBy) => void;
   setFrom: (v: string) => void;
   setTo: (v: string) => void;
   applyPreset: (p: RangePreset) => void;
@@ -44,21 +54,27 @@ export function useDateRange(initial: RangePreset = 'month'): DateRangeState {
   const [from, setFromRaw] = useState(init.from);
   const [to, setToRaw] = useState(init.to);
   const [preset, setPreset] = useState<RangePreset | null>(initial);
+  const [groupByOverride, setGroupByOverride] = useState<GroupBy | null>(null);
 
-  const groupBy = useMemo(() => suggestGroupBy(from, to), [from, to]);
+  const groupBy = useMemo(
+    () => groupByOverride ?? suggestGroupBy(from, to),
+    [from, groupByOverride, to],
+  );
 
   return {
     from,
     to,
     preset,
     groupBy,
-    setFrom: (v) => { setFromRaw(v); setPreset(null); },
-    setTo: (v) => { setToRaw(v); setPreset(null); },
+    setGroupBy: setGroupByOverride,
+    setFrom: (v) => { setFromRaw(v); setPreset(null); setGroupByOverride(null); },
+    setTo: (v) => { setToRaw(v); setPreset(null); setGroupByOverride(null); },
     applyPreset: (p) => {
       const r = rangeForPreset(p);
       setFromRaw(r.from);
       setToRaw(r.to);
       setPreset(p);
+      setGroupByOverride(null);
     },
   };
 }
