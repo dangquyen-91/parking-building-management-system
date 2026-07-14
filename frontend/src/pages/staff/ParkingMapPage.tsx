@@ -16,6 +16,7 @@ import {
   ZoomIn,
 } from 'lucide-react';
 import { KioskLayout } from '../../components/kiosk/KioskLayout';
+import { useKioskHotkeys } from '../../hooks/useKioskHotkeys';
 import { cn, compareFloorCode } from '../../lib/utils';
 import { buildingService, type Building } from '../../services/building.service';
 import { floorService, type Floor } from '../../services/floor.service';
@@ -581,6 +582,8 @@ export default function ParkingMapPage() {
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const allFloorsRef = useRef<Floor[]>([]);
 
+  useKioskHotkeys();
+
   const loadAll = useCallback(async () => {
     setPageLoading(true);
     setPageError(null);
@@ -762,7 +765,7 @@ export default function ParkingMapPage() {
     <KioskLayout
       eyebrow="Staff Kiosk"
       title="Sơ Đồ Bãi Xe"
-      subtitle="Theo dõi trực quan trạng thái từng tầng, từng ô đỗ và hàng xe máy theo thời gian thực"
+      subtitle="Theo dõi trực quan trạng thái từng tầng, từng ô đỗ và hàng xe máy theo thời gian thực · Phím F4 mở nhanh"
       headerRight={
         <div className="flex items-center gap-3">
           {lastUpdated && (

@@ -17,11 +17,11 @@ export function useKioskHotkeys(options: KioskHotkeys = {}) {
       switch (e.key) {
         case 'F1':
           e.preventDefault();
-          navigate('/staff/check-in');
+          navigate('/staff/dashboard');
           break;
         case 'F2':
           e.preventDefault();
-          navigate('/staff/check-out');
+          navigate('/staff/check-in');
           break;
         case 'F3':
           e.preventDefault();

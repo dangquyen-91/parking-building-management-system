@@ -27,6 +27,7 @@ import {
   YAxis,
 } from 'recharts';
 import { KioskLayout } from '../../components/kiosk/KioskLayout';
+import { useKioskHotkeys } from '../../hooks/useKioskHotkeys';
 import { cn, compareFloorCode } from '../../lib/utils';
 import { floorService, type Floor } from '../../services/floor.service';
 import { slotService } from '../../services/slot.service';
@@ -87,11 +88,11 @@ function KpiCard({
   delay?: number;
 }) {
   const tones = {
-    blue:    'from-blue-500/25 to-cyan-400/10 text-blue-300 shadow-blue-500/20',
-    purple:  'from-purple-500/25 to-blue-500/10 text-purple-300 shadow-purple-500/20',
+    blue: 'from-blue-500/25 to-cyan-400/10 text-blue-300 shadow-blue-500/20',
+    purple: 'from-purple-500/25 to-blue-500/10 text-purple-300 shadow-purple-500/20',
     emerald: 'from-emerald-500/25 to-teal-400/10 text-emerald-300 shadow-emerald-500/20',
-    amber:   'from-amber-500/25 to-orange-400/10 text-amber-300 shadow-amber-500/20',
-    cyan:    'from-cyan-500/25 to-blue-400/10 text-cyan-300 shadow-cyan-500/20',
+    amber: 'from-amber-500/25 to-orange-400/10 text-amber-300 shadow-amber-500/20',
+    cyan: 'from-cyan-500/25 to-blue-400/10 text-cyan-300 shadow-cyan-500/20',
   };
   return (
     <motion.article
@@ -418,7 +419,7 @@ function ActiveSessionsSection({ sessions, loading }: { sessions: ActiveSessionA
                     <td className="py-3 pr-4 text-slate-500">{s.staff?.fullName ?? '—'}</td>
                     <td className="py-3 text-right">
                       <Link
-                        to={`/staff/check-out?plate=${encodeURIComponent(s.licensePlate)}`}
+                        to={`/staff/sessions?plate=${encodeURIComponent(s.licensePlate)}`}
                         className="inline-flex h-7 items-center gap-1 rounded-xl border border-white/10 bg-white/[0.03] px-3 text-[11px] font-semibold text-slate-400 opacity-0 transition hover:border-blue-400/40 hover:text-white group-hover:opacity-100"
                       >
                         <LogOut className="h-3 w-3" />
@@ -447,6 +448,8 @@ export default function StaffDashboardPage() {
   const [countdown, setCountdown] = useState(30);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useKioskHotkeys();
 
   const loadDashboard = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -565,7 +568,7 @@ export default function StaffDashboardPage() {
     <KioskLayout
       eyebrow="Staff Kiosk"
       title="Tổng Quan Ca Trực"
-      subtitle="Theo dõi xe ra vào · Sức chứa tầng · Giờ cao điểm theo thời gian thực"
+      subtitle="Theo dõi xe ra vào · Sức chứa tầng · Giờ cao điểm theo thời gian thực · Phím F1 mở nhanh"
       headerRight={
         <div className="flex items-center gap-3">
           {lastUpdated && (
@@ -601,7 +604,7 @@ export default function StaffDashboardPage() {
           <KpiCard icon={TrendingUp} label="Đã checkout hôm nay" value={loading ? '…' : completedToday} sub="Phiên đã hoàn tất" tone="emerald" delay={0.15} />
         </section>
 
-        <div className="grid gap-6 sm:grid-cols-3">
+        <div className="grid gap-6 sm:grid-cols-2">
           {[
             {
               to: '/staff/check-in',
@@ -617,30 +620,17 @@ export default function StaffDashboardPage() {
               accentGradient: 'from-blue-600/80 to-cyan-500/80',
             },
             {
-              to: '/staff/check-out',
+              to: '/staff/sessions',
               icon: LogOut,
-              label: 'Check-out Xe Ra',
-              desc: 'Quét biển số xe, kiểm tra thời lượng & tính phí tự động',
-              stats: 'Cổng 3 & 4',
-              statusText: 'Sẵn sàng',
+              label: 'Phiên Gửi / Checkout',
+              desc: 'Quản lý toàn bộ danh sách các phương tiện trong bãi và thực hiện checkout',
+              stats: `${totalActive} xe hoạt động`,
+              statusText: 'Giám sát',
               toneColor: 'text-emerald-400',
               borderColor: 'hover:border-emerald-500/50',
               glowColor: 'group-hover:shadow-emerald-500/10',
               iconBg: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20',
               accentGradient: 'from-emerald-600/80 to-teal-500/80',
-            },
-            {
-              to: '/staff/sessions',
-              icon: Users,
-              label: 'Phiên Đang Gửi',
-              desc: 'Quản lý toàn bộ danh sách các phương tiện trong bãi',
-              stats: `${totalActive} xe hoạt động`,
-              statusText: 'Giám sát',
-              toneColor: 'text-purple-400',
-              borderColor: 'hover:border-purple-500/50',
-              glowColor: 'group-hover:shadow-purple-500/10',
-              iconBg: 'bg-purple-500/15 text-purple-400 border-purple-500/20',
-              accentGradient: 'from-purple-600/80 to-pink-500/80',
             },
           ].map((action, i) => (
             <motion.div
@@ -661,10 +651,10 @@ export default function StaffDashboardPage() {
               >
 
                 <div className={cn("absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r opacity-80 transition-all duration-300 group-hover:h-[4px] group-hover:opacity-100", action.accentGradient)} />
-                
+
 
                 <div className="absolute inset-0 opacity-0 bg-[radial-gradient(ellipse_at_top_right,var(--tw-gradient-stops))] from-white/[0.04] via-transparent to-transparent transition-opacity duration-300 group-hover:opacity-100" />
-                
+
                 <div className="flex items-start justify-between mb-5">
                   <div className={cn("flex h-12 w-12 items-center justify-center rounded-2xl border backdrop-blur-md", action.iconBg)}>
                     <action.icon className="h-6 w-6" />
@@ -680,7 +670,7 @@ export default function StaffDashboardPage() {
                 <h3 className="text-lg font-black text-white group-hover:text-blue-300 transition-colors duration-200">
                   {action.label}
                 </h3>
-                
+
                 <p className="mt-1.5 text-xs text-slate-400 leading-relaxed font-normal">
                   {action.desc}
                 </p>

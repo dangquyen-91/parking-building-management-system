@@ -103,12 +103,14 @@ export default function CheckInPage() {
     <KioskLayout
       eyebrow="Staff Kiosk"
       title="Xe Vào Bãi"
-      subtitle="Tra cứu biển số để check-in · Phím F1 mở trang này nhanh"
+      subtitle="Tra cứu biển số để check-in · Phím F2 mở nhanh"
     >
       <div className="mb-5 flex flex-wrap items-center gap-2 text-xs text-slate-600">
         {[
-          { key: 'F1', label: 'Check-In' },
-          { key: 'F2', label: 'Check-Out' },
+          { key: 'F1', label: 'Tổng quan' },
+          { key: 'F2', label: 'Check-in' },
+          { key: 'F3', label: 'Phiên gửi / Checkout' },
+          { key: 'F4', label: 'Sơ đồ bãi' },
           { key: 'Esc', label: 'Xóa' },
           { key: 'Ctrl+L', label: 'Refocus' },
         ].map(({ key, label }) => (

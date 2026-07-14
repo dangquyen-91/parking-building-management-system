@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Activity,
@@ -280,9 +281,17 @@ function SuccessToast({ data, onDismiss }: { data: ToastData | null; onDismiss: 
 
 
 export default function ActiveSessionsPage() {
+  const [searchParams] = useSearchParams();
+  const plateParam = searchParams.get('plate') ?? '';
   const [sessions, setSessions] = useState<ActiveSessionApiItem[]>([]);
   const [status, setStatus] = useState<StatusFilter>('active');
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(plateParam);
+
+  useEffect(() => {
+    if (plateParam) {
+      setSearch(plateParam);
+    }
+  }, [plateParam]);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
@@ -304,7 +313,7 @@ export default function ActiveSessionsPage() {
         res.floors.forEach(f => map.set(f.id, f));
         setFloorMap(map);
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   const loadSessions = useCallback(async () => {
@@ -395,8 +404,8 @@ export default function ActiveSessionsPage() {
   return (
     <KioskLayout
       eyebrow="Staff Kiosk"
-      title="Phiên Gửi Xe"
-      subtitle="Theo dõi xe đang trong bãi và lịch sử check-in/checkout · Phím F3 mở trang này nhanh"
+      title="Phiên đang gửi / Checkout"
+      subtitle="Theo dõi xe đang trong bãi và thực hiện checkout · Phím F3 mở nhanh"
       headerRight={
         <button
           type="button"
@@ -411,9 +420,9 @@ export default function ActiveSessionsPage() {
 
       <div className="mb-5 flex flex-wrap items-center gap-2 text-xs text-slate-600">
         {[
-          { key: 'F1', label: 'Check-in' },
-          { key: 'F2', label: 'Check-out' },
-          { key: 'F3', label: 'Phiên gửi xe' },
+          { key: 'F1', label: 'Tổng quan' },
+          { key: 'F2', label: 'Check-in' },
+          { key: 'F3', label: 'Phiên gửi / Checkout' },
           { key: 'F4', label: 'Sơ đồ bãi' },
         ].map(({ key, label }) => (
           <span key={key} className="flex items-center gap-1">
