@@ -5,7 +5,7 @@ export const loginSchema = Yup.object().shape({
     .email('Email không đúng định dạng')
     .required('Vui lòng nhập email'),
   password: Yup.string()
-    .min(6, 'Mật khẩu phải chứa ít nhất 6 ký tự')
+    .min(8, 'Mật khẩu phải chứa ít nhất 8 ký tự')
     .required('Vui lòng nhập mật khẩu'),
 });
 
@@ -34,8 +34,11 @@ export const registerSchema = Yup.object().shape({
   email: Yup.string()
     .email('Email không đúng định dạng')
     .required('Vui lòng nhập email'),
+  phone: Yup.string()
+    .matches(/^[0-9]{9,11}$/, 'Số điện thoại phải gồm 9-11 chữ số')
+    .optional(),
   password: Yup.string()
-    .min(6, 'Mật khẩu phải chứa ít nhất 6 ký tự')
+    .min(8, 'Mật khẩu phải chứa ít nhất 8 ký tự')
     .matches(/[A-Z]/, 'Mật khẩu phải chứa ít nhất 1 chữ cái in hoa')
     .matches(/[0-9]/, 'Mật khẩu phải chứa ít nhất 1 chữ số')
     .required('Vui lòng nhập mật khẩu'),
@@ -45,4 +48,17 @@ export const registerSchema = Yup.object().shape({
   terms: Yup.boolean()
     .oneOf([true], 'Bạn phải chấp nhận Điều khoản & Chính sách để đăng ký tài khoản')
     .required('Bạn phải chấp nhận Điều khoản & Chính sách'),
+});
+
+export const changePasswordSchema = Yup.object().shape({
+  currentPassword: Yup.string()
+    .required('Vui lòng nhập mật khẩu hiện tại'),
+  newPassword: Yup.string()
+    .min(8, 'Mật khẩu phải chứa ít nhất 8 ký tự')
+    .matches(/[A-Z]/, 'Mật khẩu phải chứa ít nhất 1 chữ cái in hoa')
+    .matches(/[0-9]/, 'Mật khẩu phải chứa ít nhất 1 chữ số')
+    .required('Vui lòng nhập mật khẩu mới'),
+  confirmPassword: Yup.string()
+    .oneOf([Yup.ref('newPassword')], 'Mật khẩu xác nhận không khớp')
+    .required('Vui lòng xác nhận mật khẩu mới'),
 });

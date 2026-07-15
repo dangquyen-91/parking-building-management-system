@@ -39,6 +39,12 @@ function authHeaders() {
   };
 }
 
+export interface UpdateUserPayload {
+  fullName?: string;
+  email?: string;
+  phone?: string;
+}
+
 export const userService = {
   async getUsers(params: { search?: string; role?: UserRole; page?: number; limit?: number } = {}): Promise<UsersResult> {
     const query = new URLSearchParams();
@@ -56,6 +62,25 @@ export const userService = {
     return { users: result.data, pagination: result.pagination };
   },
 
+  async getUserById(id: number): Promise<UserProfile> {
+    const response = await fetch(`${API_BASE_URL}/users/${id}`, {
+      method: 'GET',
+      headers: authHeaders(),
+    });
+    const result = await parseResponse<{ data: UserProfile }>(response);
+    return result.data;
+  },
+
+  async updateUser(id: number, payload: UpdateUserPayload): Promise<UserProfile> {
+    const response = await fetch(`${API_BASE_URL}/users/${id}`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify(payload),
+    });
+    const result = await parseResponse<{ data: UserProfile }>(response);
+    return result.data;
+  },
+
   async updateRole(userId: number, role: UserRole): Promise<UserProfile> {
     const response = await fetch(`${API_BASE_URL}/users/${userId}/role`, {
       method: 'PATCH',
@@ -67,4 +92,22 @@ export const userService = {
     return result.data;
   },
 
+  async updateUserStatus(id: number, isActive: boolean): Promise<UserProfile> {
+    const response = await fetch(`${API_BASE_URL}/users/${id}/status`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify({ isActive }),
+    });
+    const result = await parseResponse<{ data: UserProfile }>(response);
+    return result.data;
+  },
+
+  async deleteUser(id: number): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/users/${id}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    });
+    if (response.status === 204) return;
+    await parseResponse<void>(response);
+  },
 };
