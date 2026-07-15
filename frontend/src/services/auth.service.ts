@@ -140,4 +140,22 @@ export const authService = {
     });
     return handleResponse<UserProfile>(response);
   },
+
+  async changePassword(payload: {
+    currentPassword: string;
+    newPassword: string;
+    confirmPassword: string;
+  }): Promise<AuthTokens> {
+    const accessToken = localStorage.getItem('accessToken');
+    if (!accessToken) throw new Error('Vui lòng đăng nhập.');
+    const response = await fetch(`${API_BASE_URL}/auth/change-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(payload),
+    });
+    return handleResponse<AuthTokens>(response);
+  },
 };
