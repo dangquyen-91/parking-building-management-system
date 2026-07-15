@@ -3,7 +3,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import { AlertCircle, Car, Clock3, Plus, ReceiptText, RefreshCw } from 'lucide-react';
 import { BookingCard } from '../components/booking/BookingCard';
 import { BookingHero } from '../components/booking/BookingHero';
-import { BookingNotice } from '../components/booking/BookingNotice';
 import { useAuth } from '../hooks/useAuth';
 import { bookingService, type Booking } from '../services/booking.service';
 
@@ -38,7 +37,6 @@ export default function MyBookingsPage() {
   return (
     <div className="min-h-screen bg-[#f8fbff] pt-28 text-slate-950"><main className="container mx-auto px-6 pb-20 md:px-12">
       <BookingHero eyebrow="Đặt chỗ của tôi" title={`Theo dõi booking của ${user?.fullName ?? 'bạn'}`} description="Kiểm tra trạng thái thanh toán, thời gian gửi xe và hủy các booking chưa hoàn tất khi cần." />
-      <BookingNotice />
       <section className="mx-auto mt-10 grid max-w-6xl gap-4 sm:grid-cols-3">
         <Stat icon={ReceiptText} label="Tổng booking" value={bookings.length} tone="text-blue-600" /><Stat icon={Clock3} label="Đang hiệu lực" value={activeBookings.length} tone="text-emerald-600" />
         <Link to="/booking" className="flex min-h-[132px] items-center justify-center gap-3 rounded-[24px] border border-blue-200 bg-blue-600 p-5 text-sm font-bold text-white shadow-lg"><Plus className="h-5 w-5" />Tạo đặt chỗ mới</Link>

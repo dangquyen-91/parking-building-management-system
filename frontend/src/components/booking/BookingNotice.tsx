@@ -9,7 +9,15 @@ import {
   Hourglass,
   ReceiptText,
   ShieldAlert,
+  ArrowRight,
 } from 'lucide-react';
+
+interface BookingNoticeProps {
+  acceptanceRequired?: boolean;
+  accepted?: boolean;
+  onAcceptedChange?: (accepted: boolean) => void;
+  onContinue?: () => void;
+}
 
 const policies = [
   {
@@ -68,7 +76,12 @@ const policies = [
   },
 ] as const;
 
-export function BookingNotice() {
+export function BookingNotice({
+  acceptanceRequired = false,
+  accepted = false,
+  onAcceptedChange,
+  onContinue,
+}: BookingNoticeProps) {
   return (
     <section
       aria-labelledby="booking-policy-title"
@@ -103,6 +116,34 @@ export function BookingNotice() {
           </article>
         ))}
       </div>
+
+      {acceptanceRequired && (
+        <div className="border-t border-slate-200 bg-slate-50 px-5 py-5 md:px-7">
+          <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 bg-white p-4 text-sm font-semibold text-slate-700">
+            <input
+              type="checkbox"
+              checked={accepted}
+              onChange={(event) => onAcceptedChange?.(event.target.checked)}
+              className="mt-0.5 h-5 w-5 shrink-0 accent-blue-600"
+            />
+            <span>
+              Tôi đã đọc, hiểu và đồng ý tuân thủ toàn bộ chính sách booking ở trên.
+            </span>
+          </label>
+
+          <div className="mt-4 flex justify-end">
+            <button
+              type="button"
+              disabled={!accepted}
+              onClick={onContinue}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500"
+            >
+              Đồng ý và tiếp tục đặt chỗ
+              <ArrowRight className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
