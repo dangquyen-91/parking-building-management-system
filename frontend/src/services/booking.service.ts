@@ -6,7 +6,6 @@ export interface BookingCreatePayload {
   licensePlate: string;
   customerEmail: string;
   startTime: string;
-  endTime: string;
   customerName?: string;
   customerPhone?: string;
   floorId?: number;
