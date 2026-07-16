@@ -13,7 +13,6 @@ import { createBookingPayment } from './payment.service.js';
 import { sendBookingConfirmation } from './email.service.js';
 
 const CAR_PRICING = getPricingFor('car');
-const BOOKING_DURATION_MS = CAR_PRICING.blockHours * 3600_000;
 const MIN_FREE_FOR_BOOKING = 10;
 const MAX_ADVANCE_BOOKING_MS = 24 * 3600_000;
 const EARLY_GRACE_MS = 30 * 60_000;
@@ -124,7 +123,7 @@ export const createBooking = async ({ body, requester, ipAddr }) => {
       const plate = normalizePlate(body.licensePlate);
       validateTimeWindow(body.startTime);
       const startTime = new Date(body.startTime);
-      const endTime = new Date(startTime.getTime() + BOOKING_DURATION_MS);
+      const endTime = new Date(startTime.getTime() + body.durationHours * 3600_000);
 
       // Biển đã có gói cư dân (bất kỳ loại xe) → không cho booking vãng lai.
       // Áp dụng cho MỌI người đặt (guest/user/cư dân đặt hộ). Check-in tầng visitor
@@ -172,7 +171,7 @@ export const createBooking = async ({ body, requester, ipAddr }) => {
       }
 
       const fee = calculateFee(startTime, endTime, 'car');
-      const prepaidHours = CAR_PRICING.blockHours;
+      const prepaidHours = body.durationHours;
 
       const customer = await resolveCustomer(body, requester, t);
 

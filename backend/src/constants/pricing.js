@@ -11,6 +11,7 @@ export const PRICING = {
     mode: 'fixed_block',
     blockHours: 4,
     blockPrice: 35_000,
+    maxBlocks: 6,
   },
 };
 
