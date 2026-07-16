@@ -839,7 +839,6 @@ export default function ProfilePage() {
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-sm font-semibold text-slate-700">{vehicles.length} xe đã đăng ký</p>
-                          <p className="text-xs text-slate-400">1 biển số = 1 chủ xe trên toàn hệ thống</p>
                         </div>
                         <button
                           onClick={() => setVehicleModal({ open: true })}
