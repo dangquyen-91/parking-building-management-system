@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   AlertCircle,
   BadgeCheck,
@@ -631,6 +631,7 @@ function EditProfileModal({
 
 export default function ProfilePage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user: authUser, isAuthenticated, loading: authLoading, updateUser } = useAuth();
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -638,7 +639,10 @@ export default function ProfilePage() {
   const [activeSubscriptions, setActiveSubscriptions] = useState<MySubscription[]>([]);
   const [allSubscriptions, setAllSubscriptions] = useState<MySubscription[]>([]);
 
-  const [tab, setTab] = useState<TabId>('info');
+  const [tab, setTab] = useState<TabId>(() => {
+    const tabParam = searchParams.get('tab') as TabId;
+    return tabParam && TABS.some((t) => t.id === tabParam) ? tabParam : 'info';
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
