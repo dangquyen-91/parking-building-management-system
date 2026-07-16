@@ -32,7 +32,7 @@ import { floorService, type Floor } from '../../services/floor.service';
 import { slotService } from '../../services/slot.service';
 import type { ActiveSessionApiItem, ParkingRowApiItem } from '../../types/kiosk';
 
-const API_BASE_URL = 'http://localhost:5000/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
 
 function authHeaders() {
   const token = localStorage.getItem('accessToken');
