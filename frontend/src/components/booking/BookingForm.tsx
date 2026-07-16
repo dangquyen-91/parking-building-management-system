@@ -2,7 +2,8 @@ import { motion } from 'framer-motion';
 import { AlertCircle, Car } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { cn } from '../../lib/utils';
-import type { BookingFormValues } from '../../hooks/useBookingForm';
+import { BOOKING_BLOCK_HOURS, BOOKING_BLOCK_PRICE, BOOKING_DURATION_OPTIONS, type BookingFormValues } from '../../hooks/useBookingForm';
+import { formatBookingCurrency } from './booking.utils';
 
 interface Props {
   values: BookingFormValues;
@@ -39,7 +40,17 @@ export function BookingForm({ values, onChange, isAuthenticated, hasActiveSubscr
         </Field>
         <Field label="Thời gian bắt đầu">
           <input type="datetime-local" value={values.startTime} onChange={(e) => onChange('startTime', e.target.value)} className={cn(inputClass, 'border-slate-200 font-bold focus:border-blue-500')} />
-          <p className="mt-2 text-xs font-medium text-slate-500">Mỗi lượt đặt cố định 4 giờ kể từ giờ bắt đầu, giá 35.000đ.</p>
+        </Field>
+        <Field label="Thời lượng đặt chỗ">
+          <select value={values.durationHours} onChange={(e) => onChange('durationHours', Number(e.target.value))}
+            className={cn(inputClass, 'border-slate-200 font-bold focus:border-blue-500')}>
+            {BOOKING_DURATION_OPTIONS.map((hours) => (
+              <option key={hours} value={hours}>
+                {hours} giờ — {formatBookingCurrency((hours / BOOKING_BLOCK_HOURS) * BOOKING_BLOCK_PRICE)}
+              </option>
+            ))}
+          </select>
+          <p className="mt-2 text-xs font-medium text-slate-500">Mỗi block {BOOKING_BLOCK_HOURS} giờ giá {formatBookingCurrency(BOOKING_BLOCK_PRICE)}.</p>
         </Field>
         <Field label="Ghi chú" wide><textarea value={values.note} onChange={(e) => onChange('note', e.target.value)} rows={4} placeholder="Thông tin thêm cho nhân viên bãi xe" className="mt-2 w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium outline-none focus:border-blue-500" /></Field>
       </div>
