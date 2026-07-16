@@ -24,7 +24,7 @@ import { slotService, type ParkingSlot, type SlotStatus } from '../../services/s
 import { getActiveSessions } from '../../services/kiosk.service';
 import type { ParkingRowApiItem } from '../../types/kiosk';
 
-const API_BASE_URL = 'http://localhost:5000/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
 
 function authHeaders() {
   const token = localStorage.getItem('accessToken');

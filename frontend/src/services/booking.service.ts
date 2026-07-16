@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:5000/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
 
 export type BookingStatus = 'pending' | 'confirmed' | 'cancelled' | 'expired';
 
@@ -6,7 +6,7 @@ export interface BookingCreatePayload {
   licensePlate: string;
   customerEmail: string;
   startTime: string;
-  endTime: string;
+  durationHours: number;
   customerName?: string;
   customerPhone?: string;
   floorId?: number;
