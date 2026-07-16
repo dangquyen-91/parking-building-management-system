@@ -10,7 +10,9 @@ import {
   Clock,
   Edit3,
   History,
+  KeyRound,
   Loader2,
+  Lock,
   Mail,
   Motorbike,
   Package,
@@ -18,6 +20,7 @@ import {
   Plus,
   RefreshCw,
   Save,
+  Shield,
   SquareParking,
   Trash2,
   User,
@@ -33,8 +36,8 @@ import {
   type VehiclePayload,
 } from '../services/profile.service';
 import type { UserProfile } from '../services/auth.service';
+import { authService } from '../services/auth.service';
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 const formatDate = (iso: string | null) =>
   iso
     ? new Date(iso).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
@@ -43,23 +46,32 @@ const formatDate = (iso: string | null) =>
 const formatCurrency = (v: string | number) =>
   Number(v).toLocaleString('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 });
 
+function ErrorAlert({ message }: { message: string }) {
+  return (
+    <div className="flex gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+      <span>{message}</span>
+    </div>
+  );
+}
+
 const SUB_STATUS: Record<string, { label: string; cls: string }> = {
-  active:    { label: 'Đang hiệu lực', cls: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
-  pending:   { label: 'Chờ xử lý',    cls: 'bg-amber-100  text-amber-700  border-amber-200'  },
-  expired:   { label: 'Hết hạn',       cls: 'bg-slate-100  text-slate-500  border-slate-200'  },
-  cancelled: { label: 'Đã hủy',        cls: 'bg-red-100    text-red-600    border-red-200'    },
-  renewed:   { label: 'Đã cộng dồn',   cls: 'bg-blue-100   text-blue-700   border-blue-200'   },
+  active: { label: 'Đang hiệu lực', cls: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
+  pending: { label: 'Chờ xử lý', cls: 'bg-amber-100  text-amber-700  border-amber-200' },
+  expired: { label: 'Hết hạn', cls: 'bg-slate-100  text-slate-500  border-slate-200' },
+  cancelled: { label: 'Đã hủy', cls: 'bg-red-100    text-red-600    border-red-200' },
+  renewed: { label: 'Đã cộng dồn', cls: 'bg-blue-100   text-blue-700   border-blue-200' },
 };
 
 const TABS = [
-  { id: 'info',     icon: User,    label: 'Thông tin cá nhân' },
-  { id: 'vehicles', icon: Car,     label: 'Xe của tôi' },
+  { id: 'info', icon: User, label: 'Thông tin cá nhân' },
+  { id: 'vehicles', icon: Car, label: 'Xe của tôi' },
   { id: 'packages', icon: Package, label: 'Gói tháng' },
-  { id: 'history',  icon: History, label: 'Lịch sử' },
+  { id: 'history', icon: History, label: 'Lịch sử' },
+  { id: 'security', icon: Shield, label: 'Bảo mật' },
 ] as const;
 type TabId = typeof TABS[number]['id'];
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
 function InfoField({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string }) {
   return (
     <div className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-slate-50/80 px-5 py-4">
@@ -83,10 +95,10 @@ function SubscriptionCard({
 }) {
   const renewedInto = sub.status === 'cancelled'
     ? activeSubscriptions.find((activeSub) =>
-        activeSub.id !== sub.id &&
-        activeSub.licensePlate === sub.licensePlate &&
-        activeSub.vehicleType === sub.vehicleType
-      )
+      activeSub.id !== sub.id &&
+      activeSub.licensePlate === sub.licensePlate &&
+      activeSub.vehicleType === sub.vehicleType
+    )
     : null;
   const displayStatus = renewedInto ? SUB_STATUS.renewed : SUB_STATUS[sub.status] ?? { label: sub.status, cls: 'bg-slate-100 text-slate-500 border-slate-200' };
   const isActive = sub.status === 'active';
@@ -135,18 +147,18 @@ function SubscriptionCard({
 
       <div className={`mt-5 grid gap-3 ${sub.vehicleType === 'car' ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
         {[
-          { icon: Calendar, label: 'Bắt đầu',  value: renewedInto ? formatDate(renewedInto.startDate) : formatDate(sub.startDate) },
-          { icon: Clock,    label: 'Kết thúc', value: renewedInto ? formatDate(renewedInto.endDate) : formatDate(sub.endDate) },
+          { icon: Calendar, label: 'Bắt đầu', value: renewedInto ? formatDate(renewedInto.startDate) : formatDate(sub.startDate) },
+          { icon: Clock, label: 'Kết thúc', value: renewedInto ? formatDate(renewedInto.endDate) : formatDate(sub.endDate) },
           ...(sub.vehicleType === 'car'
             ? [{
-                icon: SquareParking,
-                label: 'Ô đỗ xe',
-                value: sub.slot?.slotCode
-                  ? `Ô ${sub.slot.slotCode}`
-                  : sub.status === 'pending'
-                    ? 'Đang xử lý'
-                    : '—',
-              }]
+              icon: SquareParking,
+              label: 'Ô đỗ xe',
+              value: sub.slot?.slotCode
+                ? `Ô ${sub.slot.slotCode}`
+                : sub.status === 'pending'
+                  ? 'Đang xử lý'
+                  : '—',
+            }]
             : []),
         ].map(({ icon: Icon, label, value }) => (
           <div key={label} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -160,7 +172,6 @@ function SubscriptionCard({
   );
 }
 
-// ─── VehicleCard ───────────────────────────────────────────────────────────────
 function VehicleCard({
   vehicle,
   onEdit,
@@ -183,7 +194,6 @@ function VehicleCard({
       exit={{ opacity: 0, scale: 0.95 }}
       className="flex items-center gap-4 rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm"
     >
-      {/* Icon */}
       <div className={cn(
         'flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl',
         isCar ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600',
@@ -191,7 +201,6 @@ function VehicleCard({
         <VehicleIcon className="h-6 w-6" />
       </div>
 
-      {/* Info */}
       <div className="flex-1 min-w-0">
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-lg font-black tracking-widest text-slate-950">{vehicle.licensePlate}</p>
@@ -212,7 +221,6 @@ function VehicleCard({
         <p className="mt-1 text-xs text-slate-400">Đã thêm {formatDate(vehicle.createdAt)}</p>
       </div>
 
-      {/* Actions */}
       <div className="flex shrink-0 gap-2">
         <button
           onClick={() => onEdit(vehicle)}
@@ -234,7 +242,6 @@ function VehicleCard({
   );
 }
 
-// ─── VehicleModal (Add / Edit) ─────────────────────────────────────────────────
 function VehicleModal({
   initial,
   onClose,
@@ -299,7 +306,6 @@ function VehicleModal({
         </div>
 
         <div className="space-y-4">
-          {/* License plate */}
           <div>
             <label className="block text-xs font-semibold uppercase tracking-[0.14em] text-slate-400 mb-1.5">
               Biển số xe <span className="text-red-400">*</span>
@@ -316,7 +322,6 @@ function VehicleModal({
             )}
           </div>
 
-          {/* Vehicle type */}
           <div>
             <label className="block text-xs font-semibold uppercase tracking-[0.14em] text-slate-400 mb-1.5">
               Loại xe
@@ -343,7 +348,6 @@ function VehicleModal({
             </div>
           </div>
 
-          {/* Nickname */}
           <div>
             <label className="block text-xs font-semibold uppercase tracking-[0.14em] text-slate-400 mb-1.5">
               Tên gọi <span className="text-slate-400 font-normal normal-case">(tuỳ chọn)</span>
@@ -380,7 +384,148 @@ function VehicleModal({
   );
 }
 
-// ─── EditProfileModal ──────────────────────────────────────────────────────────
+function ChangePasswordModal({
+  onClose,
+}: {
+  onClose: () => void;
+}) {
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  const handleSave = async () => {
+    if (!currentPassword.trim()) { setError('Vui lòng nhập mật khẩu hiện tại.'); return; }
+    if (newPassword.length < 8) { setError('Mật khẩu mới phải có ít nhất 8 ký tự.'); return; }
+    if (!/[A-Z]/.test(newPassword)) { setError('Mật khẩu mới phải chứa ít nhất 1 chữ in hoa.'); return; }
+    if (!/[0-9]/.test(newPassword)) { setError('Mật khẩu mới phải chứa ít nhất 1 chữ số.'); return; }
+    if (newPassword !== confirmPassword) { setError('Mật khẩu xác nhận không khớp.'); return; }
+
+    setSaving(true);
+    setError(null);
+    try {
+      const tokens = await authService.changePassword({ currentPassword, newPassword, confirmPassword });
+      localStorage.setItem('accessToken', tokens.accessToken);
+      localStorage.setItem('refreshToken', tokens.refreshToken);
+      setSuccess(true);
+      setTimeout(onClose, 1500);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Đổi mật khẩu thất bại.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.93, y: 16 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.93, y: 16 }}
+        transition={{ duration: 0.2 }}
+        onClick={e => e.stopPropagation()}
+        className="w-full max-w-md rounded-[28px] border border-slate-200 bg-white p-7 shadow-2xl"
+      >
+        <div className="mb-6 flex items-center justify-between">
+          <h2 className="text-xl font-black text-slate-950">Đổi mật khẩu</h2>
+          <button
+            onClick={onClose}
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-400 transition hover:border-slate-300 hover:text-slate-700"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {success ? (
+          <div className="flex flex-col items-center gap-3 py-6 text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 text-emerald-500">
+              <CheckCircle2 className="h-7 w-7" />
+            </div>
+            <p className="font-bold text-slate-900">Đổi mật khẩu thành công!</p>
+            <p className="text-sm text-slate-500">Phiên đăng nhập đã được cập nhật.</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-[0.14em] text-slate-400 mb-1.5">
+                Mật khẩu hiện tại <span className="text-red-400">*</span>
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <input
+                  type="password"
+                  value={currentPassword}
+                  onChange={e => setCurrentPassword(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 pl-10 pr-4 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  placeholder="••••••••"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-[0.14em] text-slate-400 mb-1.5">
+                Mật khẩu mới <span className="text-red-400">*</span>
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 pl-10 pr-4 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  placeholder="••••••••"
+                />
+              </div>
+              <p className="mt-1 text-xs text-slate-400">Ít nhất 8 ký tự, 1 chữ in hoa, 1 chữ số.</p>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-[0.14em] text-slate-400 mb-1.5">
+                Xác nhận mật khẩu mới <span className="text-red-400">*</span>
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={e => setConfirmPassword(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 pl-10 pr-4 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  placeholder="••••••••"
+                />
+              </div>
+            </div>
+
+            {error && <div className="mt-1"><ErrorAlert message={error} /></div>}
+
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={onClose}
+                className="flex-1 h-11 rounded-2xl border border-slate-200 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={saving || !currentPassword || !newPassword || !confirmPassword}
+                className="flex-1 inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-blue-600 text-sm font-bold text-white transition hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                Cập nhật
+              </button>
+            </div>
+          </div>
+        )}
+      </motion.div>
+    </motion.div>
+  );
+}
+
 function EditProfileModal({
   profile,
   onClose,
@@ -497,9 +642,9 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Modals
   const [editProfileOpen, setEditProfileOpen] = useState(false);
   const [vehicleModal, setVehicleModal] = useState<{ open: boolean; vehicle?: MyVehicle }>({ open: false });
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
@@ -568,7 +713,7 @@ export default function ProfilePage() {
   const initials = displayProfile?.fullName
     ?.split(' ').map(n => n[0]).slice(-2).join('').toUpperCase() ?? '??';
 
-  const uniquePlates = [...new Map(activeSubscriptions.map(s => [s.licensePlate, s])).values()];
+
 
   return (
     <>
@@ -612,7 +757,6 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              {/* Desktop actions */}
               <div className="ml-auto hidden sm:flex items-center gap-3">
                 <button
                   onClick={() => setEditProfileOpen(true)}
@@ -686,21 +830,12 @@ export default function ProfilePage() {
                           Thành viên từ {formatDate(displayProfile.createdAt)} · Cập nhật lần cuối {formatDate(displayProfile.updatedAt)}
                         </p>
                       </div>
-
-                      <div className="flex justify-center">
-                        <button
-                          onClick={() => setEditProfileOpen(true)}
-                          className="inline-flex h-11 items-center gap-2 rounded-2xl bg-blue-600 px-6 text-sm font-bold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500"
-                        >
-                          <Edit3 className="h-4 w-4" /> Chỉnh sửa thông tin
-                        </button>
-                      </div>
                     </motion.div>
+
                   )}
 
                   {tab === 'vehicles' && (
                     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
-                      {/* Add button */}
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-sm font-semibold text-slate-700">{vehicles.length} xe đã đăng ký</p>
@@ -746,7 +881,6 @@ export default function ProfilePage() {
                     </motion.div>
                   )}
 
-                  {/* ── Tab: Gói tháng (active) ── */}
                   {tab === 'packages' && (
                     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
                       {activeSubscriptions.length === 0 ? (
@@ -783,6 +917,32 @@ export default function ProfilePage() {
                       )}
                     </motion.div>
                   )}
+
+                  {tab === 'security' && (
+                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+                      <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+                        <h2 className="mb-2 text-lg font-black text-slate-950">Bảo mật tài khoản</h2>
+                        <p className="mb-6 text-sm text-slate-500">Quản lý mật khẩu và bảo mật phiên đăng nhập của bạn.</p>
+                        <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50/80 px-5 py-4">
+                          <div className="flex items-center gap-4">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                              <KeyRound className="h-5 w-5" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-bold text-slate-900">Mật khẩu</p>
+                              <p className="text-xs text-slate-400">Đổi mật khẩu định kỳ để bảo vệ tài khoản.</p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => setChangePasswordOpen(true)}
+                            className="inline-flex h-9 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:border-blue-300 hover:text-blue-600"
+                          >
+                            <Edit3 className="h-3.5 w-3.5" /> Đổi mật khẩu
+                          </button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
                 </>
               )}
             </div>
@@ -806,6 +966,11 @@ export default function ProfilePage() {
             initial={vehicleModal.vehicle}
             onClose={() => setVehicleModal({ open: false })}
             onSaved={handleVehicleSaved}
+          />
+        )}
+        {changePasswordOpen && (
+          <ChangePasswordModal
+            onClose={() => setChangePasswordOpen(false)}
           />
         )}
       </AnimatePresence>

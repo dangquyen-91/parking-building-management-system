@@ -14,7 +14,7 @@ import type {
   FloorApiItem,
 } from '../types/kiosk';
 
-const API_BASE_URL = 'http://localhost:5000/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
 
 function getAuthHeaders(): Record<string, string> {
   const token = localStorage.getItem('accessToken');
@@ -125,28 +125,45 @@ export async function checkIn(
   return handleResponse<CheckInApiResponse>(response);
 }
 
-export async function getActiveSessions(params?: {
+export interface SessionListParams {
+  status?: 'active' | 'completed' | 'cancelled' | 'all';
   page?: number;
   limit?: number;
   search?: string;
   buildingId?: number;
   floorId?: number;
   vehicleType?: 'car' | 'motorcycle';
-}): Promise<PaginatedResponse<ActiveSessionApiItem>> {
+  customerType?: 'resident' | 'visitor' | 'booking';
+  paymentStatus?: 'paid' | 'unpaid';
+  startDate?: string;
+  endDate?: string;
+}
+
+export async function getSessions(params: SessionListParams = {}): Promise<PaginatedResponse<ActiveSessionApiItem>> {
   const query = new URLSearchParams({
-    status: 'active',
+    status: params.status ?? 'active',
     page: String(params?.page ?? 1),
     limit: String(params?.limit ?? 20),
     ...(params?.search ? { search: params.search } : {}),
     ...(params?.buildingId ? { buildingId: String(params.buildingId) } : {}),
     ...(params?.floorId ? { floorId: String(params.floorId) } : {}),
     ...(params?.vehicleType ? { vehicleType: params.vehicleType } : {}),
+    ...(params?.customerType ? { customerType: params.customerType } : {}),
+    ...(params?.paymentStatus ? { paymentStatus: params.paymentStatus } : {}),
+    ...(params?.startDate ? { startDate: params.startDate } : {}),
+    ...(params?.endDate ? { endDate: params.endDate } : {}),
   });
   const response = await fetch(
     `${API_BASE_URL}/parking-sessions?${query.toString()}`,
     { headers: getAuthHeaders() }
   );
   return handleResponse<PaginatedResponse<ActiveSessionApiItem>>(response);
+}
+
+export async function getActiveSessions(
+  params: Omit<SessionListParams, 'status'> = {}
+): Promise<PaginatedResponse<ActiveSessionApiItem>> {
+  return getSessions({ ...params, status: 'active' });
 }
 
 export async function getCheckoutPreview(

@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:5000/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
 
 export interface UserProfile {
   id: number;
@@ -139,5 +139,23 @@ export const authService = {
       },
     });
     return handleResponse<UserProfile>(response);
+  },
+
+  async changePassword(payload: {
+    currentPassword: string;
+    newPassword: string;
+    confirmPassword: string;
+  }): Promise<AuthTokens> {
+    const accessToken = localStorage.getItem('accessToken');
+    if (!accessToken) throw new Error('Vui lòng đăng nhập.');
+    const response = await fetch(`${API_BASE_URL}/auth/change-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(payload),
+    });
+    return handleResponse<AuthTokens>(response);
   },
 };

@@ -35,7 +35,6 @@ export default function TrafficTab({ from, to }: { from: string; to: string }) {
   return (
     <div className="space-y-4">
       <div className="grid gap-4 lg:grid-cols-2">
-        {/* Peak hours */}
         <ReportCard title="Giờ cao điểm" hint="Theo khoảng đã chọn · lượt check-in theo giờ">
           {hours.loading ? <ChartSkeleton height={220} /> : hours.error ? <ErrorBox message={hours.error} /> : (
             <ResponsiveContainer width="100%" height={220}>
@@ -54,7 +53,6 @@ export default function TrafficTab({ from, to }: { from: string; to: string }) {
           )}
         </ReportCard>
 
-        {/* Peak days */}
         <ReportCard title="Theo thứ trong tuần" hint="Cuối tuần được tô vàng">
           {days.loading ? <ChartSkeleton height={220} /> : days.error ? <ErrorBox message={days.error} /> : (
             <ResponsiveContainer width="100%" height={220}>
@@ -74,7 +72,6 @@ export default function TrafficTab({ from, to }: { from: string; to: string }) {
         </ReportCard>
       </div>
 
-      {/* Sessions distribution */}
       <ReportCard title="Thống kê phiên gửi" hint="Phân bổ theo loại xe & thời gian gửi trung bình">
         {sessions.loading ? <ChartSkeleton height={180} /> : sessions.error ? <ErrorBox message={sessions.error} /> : !sess || sess.total === 0 ? <EmptyState /> : (
           <div className="flex flex-wrap items-center gap-8">
@@ -108,7 +105,6 @@ export default function TrafficTab({ from, to }: { from: string; to: string }) {
       </ReportCard>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        {/* Top vehicles + weekend toggle */}
         <ReportCard
           title="Xe quay lại nhiều nhất"
           hint="Xếp theo số lượt gửi"
@@ -151,7 +147,6 @@ export default function TrafficTab({ from, to }: { from: string; to: string }) {
           )}
         </ReportCard>
 
-        {/* Top users */}
         <ReportCard title="Khách quay lại nhiều nhất" hint="Chỉ tính khách đã đăng nhập (không gồm khách vãng lai)">
           {topUsers.loading ? <ChartSkeleton height={200} /> : topUsers.error ? <ErrorBox message={topUsers.error} /> : (topUsers.data ?? []).length === 0 ? <EmptyState label="Chưa có khách đăng nhập nào trong kỳ" /> : (
             <div className="overflow-x-auto">

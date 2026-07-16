@@ -20,7 +20,6 @@ export default function BookingsTab({ from, to }: { from: string; to: string }) 
   const b = bookings.data;
   const s = subs.data;
 
-  // Điền ngày trống = 0 cho biểu đồ đăng ký mới (luôn theo ngày)
   const newSubsChart = useMemo(
     () => fillSeries(s?.newSubscriptionsDaily ?? [], periodKeys(from, to, 'day'), (r) => r.date, (date) => ({ date, count: 0 })),
     [s, from, to],
@@ -37,7 +36,7 @@ export default function BookingsTab({ from, to }: { from: string; to: string }) 
         <StatCard
           icon={Ghost} tone="amber" label="Tỷ lệ no-show"
           value={b ? `${b.noShowRate}%` : '...'}
-          sub="Đã xác nhận nhưng không đến"
+          sub="Đã xác nhận, đã qua giờ kết thúc, nhưng chưa check-in"
         />
         <StatCard
           icon={KeyRound} tone="green" label="Thuê bao đang hoạt động"
@@ -49,11 +48,10 @@ export default function BookingsTab({ from, to }: { from: string; to: string }) 
       {s && s.expiringIn7Days > 0 && (
         <div className="flex items-center gap-3 rounded-2xl border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
           <AlertTriangle className="h-4 w-4 shrink-0" />
-          <span><b className="text-white">{fmtNum(s.expiringIn7Days)} thuê bao</b> sẽ hết hạn trong 7 ngày tới — nên gửi nhắc gia hạn.</span>
+          <span><b className="text-white">{fmtNum(s.expiringIn7Days)} thuê bao</b> sẽ hết hạn trong 7 ngày tới. Nên gửi nhắc gia hạn.</span>
         </div>
       )}
 
-      {/* booking by status */}
       <ReportCard title="Đặt chỗ theo trạng thái" hint="Trong khoảng thời gian đã chọn">
         {bookings.loading ? <ChartSkeleton height={120} /> : bookings.error ? <ErrorBox message={bookings.error} /> : !b || b.total === 0 ? <EmptyState /> : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -68,7 +66,6 @@ export default function BookingsTab({ from, to }: { from: string; to: string }) 
       </ReportCard>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        {/* active by plan */}
         <ReportCard title="Gói thuê bao đang dùng" hint="Số thuê bao active theo gói">
           {subs.loading ? <ChartSkeleton height={180} /> : subs.error ? <ErrorBox message={subs.error} /> : !s || s.activeByPlan.length === 0 ? <EmptyState /> : (
             <div className="overflow-x-auto">
@@ -92,7 +89,6 @@ export default function BookingsTab({ from, to }: { from: string; to: string }) 
           )}
         </ReportCard>
 
-        {/* new subs daily */}
         <ReportCard title="Đăng ký thuê bao mới" hint="Theo ngày trong kỳ">
           {subs.loading ? <ChartSkeleton height={180} /> : subs.error ? <ErrorBox message={subs.error} /> : !s || s.newSubscriptionsDaily.length === 0 ? <EmptyState /> : (
             <ResponsiveContainer width="100%" height={200}>

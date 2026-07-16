@@ -17,11 +17,9 @@ function rangeForPreset(preset: RangePreset): { from: string; to: string } {
   if (preset === 'year') {
     return { from: toISODate(new Date(now.getFullYear(), 0, 1)), to };
   }
-  // month (default)
   return { from: toISODate(new Date(now.getFullYear(), now.getMonth(), 1)), to };
 }
 
-/** Chọn groupBy hợp lý theo độ dài khoảng ngày để biểu đồ không quá dày/thưa. */
 export function suggestGroupBy(from: string, to: string): GroupBy {
   const days = (new Date(to).getTime() - new Date(from).getTime()) / 86_400_000;
   if (days <= 31) return 'day';

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { authService } from '../services/auth.service';
-import type { UserProfile } from '../services/auth.service';
+import type { UserProfile, AuthTokens } from '../services/auth.service';
 
 
 interface AuthContextType {
@@ -14,6 +14,26 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+let refreshPromise: Promise<AuthTokens> | null = null;
+
+async function refreshSession(): Promise<AuthTokens> {
+  const refreshToken = localStorage.getItem('refreshToken');
+  if (!refreshToken) throw new Error('No refresh token');
+  if (!refreshPromise) {
+    refreshPromise = authService
+      .refresh(refreshToken)
+      .then((tokens) => {
+        localStorage.setItem('accessToken', tokens.accessToken);
+        localStorage.setItem('refreshToken', tokens.refreshToken);
+        return tokens;
+      })
+      .finally(() => {
+        refreshPromise = null;
+      });
+  }
+  return refreshPromise;
+}
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -34,10 +54,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(profile);
       } catch (err) {
         try {
-          const newTokens = await authService.refresh(refreshToken);
-          localStorage.setItem('accessToken', newTokens.accessToken);
-          localStorage.setItem('refreshToken', newTokens.refreshToken);
-          
+          const newTokens = await refreshSession();
           const profile = await authService.getProfile(newTokens.accessToken);
           setUser(profile);
         } catch (refreshErr) {
@@ -53,15 +70,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     initializeAuth();
   }, []);
 
-  // Tự động làm mới access token trước khi hết hạn để tránh bị đăng xuất khi đang dùng.
-  // Trước đây token chỉ được refresh lúc tải lại trang, nên khi access token hết hạn giữa
-  // phiên làm việc thì các request kế tiếp trả về 401 và người dùng bị "tự động logout".
   useEffect(() => {
     if (!user) return;
 
-    const REFRESH_MARGIN_MS = 5 * 60 * 1000; // làm mới khi access token còn dưới 5 phút
+    const REFRESH_MARGIN_MS = 5 * 60 * 1000;
 
-    // Lấy thời điểm hết hạn (ms) từ payload của access token, không phụ thuộc TTL cấu hình.
     const getAccessTokenExpiry = (): number | null => {
       const token = localStorage.getItem('accessToken');
       if (!token) return null;
@@ -76,15 +89,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     const refreshTokens = async () => {
-      const refreshToken = localStorage.getItem('refreshToken');
-      if (!refreshToken) return;
+      if (!localStorage.getItem('refreshToken')) return;
       try {
-        const tokens = await authService.refresh(refreshToken);
-        localStorage.setItem('accessToken', tokens.accessToken);
-        localStorage.setItem('refreshToken', tokens.refreshToken);
+        await refreshSession();
       } catch {
-        // Bỏ qua lỗi tạm thời (mạng chập chờn); nếu refresh token thật sự hết hạn thì
-        // lần tải lại trang kế tiếp (initializeAuth) sẽ đăng xuất một cách gọn gàng.
       }
     };
 
@@ -95,8 +103,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     };
 
-    // Kiểm tra mỗi phút (chỉ thực sự gọi refresh khi gần hết hạn) và khi người dùng
-    // quay lại tab — xử lý trường hợp máy ngủ / trình duyệt điều tiết timer ở tab nền.
     const intervalId = window.setInterval(maybeRefresh, 60 * 1000);
     const onFocus = () => {
       if (document.visibilityState === 'visible') maybeRefresh();

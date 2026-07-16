@@ -40,6 +40,20 @@ export const lookupSchema = Joi.object({
     }),
 });
 
+export const listSessionsSchema = Joi.object({
+  status: Joi.string().valid('active', 'completed', 'cancelled', 'all').default('active'),
+  customerType: Joi.string().valid('resident', 'visitor', 'booking'),
+  vehicleType: Joi.string().valid(...VEHICLE_TYPES),
+  paymentStatus: Joi.string().valid('paid', 'unpaid'),
+  startDate: Joi.date().iso(),
+  endDate: Joi.date().iso().min(Joi.ref('startDate')),
+  buildingId: Joi.number().integer().positive(),
+  floorId: Joi.number().integer().positive(),
+  search: Joi.string().trim().max(20),
+  page: Joi.number().integer().min(1).default(1),
+  limit: Joi.number().integer().min(1).max(100).default(20),
+});
+
 export const checkOutSchema = Joi.object({
   paymentMethod: Joi.string().valid('cash', 'vnpay').default('cash'),
 });

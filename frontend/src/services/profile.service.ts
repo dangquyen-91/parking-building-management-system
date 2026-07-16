@@ -1,7 +1,7 @@
 import type { UserProfile } from './auth.service';
 import type { ResidentSubscription } from './subscription.service';
 
-const API_BASE_URL = 'http://localhost:5000/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
 
 export interface MySubscription extends ResidentSubscription {
   package: {
@@ -19,7 +19,6 @@ export interface MySubscription extends ResidentSubscription {
   } | null;
 }
 
-// ─── Vehicle types ────────────────────────────────────────────────────────────
 export interface MyVehicle {
   id: number;
   userId: number;
@@ -80,15 +79,11 @@ export const profileService = {
     return parseResponse<MySubscription[]>(res);
   },
 
-  // ─── Vehicle CRUD ─────────────────────────────────────────────────────────
-
-  /** GET /vehicles/me */
   async getMyVehicles(): Promise<MyVehicle[]> {
     const res = await fetch(`${API_BASE_URL}/vehicles/me`, { headers: authHeaders() });
     return parseResponse<MyVehicle[]>(res);
   },
 
-  /** POST /vehicles */
   async addVehicle(payload: VehiclePayload): Promise<MyVehicle> {
     const res = await fetch(`${API_BASE_URL}/vehicles`, {
       method: 'POST',
@@ -101,7 +96,6 @@ export const profileService = {
     return parseResponse<MyVehicle>(res);
   },
 
-  /** PATCH /vehicles/{id} */
   async updateVehicle(id: number, payload: Partial<VehiclePayload>): Promise<MyVehicle> {
     const res = await fetch(`${API_BASE_URL}/vehicles/${id}`, {
       method: 'PATCH',
@@ -114,7 +108,6 @@ export const profileService = {
     return parseResponse<MyVehicle>(res);
   },
 
-  /** DELETE /vehicles/{id} — 204 No Content */
   async deleteVehicle(id: number): Promise<void> {
     const res = await fetch(`${API_BASE_URL}/vehicles/${id}`, {
       method: 'DELETE',
