@@ -9,11 +9,17 @@ export interface BookingFormValues {
   customerPhone: string;
   customerEmail: string;
   startTime: string;
+  durationHours: number;
   note: string;
 }
 
-export const BOOKING_DURATION_HOURS = 4;
-export const BOOKING_PRICE = 35_000;
+export const BOOKING_BLOCK_HOURS = 4;
+export const BOOKING_BLOCK_PRICE = 35_000;
+export const BOOKING_MAX_BLOCKS = 6;
+export const BOOKING_DURATION_OPTIONS = Array.from(
+  { length: BOOKING_MAX_BLOCKS },
+  (_, i) => (i + 1) * BOOKING_BLOCK_HOURS
+);
 
 const platePattern = /^[A-Z0-9-]{4,20}$/;
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -35,7 +41,7 @@ export function useBookingForm() {
     const defaultWindow = createDefaultWindow();
     return {
       licensePlate: '', customerName: user?.fullName ?? '', customerPhone: user?.phone ?? '',
-      customerEmail: user?.email ?? '', startTime: defaultWindow.startTime, note: '',
+      customerEmail: user?.email ?? '', startTime: defaultWindow.startTime, durationHours: BOOKING_BLOCK_HOURS, note: '',
     };
   });
   const [submitting, setSubmitting] = useState(false);
@@ -68,7 +74,8 @@ export function useBookingForm() {
   const plateValid = platePattern.test(plate);
   const emailValid = emailPattern.test(values.customerEmail.trim());
   const phoneValid = !values.customerPhone.trim() || /^\d{9,15}$/.test(values.customerPhone.trim());
-  const durationHours = BOOKING_DURATION_HOURS;
+  const durationHours = values.durationHours;
+  const estimatedAmount = (durationHours / BOOKING_BLOCK_HOURS) * BOOKING_BLOCK_PRICE;
   const ready = plateValid && emailValid && phoneValid && !submitting;
 
   const updateField = <K extends keyof BookingFormValues>(field: K, value: BookingFormValues[K]) => {
@@ -89,6 +96,7 @@ export function useBookingForm() {
         licensePlate: plate,
         customerEmail: values.customerEmail.trim().toLowerCase(),
         startTime: new Date(values.startTime).toISOString(),
+        durationHours: values.durationHours,
         customerName: values.customerName.trim() || undefined,
         customerPhone: values.customerPhone.trim() || undefined,
         note: values.note.trim() || undefined,
@@ -103,5 +111,5 @@ export function useBookingForm() {
   };
 
   return { values, updateField, isAuthenticated, ownPlates, plate, plateValid, emailValid, phoneValid,
-    durationHours, ready, submitting, submitError, previewAmount, previewHours, submit };
+    durationHours, estimatedAmount, ready, submitting, submitError, previewAmount, previewHours, submit };
 }

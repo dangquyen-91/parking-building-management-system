@@ -1,4 +1,7 @@
 import Joi from 'joi';
+import { getPricingFor } from '../constants/pricing.js';
+
+const CAR_PRICING = getPricingFor('car');
 
 const licensePlateField = Joi.string()
   .trim()
@@ -23,6 +26,16 @@ export const createBookingSchema = Joi.object({
     'any.required': 'Email là bắt buộc để nhận xác nhận booking',
   }),
   startTime: Joi.date().iso().required(),
+  durationHours: Joi.number()
+    .integer()
+    .min(CAR_PRICING.blockHours)
+    .max(CAR_PRICING.blockHours * CAR_PRICING.maxBlocks)
+    .multiple(CAR_PRICING.blockHours)
+    .required()
+    .messages({
+      'number.multiple': `Thời lượng đặt chỗ phải là bội số của ${CAR_PRICING.blockHours} giờ`,
+      'number.max': `Chỉ cho phép đặt tối đa ${CAR_PRICING.blockHours * CAR_PRICING.maxBlocks} giờ`,
+    }),
   customerName: Joi.string().trim().min(2).max(100),
   customerPhone: phoneField,
   floorId: Joi.number().integer().positive(),
