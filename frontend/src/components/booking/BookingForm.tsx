@@ -37,8 +37,10 @@ export function BookingForm({ values, onChange, isAuthenticated, hasActiveSubscr
           <input type="email" value={values.customerEmail} onChange={(e) => onChange('customerEmail', e.target.value)} placeholder="VD: ban@example.com" className={cn(inputClass, values.customerEmail && !emailValid ? 'border-red-300' : 'border-slate-200 focus:border-blue-500')} />
           <p className="mt-2 text-xs font-medium text-slate-500">Sau khi thanh toán thành công, hệ thống sẽ gửi mã booking về email này.</p>
         </Field>
-        <Field label="Thời gian bắt đầu"><input type="datetime-local" value={values.startTime} onChange={(e) => onChange('startTime', e.target.value)} className={cn(inputClass, 'border-slate-200 font-bold focus:border-blue-500')} /></Field>
-        <Field label="Thời gian kết thúc"><input type="datetime-local" value={values.endTime} onChange={(e) => onChange('endTime', e.target.value)} className={cn(inputClass, 'border-slate-200 font-bold focus:border-blue-500')} /></Field>
+        <Field label="Thời gian bắt đầu">
+          <input type="datetime-local" value={values.startTime} onChange={(e) => onChange('startTime', e.target.value)} className={cn(inputClass, 'border-slate-200 font-bold focus:border-blue-500')} />
+          <p className="mt-2 text-xs font-medium text-slate-500">Mỗi lượt đặt cố định 4 giờ kể từ giờ bắt đầu, giá 35.000đ.</p>
+        </Field>
         <Field label="Ghi chú" wide><textarea value={values.note} onChange={(e) => onChange('note', e.target.value)} rows={4} placeholder="Thông tin thêm cho nhân viên bãi xe" className="mt-2 w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium outline-none focus:border-blue-500" /></Field>
       </div>
       {!isAuthenticated && <div className="mt-5 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-900">Bạn vẫn có thể đặt chỗ dạng khách vãng lai. <Link to="/login" className="font-bold underline">Đăng nhập</Link> để lưu booking.</div>}

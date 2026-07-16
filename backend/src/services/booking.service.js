@@ -8,12 +8,14 @@ import User from '../models/user.model.js';
 import ResidentSubscription from '../models/resident-subscription.model.js';
 import AppError from '../utils/appError.js';
 import { calculateFee } from './pricing.service.js';
+import { getPricingFor } from '../constants/pricing.js';
 import { createBookingPayment } from './payment.service.js';
 import { sendBookingConfirmation } from './email.service.js';
 
+const CAR_PRICING = getPricingFor('car');
+const BOOKING_DURATION_MS = CAR_PRICING.blockHours * 3600_000;
 const MIN_FREE_FOR_BOOKING = 10;
 const MAX_ADVANCE_BOOKING_MS = 24 * 3600_000;
-const MIN_DURATION_MS = 60 * 60_000;
 const EARLY_GRACE_MS = 30 * 60_000;
 const PENDING_TTL_MS = 15 * 60 * 1000;
 
@@ -80,20 +82,16 @@ const checkFloorCapacity = async (floor, t) => {
   return { total, activeSessions, heldByBookings, available };
 };
 
-const validateTimeWindow = (startTime, endTime) => {
+const validateTimeWindow = (startTime) => {
   const now = Date.now();
   const start = new Date(startTime).getTime();
-  const end = new Date(endTime).getTime();
 
-  if (Number.isNaN(start) || Number.isNaN(end)) {
-    throw new AppError('startTime / endTime không hợp lệ', 400);
+  if (Number.isNaN(start)) {
+    throw new AppError('startTime không hợp lệ', 400);
   }
   if (start <= now) throw new AppError('startTime phải ở tương lai', 400);
   if (start > now + MAX_ADVANCE_BOOKING_MS) {
     throw new AppError('Chỉ cho phép đặt trước tối đa 24 giờ', 400);
-  }
-  if (end - start < MIN_DURATION_MS) {
-    throw new AppError('Thời lượng booking tối thiểu 1 giờ', 400);
   }
 };
 
@@ -124,7 +122,9 @@ export const createBooking = async ({ body, requester, ipAddr }) => {
   return sequelize
     .transaction(async (t) => {
       const plate = normalizePlate(body.licensePlate);
-      validateTimeWindow(body.startTime, body.endTime);
+      validateTimeWindow(body.startTime);
+      const startTime = new Date(body.startTime);
+      const endTime = new Date(startTime.getTime() + BOOKING_DURATION_MS);
 
       // Biển đã có gói cư dân (bất kỳ loại xe) → không cho booking vãng lai.
       // Áp dụng cho MỌI người đặt (guest/user/cư dân đặt hộ). Check-in tầng visitor
@@ -171,9 +171,8 @@ export const createBooking = async ({ body, requester, ipAddr }) => {
         throw new AppError(msg, 409);
       }
 
-      const fee = calculateFee(body.startTime, body.endTime, 'car');
-      const durationMs = new Date(body.endTime) - new Date(body.startTime);
-      const prepaidHours = Math.max(1, Math.ceil(durationMs / 3600_000));
+      const fee = calculateFee(startTime, endTime, 'car');
+      const prepaidHours = CAR_PRICING.blockHours;
 
       const customer = await resolveCustomer(body, requester, t);
 
@@ -187,8 +186,8 @@ export const createBooking = async ({ body, requester, ipAddr }) => {
           customerEmail: customer.customerEmail,
           licensePlate: plate,
           vehicleType: 'car',
-          startTime: body.startTime,
-          endTime: body.endTime,
+          startTime,
+          endTime,
           amount: fee.totalFee,
           prepaidHours,
           status: 'pending',
