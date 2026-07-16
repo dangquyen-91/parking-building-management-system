@@ -520,7 +520,7 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
             <h3 className="font-bold text-red-300">Không kiểm tra được gói cư dân</h3>
             <p className="mt-1 text-sm leading-6 text-red-400/80">{scenario.message}</p>
             <p className="mt-2 text-xs leading-5 text-slate-500">
-              Vui lòng kiểm tra backend, token nhân viên hoặc thử tra cứu lại biển số trước khi check-in.
+              Vui lòng kiểm tra lại kết nối hệ thống, tài khoản nhân viên hoặc thử tra cứu lại biển số trước khi check-in.
             </p>
           </div>
         </div>
@@ -633,7 +633,7 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
         </div>
 
         <div className="mb-5 rounded-xl border border-emerald-400/20 bg-emerald-400/5 px-4 py-3 text-xs leading-5 text-emerald-300">
-          Backend sẽ check-in theo tầng cư dân. Ô tô dùng ô cố định đã mua gói, xe máy được tự chọn hàng còn trống trong tầng cư dân.
+          Hệ thống sẽ thực hiện check-in theo tầng cư dân. Ô tô dùng ô đỗ cố định đã mua gói, xe máy được tự chọn hàng còn trống trong tầng cư dân.
         </div>
 
         <div className="flex items-center gap-2 text-xs text-slate-600 mb-3">
@@ -724,9 +724,9 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
               Khách đến sớm hơn 30 phút so với giờ đặt
             </p>
             <p className="mt-1 text-amber-400/80">
-              Hệ thống backend chỉ nhận check-in booking trong vòng <strong>30 phút</strong> trước giờ hẹn.
-              Nếu check-in ngay bây giờ, backend sẽ <strong className="text-red-400">bỏ qua booking</strong> và
-              tạo phiên vãng lai — khách sẽ bị tính phí vãng lai và mất tiền đặt trước.
+              Hệ thống chỉ nhận check-in đặt chỗ trong vòng <strong>30 phút</strong> trước giờ hẹn.
+              Nếu check-in ngay bây giờ, hệ thống sẽ <strong className="text-red-400">bỏ qua lượt đặt chỗ</strong> và
+              tạo phiên gửi xe vãng lai — khách sẽ bị tính phí vãng lai và mất tiền đặt chỗ trước.
             </p>
             <p className="mt-1.5 font-medium text-amber-300">
               → Để tránh mất tiền: yêu cầu khách đợi đến trong vòng 30 phút trước giờ hẹn,
@@ -750,7 +750,7 @@ export function LookupResultPanel({ lookup, onSuccess }: LookupResultPanelProps)
 
         {bookingStatus.canCheckIn && bookingStatus.label.startsWith('Tới sớm') && (
           <div className="mb-3 rounded-xl border border-green-400/20 bg-green-400/5 px-4 py-3 text-xs leading-5 text-green-300">
-            Khách đến sớm nhưng trong vùng 30 phút cho phép. Backend sẽ nhận diện và check-in theo booking.
+            Khách đến sớm nhưng trong phạm vi 30 phút cho phép. Hệ thống sẽ tự động nhận diện và check-in theo lượt đặt chỗ.
           </div>
         )}
 

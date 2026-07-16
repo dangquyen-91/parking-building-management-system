@@ -215,7 +215,7 @@ function CarVisitorFloorGrid({ floor, activeCount }: { floor: Floor; activeCount
         <div className="flex-1">
           <p className="text-sm font-semibold text-blue-200">Ô tô vãng lai — Đếm theo tầng</p>
           <p className="mt-1 text-xs text-slate-500 leading-5">
-            Backend quản lý chỗ trống bằng cách đếm số phiên đang hoạt động trên tầng,
+            Hệ thống quản lý chỗ trống bằng cách đếm số phiên đang hoạt động trên tầng,
             không phân công slot vật lý cho từng xe.
           </p>
         </div>
