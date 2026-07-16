@@ -32,7 +32,7 @@ const sendEmail = async ({ to, toName, subject, htmlContent }) => {
 
 const fmtVND = (n) => Number(n).toLocaleString('vi-VN') + 'đ';
 const fmtTime = (d) =>
-  new Date(d).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' });
+  new Date(d).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Ho_Chi_Minh' });
 
 export const sendBookingConfirmation = async (booking) => {
   const html = `
