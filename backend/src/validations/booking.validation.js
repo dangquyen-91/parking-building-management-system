@@ -23,7 +23,6 @@ export const createBookingSchema = Joi.object({
     'any.required': 'Email là bắt buộc để nhận xác nhận booking',
   }),
   startTime: Joi.date().iso().required(),
-  endTime: Joi.date().iso().greater(Joi.ref('startTime')).required(),
   customerName: Joi.string().trim().min(2).max(100),
   customerPhone: phoneField,
   floorId: Joi.number().integer().positive(),
