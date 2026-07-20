@@ -13,13 +13,50 @@ export interface BookingFormValues {
   note: string;
 }
 
-export const BOOKING_BLOCK_HOURS = 4;
-export const BOOKING_BLOCK_PRICE = 35_000;
-export const BOOKING_MAX_BLOCKS = 6;
-export const BOOKING_DURATION_OPTIONS = Array.from(
-  { length: BOOKING_MAX_BLOCKS },
-  (_, i) => (i + 1) * BOOKING_BLOCK_HOURS
-);
+// Phải khớp backend/src/constants/pricing.js (car: mode 'hourly')
+export const CAR_HOUR_PRICE = 20_000;       // giá mỗi giờ ban ngày
+export const CAR_NIGHT_SURCHARGE = 10_000;  // phụ thu mỗi giờ khung đêm
+export const CAR_NIGHT_START = 22;          // 22:00
+export const CAR_NIGHT_END = 5;             // 05:00
+export const BOOKING_MAX_HOURS = 24;
+export const BOOKING_DURATION_OPTIONS = Array.from({ length: BOOKING_MAX_HOURS }, (_, i) => i + 1);
+
+const isNightHour = (hour: number) =>
+  CAR_NIGHT_START <= CAR_NIGHT_END
+    ? hour >= CAR_NIGHT_START && hour < CAR_NIGHT_END
+    : hour >= CAR_NIGHT_START || hour < CAR_NIGHT_END;
+
+export const CAR_NIGHT_HOUR_PRICE = CAR_HOUR_PRICE + CAR_NIGHT_SURCHARGE; // giá 1 giờ đêm (đã gồm phụ thu)
+
+export interface CarFeeBreakdown {
+  hours: number;
+  dayHours: number;
+  nightHours: number;
+  dayFee: number;
+  nightFee: number;
+  total: number;
+}
+
+/** Ước tính phí ô tô theo giờ + phụ thu đêm — khớp calcCarFeeHourly ở backend. */
+export function carFeeBreakdown(startTime: string, durationHours: number): CarFeeBreakdown {
+  const hours = Math.max(1, Math.ceil(durationHours || 0));
+  let nightHours = 0;
+  const cursor = new Date(startTime);
+  if (!Number.isNaN(cursor.getTime())) {
+    for (let i = 0; i < hours; i += 1) {
+      if (isNightHour(cursor.getHours())) nightHours += 1;
+      cursor.setHours(cursor.getHours() + 1);
+    }
+  }
+  const dayHours = hours - nightHours;
+  const dayFee = dayHours * CAR_HOUR_PRICE;
+  const nightFee = nightHours * CAR_NIGHT_HOUR_PRICE;
+  return { hours, dayHours, nightHours, dayFee, nightFee, total: dayFee + nightFee };
+}
+
+export function estimateCarFee(startTime: string, durationHours: number): number {
+  return carFeeBreakdown(startTime, durationHours).total;
+}
 
 const platePattern = /^[A-Z0-9-]{4,20}$/;
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -41,7 +78,7 @@ export function useBookingForm() {
     const defaultWindow = createDefaultWindow();
     return {
       licensePlate: '', customerName: user?.fullName ?? '', customerPhone: user?.phone ?? '',
-      customerEmail: user?.email ?? '', startTime: defaultWindow.startTime, durationHours: BOOKING_BLOCK_HOURS, note: '',
+      customerEmail: user?.email ?? '', startTime: defaultWindow.startTime, durationHours: 2, note: '',
     };
   });
   const [submitting, setSubmitting] = useState(false);
@@ -75,7 +112,8 @@ export function useBookingForm() {
   const emailValid = emailPattern.test(values.customerEmail.trim());
   const phoneValid = !values.customerPhone.trim() || /^\d{9,15}$/.test(values.customerPhone.trim());
   const durationHours = values.durationHours;
-  const estimatedAmount = (durationHours / BOOKING_BLOCK_HOURS) * BOOKING_BLOCK_PRICE;
+  const feeBreakdown = carFeeBreakdown(values.startTime, durationHours);
+  const estimatedAmount = feeBreakdown.total;
   const ready = plateValid && emailValid && phoneValid && !submitting;
 
   const updateField = <K extends keyof BookingFormValues>(field: K, value: BookingFormValues[K]) => {
@@ -111,5 +149,5 @@ export function useBookingForm() {
   };
 
   return { values, updateField, isAuthenticated, ownPlates, plate, plateValid, emailValid, phoneValid,
-    durationHours, estimatedAmount, ready, submitting, submitError, previewAmount, previewHours, submit };
+    durationHours, estimatedAmount, feeBreakdown, ready, submitting, submitError, previewAmount, previewHours, submit };
 }
