@@ -28,13 +28,12 @@ export const createBookingSchema = Joi.object({
   startTime: Joi.date().iso().required(),
   durationHours: Joi.number()
     .integer()
-    .min(CAR_PRICING.blockHours)
-    .max(CAR_PRICING.blockHours * CAR_PRICING.maxBlocks)
-    .multiple(CAR_PRICING.blockHours)
+    .min(1)
+    .max(CAR_PRICING.maxHours)
     .required()
     .messages({
-      'number.multiple': `Thời lượng đặt chỗ phải là bội số của ${CAR_PRICING.blockHours} giờ`,
-      'number.max': `Chỉ cho phép đặt tối đa ${CAR_PRICING.blockHours * CAR_PRICING.maxBlocks} giờ`,
+      'number.min': 'Thời lượng đặt tối thiểu 1 giờ',
+      'number.max': `Chỉ cho phép đặt tối đa ${CAR_PRICING.maxHours} giờ`,
     }),
   customerName: Joi.string().trim().min(2).max(100),
   customerPhone: phoneField,

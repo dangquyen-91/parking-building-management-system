@@ -1,12 +1,13 @@
-import { AlertCircle, CalendarClock, Check, Clock3, CreditCard, Loader2, MapPin, ReceiptText, ShieldCheck } from 'lucide-react';
+import { AlertCircle, CalendarClock, Check, Clock3, CreditCard, Loader2, MapPin, Moon, ReceiptText, ShieldCheck, Sun } from 'lucide-react';
 import { formatBookingCurrency } from './booking.utils';
+import { CAR_HOUR_PRICE, CAR_NIGHT_HOUR_PRICE, CAR_NIGHT_SURCHARGE, type CarFeeBreakdown } from '../../hooks/useBookingForm';
 
 interface Props {
   plate: string; customerEmail: string; durationHours: number; estimatedAmount: number; previewHours: number | null;
-  previewAmount: number | null; submitError: string | null; submitting: boolean; ready: boolean; onSubmit: () => void;
+  previewAmount: number | null; breakdown: CarFeeBreakdown; submitError: string | null; submitting: boolean; ready: boolean; onSubmit: () => void;
 }
 
-export function BookingSummary({ plate, customerEmail, durationHours, estimatedAmount, previewHours, previewAmount, submitError, submitting, ready, onSubmit }: Props) {
+export function BookingSummary({ plate, customerEmail, durationHours, estimatedAmount, previewHours, previewAmount, breakdown, submitError, submitting, ready, onSubmit }: Props) {
   return (
     <aside className="lg:sticky lg:top-28 lg:self-start"><div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_18px_38px_rgba(15,23,42,0.11)]">
       <div className="mb-4 flex items-center justify-between"><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-600">Tóm tắt</p><h3 className="mt-1 text-lg font-black">Thanh toán booking</h3></div><div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-50 text-blue-600"><ReceiptText className="h-5 w-5" /></div></div>
@@ -15,7 +16,36 @@ export function BookingSummary({ plate, customerEmail, durationHours, estimatedA
         <div className="grid grid-cols-2 gap-3"><Metric icon={Clock3} label="Thời lượng" value={`${durationHours || '--'} giờ`} /><Metric icon={CalendarClock} label="Trả trước" value={`${previewHours ?? (durationHours || '--')} giờ`} /></div>
         <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-4">
           <div className="flex justify-between"><div><Label>Biển số</Label><p className="mt-1 font-black tracking-widest">{plate || '--'}</p></div><ShieldCheck className="h-5 w-5 text-blue-500" /></div>
-          <div className="mt-4 flex items-end justify-between border-t border-slate-200 pt-4"><span className="text-sm font-semibold text-slate-500">Số tiền</span><span className="text-xl font-black text-blue-600">{formatBookingCurrency(previewAmount ?? estimatedAmount)}</span></div>
+          <div className="mt-4 space-y-2 border-t border-slate-200 pt-4">
+            {breakdown.dayHours > 0 && (
+              <div className="flex items-center justify-between rounded-xl bg-amber-50 px-3 py-2.5 ring-1 ring-amber-100">
+                <div className="flex items-center gap-2.5">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100 text-amber-600"><Sun className="h-4 w-4" /></span>
+                  <div>
+                    <p className="text-sm font-bold text-slate-800">Ban ngày</p>
+                    <p className="text-xs font-medium text-slate-400">{breakdown.dayHours} giờ × {formatBookingCurrency(CAR_HOUR_PRICE)}</p>
+                  </div>
+                </div>
+                <span className="text-sm font-black text-slate-900">{formatBookingCurrency(breakdown.dayFee)}</span>
+              </div>
+            )}
+            {breakdown.nightHours > 0 && (
+              <div className="flex items-center justify-between rounded-xl bg-indigo-50 px-3 py-2.5 ring-1 ring-indigo-100">
+                <div className="flex items-center gap-2.5">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-100 text-indigo-600"><Moon className="h-4 w-4" /></span>
+                  <div>
+                    <p className="flex items-center gap-1.5 text-sm font-bold text-indigo-700">
+                      Ban đêm
+                      <span className="rounded-full bg-indigo-600/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-indigo-600">+{formatBookingCurrency(CAR_NIGHT_SURCHARGE)}/giờ</span>
+                    </p>
+                    <p className="text-xs font-medium text-slate-400">{breakdown.nightHours} giờ × {formatBookingCurrency(CAR_NIGHT_HOUR_PRICE)} · khung 22:00–05:00</p>
+                  </div>
+                </div>
+                <span className="text-sm font-black text-indigo-700">{formatBookingCurrency(breakdown.nightFee)}</span>
+              </div>
+            )}
+          </div>
+          <div className="mt-3 flex items-end justify-between border-t border-slate-200 pt-3"><span className="text-sm font-semibold text-slate-500">Số tiền</span><span className="text-xl font-black text-blue-600">{formatBookingCurrency(previewAmount ?? estimatedAmount)}</span></div>
           <div className="mt-4 border-t border-slate-200 pt-4"><Label>Email xác nhận</Label><p className="mt-1 break-all text-sm font-bold">{customerEmail.trim() || '--'}</p></div>
         </div>
       </div>
