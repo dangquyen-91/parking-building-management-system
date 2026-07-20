@@ -219,22 +219,40 @@ export const getRevenueByVehicle = async ({ from, to, groupBy = 'day' }) => {
   return Object.values(periodMap).sort((a, b) => a.period.localeCompare(b.period));
 };
 
-const buildComparisonRange = (period) => {
+const buildComparisonRange = (period, baseline = 'previous') => {
   const now = new Date();
-  let curStart, prevStart;
 
+  // Mốc bắt đầu KỲ HIỆN TẠI.
+  let curStart;
   if (period === 'week') {
     curStart = new Date(now);
     curStart.setDate(now.getDate() - now.getDay()); // về Chủ nhật đầu tuần
     curStart.setHours(0, 0, 0, 0);
-    prevStart = new Date(curStart);
-    prevStart.setDate(curStart.getDate() - 7);
+  } else if (period === 'quarter') {
+    const q = Math.floor(now.getMonth() / 3); // 0..3
+    curStart = new Date(now.getFullYear(), q * 3, 1);
   } else if (period === 'year') {
     curStart = new Date(now.getFullYear(), 0, 1);
-    prevStart = new Date(now.getFullYear() - 1, 0, 1);
   } else {
     curStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    prevStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  }
+
+  // Mốc bắt đầu KỲ SO SÁNH (baseline).
+  let prevStart;
+  if (baseline === 'last_year') {
+    // Cùng kỳ năm trước: lùi đúng 1 năm (khử yếu tố mùa vụ).
+    prevStart = new Date(curStart);
+    prevStart.setFullYear(curStart.getFullYear() - 1);
+  } else if (period === 'week') {
+    prevStart = new Date(curStart);
+    prevStart.setDate(curStart.getDate() - 7);
+  } else if (period === 'quarter') {
+    prevStart = new Date(curStart);
+    prevStart.setMonth(curStart.getMonth() - 3);
+  } else if (period === 'year') {
+    prevStart = new Date(curStart.getFullYear() - 1, 0, 1);
+  } else {
+    prevStart = new Date(curStart.getFullYear(), curStart.getMonth() - 1, 1);
   }
 
   // So sánh "cùng khoảng thời gian đã trôi qua" (period-to-date):
@@ -257,13 +275,15 @@ const sumRevenue = async (start, end) => {
   return (s || 0) + (b || 0) + (sub || 0);
 };
 
-export const getRevenueComparison = async ({ period = 'month' }) => {
-  if (!['week', 'month', 'year'].includes(period)) throw new AppError('period must be week|month|year', 400);
-  const { curStart, curEnd, prevStart, prevEnd } = buildComparisonRange(period);
+export const getRevenueComparison = async ({ period = 'month', baseline = 'previous' }) => {
+  if (!['week', 'month', 'quarter', 'year'].includes(period)) throw new AppError('period must be week|month|quarter|year', 400);
+  if (!['previous', 'last_year'].includes(baseline)) throw new AppError('baseline must be previous|last_year', 400);
+  const { curStart, curEnd, prevStart, prevEnd } = buildComparisonRange(period, baseline);
   const [current, previous] = await Promise.all([sumRevenue(curStart, curEnd), sumRevenue(prevStart, prevEnd)]);
   const change = previous === 0 ? null : ((current - previous) / previous) * 100;
   return {
     period,
+    baseline,
     current: { from: curStart, to: curEnd, revenue: current },
     previous: { from: prevStart, to: prevEnd, revenue: previous },
     changePercent: change !== null ? Math.round(change * 100) / 100 : null,

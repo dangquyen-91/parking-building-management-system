@@ -38,13 +38,36 @@ const calcMotorcycleFee = (entry, exit, cfg) => {
   return { baseFee, overnightFee: 0, detail: { mode: 'time_block', blocks: breakdown } };
 };
 
-const calcCarFee = (entry, exit, cfg) => {
-  const hours = (exit - entry) / HOUR_MS;
-  const blocks = Math.max(1, Math.ceil(hours / cfg.blockHours));
+// Giờ (0–23) có nằm trong khung đêm không (khung có thể vắt qua nửa đêm, vd 22→5).
+const isNightHour = (hour, nightStart, nightEnd) =>
+  nightStart <= nightEnd
+    ? hour >= nightStart && hour < nightEnd
+    : hour >= nightStart || hour < nightEnd;
+
+// Ô tô: tính THEO GIỜ, làm tròn lên và tối thiểu 1 giờ. Mỗi giờ nằm trong khung đêm
+// (22:00–05:00) chịu thêm phụ thu. Phân loại ngày/đêm theo giờ bắt đầu của từng block 1 tiếng.
+const calcCarFeeHourly = (entry, exit, cfg) => {
+  const durationMs = Math.max(0, exit - entry);
+  const hours = Math.max(1, Math.ceil(durationMs / HOUR_MS));
+
+  let nightHours = 0;
+  const cursor = new Date(entry);
+  for (let i = 0; i < hours; i += 1) {
+    if (isNightHour(cursor.getHours(), cfg.nightStart, cfg.nightEnd)) nightHours += 1;
+    cursor.setHours(cursor.getHours() + 1);
+  }
+
   return {
-    baseFee: blocks * cfg.blockPrice,
-    overnightFee: 0,
-    detail: { mode: 'fixed_block', blocks, blockHours: cfg.blockHours, hours: Math.ceil(hours) },
+    baseFee: hours * cfg.hourPrice,               // toàn bộ giờ tính giá gốc
+    overnightFee: nightHours * cfg.nightSurcharge, // cộng phụ thu cho giờ đêm
+    detail: {
+      mode: 'hourly',
+      hours,
+      dayHours: hours - nightHours,
+      nightHours,
+      hourPrice: cfg.hourPrice,
+      nightSurcharge: cfg.nightSurcharge,
+    },
   };
 };
 
@@ -62,8 +85,8 @@ export const calculateFee = (entryTime, exitTime, vehicleType) => {
   let result;
   if (cfg.mode === 'time_block') {
     result = calcMotorcycleFee(entry, exit, cfg);
-  } else if (cfg.mode === 'fixed_block') {
-    result = calcCarFee(entry, exit, cfg);
+  } else if (cfg.mode === 'hourly') {
+    result = calcCarFeeHourly(entry, exit, cfg);
   } else {
     return { baseFee: 0, overnightFee: 0, totalFee: 0, mode: cfg.mode, durationMinutes };
   }

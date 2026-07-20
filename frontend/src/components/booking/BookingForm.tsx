@@ -2,7 +2,7 @@ import { motion } from 'framer-motion';
 import { AlertCircle, Car } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { cn } from '../../lib/utils';
-import { BOOKING_BLOCK_HOURS, BOOKING_BLOCK_PRICE, BOOKING_DURATION_OPTIONS, type BookingFormValues } from '../../hooks/useBookingForm';
+import { BOOKING_DURATION_OPTIONS, estimateCarFee, CAR_HOUR_PRICE, CAR_NIGHT_SURCHARGE, CAR_NIGHT_START, CAR_NIGHT_END, type BookingFormValues } from '../../hooks/useBookingForm';
 import { formatBookingCurrency } from './booking.utils';
 
 interface Props {
@@ -46,11 +46,13 @@ export function BookingForm({ values, onChange, isAuthenticated, hasActiveSubscr
             className={cn(inputClass, 'border-slate-200 font-bold focus:border-blue-500')}>
             {BOOKING_DURATION_OPTIONS.map((hours) => (
               <option key={hours} value={hours}>
-                {hours} giờ — {formatBookingCurrency((hours / BOOKING_BLOCK_HOURS) * BOOKING_BLOCK_PRICE)}
+                {hours} giờ — {formatBookingCurrency(estimateCarFee(values.startTime, hours))}
               </option>
             ))}
           </select>
-          <p className="mt-2 text-xs font-medium text-slate-500">Mỗi block {BOOKING_BLOCK_HOURS} giờ giá {formatBookingCurrency(BOOKING_BLOCK_PRICE)}.</p>
+          <p className="mt-2 text-xs font-medium text-slate-500">
+            {formatBookingCurrency(CAR_HOUR_PRICE)}/giờ · phụ thu {formatBookingCurrency(CAR_NIGHT_SURCHARGE)}/giờ khung đêm {CAR_NIGHT_START}:00–{String(CAR_NIGHT_END).padStart(2, '0')}:00.
+          </p>
         </Field>
         <Field label="Ghi chú" wide><textarea value={values.note} onChange={(e) => onChange('note', e.target.value)} rows={4} placeholder="Thông tin thêm cho nhân viên bãi xe" className="mt-2 w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium outline-none focus:border-blue-500" /></Field>
       </div>

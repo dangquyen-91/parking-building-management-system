@@ -8,10 +8,12 @@ export const PRICING = {
     ],
   },
   car: {
-    mode: 'fixed_block',
-    blockHours: 4,
-    blockPrice: 35_000,
-    maxBlocks: 6,
+    mode: 'hourly',
+    hourPrice: 20_000,        // giá mỗi giờ ban ngày
+    nightSurcharge: 10_000,   // phụ thu MỖI GIỜ trong khung đêm
+    nightStart: 22,           // khung đêm bắt đầu 22:00
+    nightEnd: 5,              // khung đêm kết thúc 05:00 (22:00–05:00)
+    maxHours: 24,             // thời lượng đặt trước tối đa (giờ)
   },
 };
 
