@@ -24,8 +24,12 @@ export interface RevenueByVehiclePoint {
   total: number;
 }
 
+export type ComparePeriod = 'week' | 'month' | 'quarter' | 'year';
+export type CompareBaseline = 'previous' | 'last_year';
+
 export interface RevenueComparison {
-  period: 'week' | 'month' | 'year';
+  period: ComparePeriod;
+  baseline: CompareBaseline;
   current: { from: string; to: string; revenue: number };
   previous: { from: string; to: string; revenue: number };
   changePercent: number | null;

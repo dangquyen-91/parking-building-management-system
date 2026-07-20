@@ -1,11 +1,12 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Banknote, Receipt, Trophy } from 'lucide-react';
 import {
   ResponsiveContainer, AreaChart, Area, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 } from 'recharts';
 import { reportService } from '../../services/report.service';
-import type { GroupBy } from '../../types/report';
+import { cn } from '../../lib/utils';
+import type { GroupBy, ComparePeriod, CompareBaseline } from '../../types/report';
 import {
   COLORS, ReportCard, StatCard, useAsync, fmtVND, fmtShort, fmtNum,
   ChartSkeleton, ErrorBox, EmptyState, DarkTooltip, periodKeys, fillSeries,
@@ -13,8 +14,12 @@ import {
 
 const axisTick = { fill: COLORS.axis, fontSize: 11 };
 
+const PERIOD_LABELS: Record<ComparePeriod, string> = { week: 'Tuần', month: 'Tháng', quarter: 'Quý', year: 'Năm' };
+
 export default function RevenueTab({ from, to, groupBy }: { from: string; to: string; groupBy: GroupBy }) {
-  const comparison = useAsync(() => reportService.getRevenueComparison('month'), []);
+  const [period, setPeriod] = useState<ComparePeriod>('month');
+  const [baseline, setBaseline] = useState<CompareBaseline>('previous');
+  const comparison = useAsync(() => reportService.getRevenueComparison(period, baseline), [period, baseline]);
   const revenue = useAsync(() => reportService.getRevenue({ from, to, groupBy }), [from, to, groupBy]);
   const byVehicle = useAsync(() => reportService.getRevenueByVehicle({ from, to, groupBy }), [from, to, groupBy]);
 
@@ -56,15 +61,35 @@ export default function RevenueTab({ from, to, groupBy }: { from: string; to: st
   const delta = cmp?.changePercent != null
     ? { value: `${Math.abs(cmp.changePercent)}%`, trend: cmp.changePercent >= 0 ? ('up' as const) : ('down' as const) }
     : null;
+  const periodLabel = PERIOD_LABELS[period];
+  const baselineLabel = baseline === 'last_year' ? `cùng ${periodLabel.toLowerCase()} năm trước` : `${periodLabel.toLowerCase()} trước`;
 
   return (
     <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="inline-flex rounded-xl border border-white/10 bg-white/[0.03] p-1">
+          {(['week', 'month', 'quarter', 'year'] as ComparePeriod[]).map((p) => (
+            <button key={p} type="button" onClick={() => setPeriod(p)}
+              className={cn('rounded-lg px-3 py-1.5 text-xs font-semibold transition', period === p ? 'bg-blue-500/20 text-blue-300' : 'text-slate-400 hover:text-white')}>
+              {PERIOD_LABELS[p]}
+            </button>
+          ))}
+        </div>
+        <div className="inline-flex rounded-xl border border-white/10 bg-white/[0.03] p-1">
+          {([['previous', 'Kỳ trước'], ['last_year', 'Cùng kỳ năm trước']] as [CompareBaseline, string][]).map(([b, label]) => (
+            <button key={b} type="button" onClick={() => setBaseline(b)}
+              className={cn('rounded-lg px-3 py-1.5 text-xs font-semibold transition', baseline === b ? 'bg-purple-500/20 text-purple-300' : 'text-slate-400 hover:text-white')}>
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
       <div className="grid gap-4 md:grid-cols-3">
         <StatCard
-          icon={Banknote} tone="green" label="So sánh tháng hiện tại"
+          icon={Banknote} tone="green" label={`So sánh ${periodLabel.toLowerCase()} hiện tại`}
           value={cmp ? fmtShort(cmp.current.revenue) : '...'}
           delta={delta}
-          sub={cmp ? <>Tháng trước <b className="text-slate-300">{fmtShort(cmp.previous.revenue)}</b> · không phụ thuộc bộ lọc</> : 'so với tháng trước'}
+          sub={cmp ? <>{baseline === 'last_year' ? 'Cùng kỳ năm trước' : 'Kỳ trước'} <b className="text-slate-300">{fmtShort(cmp.previous.revenue)}</b> · không phụ thuộc bộ lọc</> : `so với ${baselineLabel}`}
         />
         <StatCard
           icon={Receipt} tone="blue" label="Doanh thu trong kỳ"
