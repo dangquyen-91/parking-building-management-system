@@ -20,7 +20,8 @@ export const revenueByVehicleSchema = Joi.object({
 });
 
 export const revenueComparisonSchema = Joi.object({
-  period: Joi.string().valid('week', 'month', 'year').default('month'),
+  period: Joi.string().valid('week', 'month', 'quarter', 'year').default('month'),
+  baseline: Joi.string().valid('previous', 'last_year').default('previous'),
 });
 
 export const dateRangeSchema = Joi.object({

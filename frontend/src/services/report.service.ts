@@ -3,6 +3,8 @@ import type {
   RevenuePoint,
   RevenueByVehiclePoint,
   RevenueComparison,
+  ComparePeriod,
+  CompareBaseline,
   SessionStats,
   BookingStats,
   SubscriptionStats,
@@ -66,8 +68,8 @@ export const reportService = {
   getRevenueByVehicle: (params: DateRange & { groupBy?: GroupBy } = {}) =>
     get<RevenueByVehiclePoint[]>('revenue/by-vehicle', params),
 
-  getRevenueComparison: (period: 'week' | 'month' | 'year' = 'month') =>
-    get<RevenueComparison>('revenue/comparison', { period }),
+  getRevenueComparison: (period: ComparePeriod = 'month', baseline: CompareBaseline = 'previous') =>
+    get<RevenueComparison>('revenue/comparison', { period, baseline }),
 
   getSessionStats: (params: DateRange = {}) => get<SessionStats>('sessions', params),
 
