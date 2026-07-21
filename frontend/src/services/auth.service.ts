@@ -89,12 +89,8 @@ export const authService = {
     });
     
     if (!response.ok) {
-      try {
-        const result = await response.json();
-        throw new Error(result.message || 'Logout failed');
-      } catch (err) {
-        throw new Error('Logout failed');
-      }
+      const result = await response.json().catch(() => null);
+      throw new Error(result?.message || 'Logout failed');
     }
   },
 

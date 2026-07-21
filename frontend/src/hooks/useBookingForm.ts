@@ -13,9 +13,9 @@ export interface BookingFormValues {
   note: string;
 }
 
-// Phải khớp backend/src/constants/pricing.js (car: mode 'hourly')
-export const CAR_HOUR_PRICE = 20_000;       // giá mỗi giờ ban ngày
-export const CAR_NIGHT_SURCHARGE = 10_000;  // phụ thu mỗi giờ khung đêm
+// Must match backend/src/constants/pricing.js (car: mode 'hourly')
+export const CAR_HOUR_PRICE = 20_000;       // daytime rate per hour
+export const CAR_NIGHT_SURCHARGE = 10_000;  // surcharge per night hour
 export const CAR_NIGHT_START = 22;          // 22:00
 export const CAR_NIGHT_END = 5;             // 05:00
 export const BOOKING_MAX_HOURS = 24;
@@ -26,7 +26,7 @@ const isNightHour = (hour: number) =>
     ? hour >= CAR_NIGHT_START && hour < CAR_NIGHT_END
     : hour >= CAR_NIGHT_START || hour < CAR_NIGHT_END;
 
-export const CAR_NIGHT_HOUR_PRICE = CAR_HOUR_PRICE + CAR_NIGHT_SURCHARGE; // giá 1 giờ đêm (đã gồm phụ thu)
+export const CAR_NIGHT_HOUR_PRICE = CAR_HOUR_PRICE + CAR_NIGHT_SURCHARGE; // total rate per night hour (includes surcharge)
 
 export interface CarFeeBreakdown {
   hours: number;
@@ -37,7 +37,7 @@ export interface CarFeeBreakdown {
   total: number;
 }
 
-/** Ước tính phí ô tô theo giờ + phụ thu đêm — khớp calcCarFeeHourly ở backend. */
+/** Estimates car parking fee by hour + night surcharge — matches calcCarFeeHourly on the backend. */
 export function carFeeBreakdown(startTime: string, durationHours: number): CarFeeBreakdown {
   const hours = Math.max(1, Math.ceil(durationHours || 0));
   let nightHours = 0;
@@ -92,7 +92,7 @@ export function useBookingForm() {
     let cancelled = false;
     profileService.getMySubscriptions('active').then((subscriptions) => {
       if (!cancelled) setOwnPlates(subscriptions.map((item) => normalizePlate(item.licensePlate)));
-    }).catch(() => {});
+    }).catch(() => { });
     return () => { cancelled = true; };
   }, [isAuthenticated]);
 
@@ -148,6 +148,8 @@ export function useBookingForm() {
     }
   };
 
-  return { values, updateField, isAuthenticated, ownPlates, plate, plateValid, emailValid, phoneValid,
-    durationHours, estimatedAmount, feeBreakdown, ready, submitting, submitError, previewAmount, previewHours, submit };
+  return {
+    values, updateField, isAuthenticated, ownPlates, plate, plateValid, emailValid, phoneValid,
+    durationHours, estimatedAmount, feeBreakdown, ready, submitting, submitError, previewAmount, previewHours, submit
+  };
 }

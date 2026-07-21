@@ -16,18 +16,22 @@ export function useKioskHotkeys(options: KioskHotkeys = {}) {
 
       switch (e.key) {
         case 'F1':
+          if (isTyping) break;
           e.preventDefault();
           navigate('/staff/dashboard');
           break;
         case 'F2':
+          if (isTyping) break;
           e.preventDefault();
           navigate('/staff/check-in');
           break;
         case 'F3':
+          if (isTyping) break;
           e.preventDefault();
           navigate('/staff/sessions');
           break;
         case 'F4':
+          if (isTyping) break;
           e.preventDefault();
           navigate('/staff/map');
           break;

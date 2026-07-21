@@ -30,22 +30,10 @@ import { useKioskHotkeys } from '../../hooks/useKioskHotkeys';
 import { cn, compareFloorCode } from '../../lib/utils';
 import { floorService, type Floor } from '../../services/floor.service';
 import { slotService } from '../../services/slot.service';
-import type { ActiveSessionApiItem, ParkingRowApiItem } from '../../types/kiosk';
+import { getSessions } from '../../services/kiosk.service';
+import { parkingRowService } from '../../services/parking-row.service';
+import type { ActiveSessionApiItem } from '../../types/kiosk';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
-
-function authHeaders() {
-  const token = localStorage.getItem('accessToken');
-  return { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
-}
-
-async function fetchRows(params?: Record<string, string>): Promise<ParkingRowApiItem[]> {
-  const q = new URLSearchParams({ limit: '200', ...params });
-  const res = await fetch(`${API_BASE_URL}/parking-rows?${q.toString()}`, { headers: authHeaders() });
-  const json = await res.json();
-  if (!res.ok || !json.success) throw new Error(json.message ?? 'Lỗi tải hàng xe');
-  return json.data as ParkingRowApiItem[];
-}
 
 const formatTime = (iso: string) =>
   new Date(iso).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
@@ -384,7 +372,7 @@ function ActiveSessionsSection({ sessions, loading }: { sessions: ActiveSessionA
           <table className="w-full min-w-[560px] text-sm">
             <thead>
               <tr className="border-b border-white/[0.06]">
-                {['Biển số', 'Loại xe', 'Giờ vào', 'Thời gian', 'Nhân viên', ''].map((h) => (
+                {['Biển số', 'Loại xe', 'Giờ vào', 'Thời gian', 'Nhân viên', 'Thao tác'].map((h) => (
                   <th key={h} className="pb-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-slate-600 first:pl-0 last:text-right">
                     {h}
                   </th>
@@ -454,14 +442,15 @@ export default function StaffDashboardPage() {
     if (!silent) setLoading(true);
     try {
       const [activeRes, completedRes, floorRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/parking-sessions?status=active&limit=200`, { headers: authHeaders() })
-          .then(r => r.json()),
+        getSessions({ status: 'active', limit: 200 }),
         (() => {
           const todayStart = new Date();
           todayStart.setHours(0, 0, 0, 0);
-          const params = new URLSearchParams({ status: 'completed', limit: '1' });
-          return fetch(`${API_BASE_URL}/parking-sessions?${params}`, { headers: authHeaders() })
-            .then(r => r.json());
+          return getSessions({
+            status: 'completed',
+            limit: 1,
+            startDate: todayStart.toISOString(),
+          });
         })(),
         floorService.getFloors({ limit: 200, isActive: true }),
       ]);
@@ -492,7 +481,7 @@ export default function StaffDashboardPage() {
               pct: Math.round((used / capacity) * 100),
             };
           } else {
-            const rows = await fetchRows({ floorId: String(floor.id) });
+            const { rows } = await parkingRowService.getRows({ floorId: floor.id, limit: 200 });
             const used = rows.reduce((s, r) => s + r.occupiedCount, 0);
             const capacity = rows.reduce((s, r) => s + r.capacity, 0) || 1;
             return {
