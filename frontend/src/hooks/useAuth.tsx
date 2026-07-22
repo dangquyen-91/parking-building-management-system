@@ -71,9 +71,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || loading) return;
 
     const REFRESH_MARGIN_MS = 5 * 60 * 1000;
+    let isUnloading = false;
+
+    const handleBeforeUnload = () => {
+      isUnloading = true;
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
 
     const getAccessTokenExpiry = (): number | null => {
       const token = localStorage.getItem('accessToken');
@@ -89,7 +95,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     const refreshTokens = async () => {
-      if (!localStorage.getItem('refreshToken')) return;
+      if (!localStorage.getItem('refreshToken') || isUnloading) return;
       try {
         await refreshSession();
       } catch {
@@ -97,8 +103,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     const maybeRefresh = () => {
+      if (loading || isUnloading) return;
       const expiry = getAccessTokenExpiry();
-      if (expiry === null || Date.now() > expiry - REFRESH_MARGIN_MS) {
+      if (expiry !== null && Date.now() > expiry - REFRESH_MARGIN_MS) {
         refreshTokens();
       }
     };
@@ -114,8 +121,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       window.clearInterval(intervalId);
       window.removeEventListener('focus', onFocus);
       document.removeEventListener('visibilitychange', onFocus);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [user]);
+  }, [user, loading]);
 
   const login = async (credentials: { email: string; password: string }) => {
     setLoading(true);

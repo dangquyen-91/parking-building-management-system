@@ -24,10 +24,10 @@ function InfoCard({ icon: Icon, label, value, tone = 'blue' }: {
   tone?: 'blue' | 'emerald' | 'amber' | 'purple';
 }) {
   const colors = {
-    blue:    'from-blue-500/20 to-cyan-500/10 text-blue-300',
+    blue: 'from-blue-500/20 to-cyan-500/10 text-blue-300',
     emerald: 'from-emerald-500/20 to-teal-500/10 text-emerald-300',
-    amber:   'from-amber-500/20 to-orange-500/10 text-amber-300',
-    purple:  'from-purple-500/20 to-blue-500/10 text-purple-300',
+    amber: 'from-amber-500/20 to-orange-500/10 text-amber-300',
+    purple: 'from-purple-500/20 to-blue-500/10 text-purple-300',
   };
   return (
     <div className="rounded-2xl border border-white/10 bg-[#0F172A]/80 p-5 backdrop-blur-xl">
@@ -137,7 +137,7 @@ export default function CheckInPage() {
               </div>
               <div>
                 <h2 className="font-bold text-white">Tra Cứu Biển Số</h2>
-                <p className="text-xs text-slate-500">GET /parking-sessions/lookup</p>
+                <p className="text-xs text-slate-500">Tìm kiếm thông tin phương tiện trong hệ thống</p>
               </div>
             </div>
 
@@ -184,10 +184,10 @@ export default function CheckInPage() {
 
         <div className="space-y-5">
           <div className="grid grid-cols-2 gap-4">
-            <InfoCard icon={Activity}    label="Phiên đang hoạt động" value="—"   tone="blue" />
-            <InfoCard icon={Car}         label="Chỗ ô tô còn trống"   value={lookupResult?.availableSlots.car ?? '—'} tone="emerald" />
-            <InfoCard icon={Motorbike}   label="Tổng chỗ xe máy còn trống" value={lookupResult?.availableSlots.motorcycle ?? '—'} tone="amber" />
-            <InfoCard icon={Clock}       label="Thời gian hiện tại"    value={new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} tone="purple" />
+            <InfoCard icon={Activity} label="Phiên đang hoạt động" value="—" tone="blue" />
+            <InfoCard icon={Car} label="Chỗ ô tô còn trống" value={lookupResult?.availableSlots.car ?? '—'} tone="emerald" />
+            <InfoCard icon={Motorbike} label="Tổng chỗ xe máy còn trống" value={lookupResult?.availableSlots.motorcycle ?? '—'} tone="amber" />
+            <InfoCard icon={Clock} label="Thời gian hiện tại" value={new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} tone="purple" />
           </div>
 
           <motion.div
@@ -223,7 +223,7 @@ export default function CheckInPage() {
                 <strong className="text-amber-400">⚠️ Lưu ý grace period 30 phút:</strong>
                 <ul className="mt-1.5 space-y-1">
                   <li>🟢 Đến trong vòng <strong className="text-white">30 phút trước giờ hẹn</strong> → check-in được theo booking</li>
-                  <li>🟡 Đến <strong className="text-white">sớm hơn 30 phút</strong> → backend bỏ qua booking → <strong className="text-red-400">chỉ được vãng lai</strong></li>
+                  <li>🟡 Đến <strong className="text-white">sớm hơn 30 phút</strong> → bỏ qua booking → <strong className="text-red-400">chỉ được vãng lai</strong></li>
                   <li>🔴 Đến sau giờ kết thúc booking → booking expired → <strong className="text-red-400">chỉ được vãng lai</strong></li>
                 </ul>
               </div>

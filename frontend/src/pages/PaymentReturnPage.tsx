@@ -139,7 +139,7 @@ export default function PaymentReturnPage() {
       };
     }
     if (isBooking) return { primary: { to: '/my-bookings', label: 'Xem booking của tôi' }, secondary: { to: '/booking', label: 'Đặt chỗ khác' } };
-    if (isSubscription) return { primary: { to: '/membership', label: 'Xem gói của tôi' }, secondary: { to: '/', label: 'Về trang chủ' } };
+    if (isSubscription) return { primary: { to: '/profile?tab=packages', label: 'Xem gói của tôi' }, secondary: { to: '/', label: 'Về trang chủ' } };
     return { primary: { to: '/', label: 'Về trang chủ' }, secondary: null };
   }, [isAuthenticated, isFailed, isBooking, isSubscription]);
 

@@ -1,4 +1,3 @@
-import { motion } from 'framer-motion';
 import {
   Car,
   Clock3,
@@ -13,7 +12,7 @@ import { cn } from '../../lib/utils';
 const menuItems = [
   { label: 'Tổng quan', icon: LayoutDashboard, to: '/staff/dashboard', shortcut: 'F1' },
   { label: 'Check-in', icon: LogIn, to: '/staff/check-in', shortcut: 'F2' },
-  { label: 'Phiên gửi / Checkout', icon: Clock3, to: '/staff/sessions', shortcut: 'F3' },
+  { label: 'Checkout', icon: Clock3, to: '/staff/sessions', shortcut: 'F3' },
   { label: 'Sơ đồ bãi xe', icon: MapPinned, to: '/staff/map', shortcut: 'F4' },
 ];
 
@@ -43,35 +42,32 @@ export function StaffSidebar() {
           {menuItems.map((item) => (
             <NavLink key={item.label} to={item.to}>
               {({ isActive }) => (
-                <motion.div
-                  whileHover={{ x: 4, scale: 1.01 }}
-                  transition={{ type: 'spring', stiffness: 280, damping: 24 }}
+                <div
                   className={cn(
-                    'group relative flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium text-slate-400 transition-colors',
-                    'hover:bg-white/[0.06] hover:text-white',
+                    'group relative flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium text-slate-400 transition-all duration-200 ease-out',
+                    'hover:bg-white/[0.06] hover:text-white hover:translate-x-1 hover:scale-[1.01]',
                     isActive &&
                     'border border-blue-400/30 bg-gradient-to-r from-blue-500/20 to-purple-500/10 text-white shadow-[0_0_28px_rgba(59,130,246,0.18)]',
                   )}
                 >
                   {isActive && (
-                    <motion.span
-                      layoutId="staff-sidebar-active"
+                    <span
                       className="absolute left-0 h-7 w-1 rounded-r-full bg-gradient-to-b from-blue-400 to-purple-400"
                     />
                   )}
                   <item.icon
                     className={cn(
-                      'h-4 w-4',
+                      'h-4 w-4 transition-colors duration-200',
                       isActive ? 'text-blue-300' : 'text-slate-500 group-hover:text-blue-300',
                     )}
                   />
                   <span className="flex-1">{item.label}</span>
                   {item.shortcut && (
-                    <span className="rounded-md border border-white/10 bg-white/[0.05] px-1.5 py-0.5 text-[10px] font-mono text-slate-500 group-hover:border-blue-400/20 group-hover:text-blue-400">
+                    <span className="rounded-md border border-white/10 bg-white/[0.05] px-1.5 py-0.5 text-[10px] font-mono text-slate-500 group-hover:border-blue-400/20 group-hover:text-blue-400 transition-colors duration-200">
                       {item.shortcut}
                     </span>
                   )}
-                </motion.div>
+                </div>
               )}
             </NavLink>
           ))}

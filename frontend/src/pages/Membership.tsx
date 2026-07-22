@@ -23,6 +23,7 @@ import { floorService } from '../services/floor.service';
 import { getAvailableSlots } from '../services/kiosk.service';
 import type { ParkingSlotApiItem } from '../types/kiosk';
 import { subscriptionService, type ResidentSubscription } from '../services/subscription.service';
+import { profileService, type MyVehicle } from '../services/profile.service';
 
 type VehicleTab = 'motorcycle' | 'car';
 
@@ -85,6 +86,7 @@ export default function Membership() {
   const [packages, setPackages] = useState<ParkingPackage[]>([]);
   const [residentSlots, setResidentSlots] = useState<ParkingSlotApiItem[]>([]);
   const [mySubscriptions, setMySubscriptions] = useState<ResidentSubscription[]>([]);
+  const [vehicles, setVehicles] = useState<MyVehicle[]>([]);
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleTab>('motorcycle');
   const [selectedPackageId, setSelectedPackageId] = useState<number | null>(null);
   const [licensePlate, setLicensePlate] = useState('');
@@ -148,6 +150,19 @@ export default function Membership() {
   );
   const activeSubCount = mySubscriptions.filter((sub) => sub.status === 'active').length;
 
+  const availableVehicles = useMemo(() => {
+    if (!selectedPackage || !isAuthenticated) return [];
+    return vehicles.filter((vehicle) => {
+      if (vehicle.vehicleType !== selectedPackage.vehicleType) return false;
+      const hasActiveSub = mySubscriptions.some(
+        (sub) =>
+          normalizePlate(sub.licensePlate) === normalizePlate(vehicle.licensePlate) &&
+          isStillActive(sub)
+      );
+      return !hasActiveSub;
+    });
+  }, [vehicles, selectedPackage, mySubscriptions, isAuthenticated]);
+
   useEffect(() => {
     if (!pendingSubId) return;
     const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
@@ -195,10 +210,19 @@ export default function Membership() {
         setSelectedPackageId(defaultPackage?.id ?? null);
 
         try {
-          const mine = await subscriptionService.getMine();
-          if (!cancelled) setMySubscriptions(mine);
+          const [mine, myVehs] = await Promise.all([
+            subscriptionService.getMine(),
+            profileService.getMyVehicles(),
+          ]);
+          if (!cancelled) {
+            setMySubscriptions(mine);
+            setVehicles(myVehs);
+          }
         } catch {
-          if (!cancelled) setMySubscriptions([]);
+          if (!cancelled) {
+            setMySubscriptions([]);
+            setVehicles([]);
+          }
         }
       } catch (err) {
         if (!cancelled) {
@@ -271,6 +295,7 @@ export default function Membership() {
     setSelectedSlotId(null);
     setSlotSearch('');
     setSlotModalOpen(false);
+    setLicensePlate('');
 
     const nextDefault = findDefaultPackage(packages.filter((pkg) => pkg.vehicleType === vehicle));
     setSelectedPackageId(nextDefault?.id ?? null);
@@ -282,6 +307,7 @@ export default function Membership() {
     setSelectedSlotId(null);
     setSlotSearch('');
     setSlotModalOpen(false);
+    setLicensePlate('');
   };
 
   const handleSlotSelect = (slotId: number) => {
@@ -387,393 +413,401 @@ export default function Membership() {
         ) : isAuthenticated ? (
           <>
             <div className="mx-auto mb-5 mt-12 flex max-w-6xl flex-col gap-3 sm:flex-row sm:items-center">
-                <div className="inline-flex w-full rounded-3xl border border-slate-200 bg-white p-1.5 shadow-sm sm:w-auto">
-                  {([
-                    { value: 'motorcycle' as const, label: 'Xe máy', icon: Motorbike },
-                    { value: 'car' as const, label: 'Ô tô', icon: Car },
-                  ]).map((item) => {
-                    const active = selectedVehicle === item.value;
-                    return (
-                      <button
-                        key={item.value}
-                        type="button"
-                        onClick={() => handleVehicleChange(item.value)}
-                        className={cn(
-                          'relative flex h-12 flex-1 items-center justify-center gap-2 rounded-2xl px-5 text-sm font-bold transition sm:flex-none',
-                          active ? 'text-white' : 'text-slate-500 hover:text-slate-900'
-                        )}
-                      >
-                        {active && (
-                          <motion.span
-                            layoutId="membershipVehicleTab"
-                            className="absolute inset-0 rounded-2xl bg-blue-600 shadow-lg shadow-blue-600/20"
-                            transition={{ type: 'spring', stiffness: 420, damping: 34 }}
-                          />
-                        )}
-                        <item.icon className="relative h-4 w-4" />
-                        <span className="relative">{item.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
+              <div className="inline-flex w-full rounded-3xl border border-slate-200 bg-white p-1.5 shadow-sm sm:w-auto">
+                {([
+                  { value: 'motorcycle' as const, label: 'Xe máy', icon: Motorbike },
+                  { value: 'car' as const, label: 'Ô tô', icon: Car },
+                ]).map((item) => {
+                  const active = selectedVehicle === item.value;
+                  return (
+                    <button
+                      key={item.value}
+                      type="button"
+                      onClick={() => handleVehicleChange(item.value)}
+                      className={cn(
+                        'relative flex h-12 flex-1 items-center justify-center gap-2 rounded-2xl px-5 text-sm font-bold transition sm:flex-none',
+                        active ? 'text-white' : 'text-slate-500 hover:text-slate-900'
+                      )}
+                    >
+                      {active && (
+                        <motion.span
+                          layoutId="membershipVehicleTab"
+                          className="absolute inset-0 rounded-2xl bg-blue-600 shadow-lg shadow-blue-600/20"
+                          transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+                        />
+                      )}
+                      <item.icon className="relative h-4 w-4" />
+                      <span className="relative">{item.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
 
-                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500 shadow-sm">
-                  Đang hiển thị <span className="font-bold text-slate-950">{visiblePackages.length}</span> gói {vehicleLabels[selectedVehicle].toLowerCase()}
-                </div>
+              <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500 shadow-sm">
+                Đang hiển thị <span className="font-bold text-slate-950">{visiblePackages.length}</span> gói {vehicleLabels[selectedVehicle].toLowerCase()}
+              </div>
             </div>
 
             <section className="mx-auto grid max-w-6xl items-start gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
               <div>
-              {visiblePackages.length === 0 ? (
-                <div className="rounded-[26px] border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
-                  <SquareParking className="mx-auto mb-4 h-10 w-10 text-slate-300" />
-                  <h2 className="text-lg font-bold text-slate-700">
-                    Chưa có gói cho {vehicleLabels[selectedVehicle].toLowerCase()}
-                  </h2>
-                  <p className="mx-auto mt-2 max-w-sm text-sm text-slate-500">
-                    Hiện chưa có gói nào cho loại xe này. Vui lòng chọn loại xe khác hoặc quay lại sau.
-                  </p>
-                </div>
-              ) : (
-              <div className="grid justify-center gap-5 [grid-template-columns:repeat(auto-fit,minmax(260px,340px))]">
-                {visiblePackages.map((pkg, index) => {
-                  const selected = pkg.id === selectedPackageId;
-                  const savings = getSavings(pkg, packages);
-                  const Icon = pkg.vehicleType === 'car' ? Car : Motorbike;
+                {visiblePackages.length === 0 ? (
+                  <div className="rounded-[26px] border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
+                    <SquareParking className="mx-auto mb-4 h-10 w-10 text-slate-300" />
+                    <h2 className="text-lg font-bold text-slate-700">
+                      Chưa có gói cho {vehicleLabels[selectedVehicle].toLowerCase()}
+                    </h2>
+                    <p className="mx-auto mt-2 max-w-sm text-sm text-slate-500">
+                      Hiện chưa có gói nào cho loại xe này. Vui lòng chọn loại xe khác hoặc quay lại sau.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid justify-center gap-5 [grid-template-columns:repeat(auto-fit,minmax(260px,340px))]">
+                    {visiblePackages.map((pkg, index) => {
+                      const selected = pkg.id === selectedPackageId;
+                      const savings = getSavings(pkg, packages);
+                      const Icon = pkg.vehicleType === 'car' ? Car : Motorbike;
 
-                  return (
-                    <motion.button
-                      key={pkg.id}
-                      type="button"
-                      layout
-                      initial={{ opacity: 0, y: 18 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.28, delay: index * 0.05 }}
-                      onClick={() => handleSelectPackage(pkg)}
-                      className={cn(
-                        'group relative overflow-hidden rounded-[26px] border bg-white p-5 text-left shadow-[0_14px_30px_rgba(15,23,42,0.07)] transition',
-                        selected
-                          ? 'border-blue-500 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] ring-4 ring-blue-100'
-                          : 'border-slate-200 hover:-translate-y-1 hover:border-blue-300'
-                      )}
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
-                              {vehicleLabels[pkg.vehicleType]}
+                      return (
+                        <motion.button
+                          key={pkg.id}
+                          type="button"
+                          layout
+                          initial={{ opacity: 0, y: 18 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.28, delay: index * 0.05 }}
+                          onClick={() => handleSelectPackage(pkg)}
+                          className={cn(
+                            'group relative overflow-hidden rounded-[26px] border bg-white p-5 text-left shadow-[0_14px_30px_rgba(15,23,42,0.07)] transition',
+                            selected
+                              ? 'border-blue-500 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] ring-4 ring-blue-100'
+                              : 'border-slate-200 hover:-translate-y-1 hover:border-blue-300'
+                          )}
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
+                                  {vehicleLabels[pkg.vehicleType]}
+                                </span>
+                                <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
+                                  {pkg.durationDays} ngày
+                                </span>
+                                {savings > 0 && (
+                                  <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
+                                    Tiết kiệm {formatCurrency(savings)}
+                                  </span>
+                                )}
+                              </div>
+                              <h2 className="mt-4 text-xl font-black tracking-tight text-slate-950">{pkg.name}</h2>
+                              <p className="mt-2 min-h-[38px] text-sm font-light leading-6 text-slate-500">
+                                {pkg.description || `Gói gửi xe cư dân dành cho ${vehicleLabels[pkg.vehicleType].toLowerCase()}.`}
+                              </p>
+                            </div>
+
+                            <div className={cn(
+                              'flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl transition',
+                              pkg.vehicleType === 'car' ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600',
+                              selected && 'scale-110'
+                            )}>
+                              <Icon className="h-5 w-5" />
+                            </div>
+                          </div>
+
+                          <div className="mt-5 flex items-end gap-2">
+                            <span className="text-3xl font-black tracking-tight text-slate-950">
+                              {formatCurrency(pkg.price)}
                             </span>
-                            <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
-                              {pkg.durationDays} ngày
-                            </span>
-                            {savings > 0 && (
-                              <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
-                                Tiết kiệm {formatCurrency(savings)}
-                              </span>
+                            <span className="mb-2 text-sm font-light text-slate-500">/{pkg.durationDays} ngày</span>
+                          </div>
+                          <p className="mt-1 text-xs font-medium text-slate-400">
+                            ≈ {formatCurrency(Math.round(Number(pkg.price) / pkg.durationDays))}/ngày
+                          </p>
+
+                          <div className="mt-5 grid gap-2.5">
+                            {packageFeatures(pkg).map((feature) => (
+                              <div key={feature} className="flex items-center gap-3 text-sm text-slate-600">
+                                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-600">
+                                  <Check className="h-3.5 w-3.5 stroke-[3]" />
+                                </span>
+                                {feature}
+                              </div>
+                            ))}
+                          </div>
+
+                          <div className={cn(
+                            'mt-5 flex h-11 items-center justify-center rounded-2xl border text-sm font-bold transition',
+                            selected
+                              ? 'border-blue-600 bg-blue-600 text-white shadow-lg shadow-blue-600/25'
+                              : 'border-slate-200 bg-slate-50 text-slate-900 group-hover:border-blue-300 group-hover:text-blue-600'
+                          )}>
+                            {selected ? (
+                              <>
+                                <CheckCircle2 className="mr-2 h-4 w-4" />
+                                Đã chọn
+                              </>
+                            ) : (
+                              'Chọn gói'
                             )}
                           </div>
-                          <h2 className="mt-4 text-xl font-black tracking-tight text-slate-950">{pkg.name}</h2>
-                          <p className="mt-2 min-h-[38px] text-sm font-light leading-6 text-slate-500">
-                            {pkg.description || `Gói gửi xe cư dân dành cho ${vehicleLabels[pkg.vehicleType].toLowerCase()}.`}
-                          </p>
-                        </div>
+                        </motion.button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
 
-                        <div className={cn(
-                          'flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl transition',
-                          pkg.vehicleType === 'car' ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600',
-                          selected && 'scale-110'
-                        )}>
-                          <Icon className="h-5 w-5" />
-                        </div>
+              {selectedPackage && (
+                <aside className="lg:sticky lg:top-28 lg:self-start">
+                  <div className="rounded-[26px] border border-slate-200 bg-white p-4 shadow-[0_18px_38px_rgba(15,23,42,0.11)]">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-600">Thanh toán</p>
+                        <h3 className="mt-1 text-lg font-black text-slate-950">{isRenewal ? 'Hoàn tất gia hạn' : 'Hoàn tất đăng ký'}</h3>
                       </div>
-
-                      <div className="mt-5 flex items-end gap-2">
-                        <span className="text-3xl font-black tracking-tight text-slate-950">
-                          {formatCurrency(pkg.price)}
-                        </span>
-                        <span className="mb-2 text-sm font-light text-slate-500">/{pkg.durationDays} ngày</span>
+                      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+                        <ReceiptText className="h-5 w-5" />
                       </div>
-                      <p className="mt-1 text-xs font-medium text-slate-400">
-                        ≈ {formatCurrency(Math.round(Number(pkg.price) / pkg.durationDays))}/ngày
-                      </p>
+                    </div>
 
-                      <div className="mt-5 grid gap-2.5">
-                        {packageFeatures(pkg).map((feature) => (
-                          <div key={feature} className="flex items-center gap-3 text-sm text-slate-600">
-                            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-600">
-                              <Check className="h-3.5 w-3.5 stroke-[3]" />
+                    <div className="mb-3">
+                      <div className="relative grid grid-cols-3 gap-2">
+                        <div className="absolute left-[16%] right-[16%] top-4 h-0.5 bg-slate-200" />
+                        <div
+                          className="absolute left-[16%] top-4 h-0.5 bg-blue-500 transition-all"
+                          style={{ width: `${Math.max(0, steps.filter((step) => step.done).length - 1) * 34}%` }}
+                        />
+                        {steps.map((step, index) => (
+                          <div
+                            key={step.label}
+                            className={cn(
+                              'relative z-10 text-center text-[10px] font-bold transition',
+                              step.done ? 'text-blue-700' : 'text-slate-400'
+                            )}
+                          >
+                            <span className={cn(
+                              'mx-auto mb-1 flex h-8 w-8 items-center justify-center rounded-full border bg-white text-[10px] shadow-sm',
+                              step.done ? 'border-blue-300 text-blue-700' : 'border-slate-200 text-slate-400'
+                            )}>
+                              {step.done ? <Check className="h-3 w-3 stroke-[3]" /> : index + 1}
                             </span>
-                            {feature}
+                            {step.label}
                           </div>
                         ))}
                       </div>
-
-                      <div className={cn(
-                        'mt-5 flex h-11 items-center justify-center rounded-2xl border text-sm font-bold transition',
-                        selected
-                          ? 'border-blue-600 bg-blue-600 text-white shadow-lg shadow-blue-600/25'
-                          : 'border-slate-200 bg-slate-50 text-slate-900 group-hover:border-blue-300 group-hover:text-blue-600'
-                      )}>
-                        {selected ? (
-                          <>
-                            <CheckCircle2 className="mr-2 h-4 w-4" />
-                            Đã chọn
-                          </>
-                        ) : (
-                          'Chọn gói'
-                        )}
-                      </div>
-                    </motion.button>
-                  );
-                })}
-              </div>
-              )}
-            </div>
-
-            {selectedPackage && (
-              <aside className="lg:sticky lg:top-28 lg:self-start">
-                <div className="rounded-[26px] border border-slate-200 bg-white p-4 shadow-[0_18px_38px_rgba(15,23,42,0.11)]">
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-600">Thanh toán</p>
-                      <h3 className="mt-1 text-lg font-black text-slate-950">{isRenewal ? 'Hoàn tất gia hạn' : 'Hoàn tất đăng ký'}</h3>
                     </div>
-                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
-                      <ReceiptText className="h-5 w-5" />
-                    </div>
-                  </div>
 
-                  <div className="mb-3">
-                    <div className="relative grid grid-cols-3 gap-2">
-                      <div className="absolute left-[16%] right-[16%] top-4 h-0.5 bg-slate-200" />
-                      <div
-                        className="absolute left-[16%] top-4 h-0.5 bg-blue-500 transition-all"
-                        style={{ width: `${Math.max(0, steps.filter((step) => step.done).length - 1) * 34}%` }}
-                      />
-                      {steps.map((step, index) => (
-                        <div
-                          key={step.label}
-                          className={cn(
-                            'relative z-10 text-center text-[10px] font-bold transition',
-                            step.done ? 'text-blue-700' : 'text-slate-400'
-                          )}
-                        >
-                          <span className={cn(
-                            'mx-auto mb-1 flex h-8 w-8 items-center justify-center rounded-full border bg-white text-[10px] shadow-sm',
-                            step.done ? 'border-blue-300 text-blue-700' : 'border-slate-200 text-slate-400'
-                          )}>
-                            {step.done ? <Check className="h-3 w-3 stroke-[3]" /> : index + 1}
-                          </span>
-                          {step.label}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <label className="block">
-                      <span className="text-sm font-bold text-slate-700">Biển số xe</span>
-                      <input
-                        value={licensePlate}
-                        onChange={(event) => {
-                          setLicensePlate(event.target.value.toUpperCase());
-                          setSubmitError(null);
-                        }}
-                        placeholder="VD: 51A-12345"
-                        className={cn(
-                          'mt-2 h-11 w-full rounded-2xl border bg-slate-50 px-4 text-base font-bold tracking-widest text-slate-950 outline-none transition placeholder:text-slate-400 focus:bg-white',
-                          licensePlate && !plateValid ? 'border-red-300 focus:border-red-400' : 'border-slate-200 focus:border-blue-500'
-                        )}
-                      />
-                      <span className={cn(
-                        'mt-1.5 block text-xs',
-                        licensePlate && !plateValid ? 'text-red-500' : 'text-slate-400'
-                      )}>
-                        Gồm chữ, số và dấu gạch ngang, dài 4–20 ký tự.
-                      </span>
-                    </label>
-
-                    {plateValid && pendingPlateSub && (
-                      <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                        <div className="flex gap-2">
-                          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                          <div className="min-w-0 flex-1">
-                            <p className="font-bold">Biển số này đang có giao dịch chờ thanh toán.</p>
-                            <p className="mt-1 leading-5">
-                              Hãy hoàn tất giao dịch hiện tại trước khi mua gói khác. Gói đang chờ:
-                              {' '}
-                              <span className="font-bold">{pendingPlateSub.package?.name ?? `#${pendingPlateSub.packageId}`}</span>.
-                            </p>
-                            <div className="mt-3 flex flex-wrap items-center gap-2">
-                              <span className="rounded-full border border-amber-300 bg-white px-3 py-1 text-xs font-black text-amber-800">
-                                {pendingRemainingMs === null
-                                  ? 'Tự hủy sau khoảng 15 phút'
-                                  : pendingExpired
-                                    ? 'Đã hết 15 phút'
-                                    : `Còn ${formatRemaining(pendingRemainingMs)}`}
-                              </span>
-                              <span className="text-xs font-semibold text-amber-700">
-                                Sau 15 phút backend sẽ tự hủy, có thể cần thêm vài phút để job dọn chạy.
-                              </span>
+                    <div className="space-y-3">
+                      <label className="block">
+                        <span className="text-sm font-bold text-slate-700">Biển số xe</span>
+                        {availableVehicles.length === 0 ? (
+                          <div className="mt-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-800 leading-relaxed">
+                            Không tìm thấy {vehicleLabels[selectedPackage.vehicleType].toLowerCase()} nào chưa mua gói trong danh sách xe của bạn.
+                            <div className="mt-1">
+                              <Link to="/profile" className="font-bold text-blue-600 underline">
+                                Quản lý xe trong Hồ sơ cá nhân →
+                              </Link>
                             </div>
-                            {(pendingExpired || pendingRemainingMs === null) && (
-                              <button
-                                type="button"
-                                onClick={refreshSubscriptions}
-                                disabled={refreshingPending}
-                                className="mt-3 inline-flex h-9 items-center gap-2 rounded-xl border border-amber-300 bg-white px-3 text-xs font-bold text-amber-800 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
-                              >
-                                {refreshingPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-                                Kiểm tra lại
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {plateValid && activeOtherVehicleSub && selectedPackage && (
-                      <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                        <div className="flex gap-2">
-                          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                          <div>
-                            <p className="font-bold">Không thể mua gói khác loại xe cho cùng biển số.</p>
-                            <p className="mt-1 leading-5">
-                              Biển số này đang có gói {vehicleLabels[activeOtherVehicleSub.vehicleType].toLowerCase()} còn hạn đến
-                              {' '}
-                              <span className="font-bold">{formatDateOnly(activeOtherVehicleSub.endDate)}</span>.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {plateValid && activeSameVehicleSub && selectedPackage && !pendingPlateSub && (
-                      <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-                        <div className="flex gap-2">
-                          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
-                          <div>
-                            <p className="font-bold">Gia hạn gói hiện tại</p>
-                            <p className="mt-1 leading-5">
-                              Sau khi thanh toán, {selectedPackage.durationDays} ngày sẽ được cộng vào hạn hiện tại
-                              {' '}
-                              <span className="font-bold">{formatDateOnly(activeSameVehicleSub.endDate)}</span>.
-                              {activeSameVehicleSub.slot ? ` Ô ${activeSameVehicleSub.slot.slotCode} sẽ được giữ nguyên.` : ''}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {needsSlot && (
-                      <div>
-                        <div className="mb-2 flex items-center justify-between gap-3">
-                          <span className="text-sm font-bold text-slate-700">Ô cư dân</span>
-                          {slotsLoading && <Loader2 className="h-4 w-4 animate-spin text-blue-600" />}
-                        </div>
-
-                        {residentSlots.length === 0 && !slotsLoading ? (
-                          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
-                            Chưa có ô cư dân trống. Vui lòng kiểm tra cấu hình tầng/slot hoặc chọn gói xe máy.
                           </div>
                         ) : (
-                          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                            <div className="flex items-center gap-3">
-                              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-blue-600 shadow-sm">
-                                <SquareParking className={cn('h-5 w-5', selectedSlot && 'text-emerald-500')} />
-                              </span>
-                              <div className="min-w-0 flex-1">
-                                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
-                                  {selectedSlot ? 'Đã chọn' : 'Chưa chọn'}
-                                </p>
-                                <p className="mt-0.5 text-sm font-bold text-slate-950">
-                                  {selectedSlot ? selectedSlot.slotCode : `${residentSlots.length} ô trống`}
-                                </p>
-                                <p className="mt-0.5 text-[11px] text-slate-500">
-                                  {selectedSlot
-                                    ? `Tầng ${selectedSlot.floor?.floorNumber ?? '--'} · ${selectedSlot.floor?.building?.name ?? 'Resident'}`
-                                    : 'Mở danh sách để chọn ô phù hợp'}
-                                </p>
+                          <select
+                            value={licensePlate}
+                            onChange={(event) => {
+                              setLicensePlate(event.target.value);
+                              setSubmitError(null);
+                            }}
+                            className="mt-2 h-11 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold tracking-widest text-slate-950 outline-none transition focus:border-blue-500 focus:bg-white"
+                          >
+                            <option value="" className="tracking-normal font-sans">-- Chọn biển số xe của bạn --</option>
+                            {availableVehicles.map((vehicle) => (
+                              <option key={vehicle.id} value={vehicle.licensePlate}>
+                                {vehicle.licensePlate} {vehicle.nickname ? `(${vehicle.nickname})` : ''}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </label>
+
+                      {plateValid && pendingPlateSub && (
+                        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                          <div className="flex gap-2">
+                            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                            <div className="min-w-0 flex-1">
+                              <p className="font-bold">Biển số này đang có giao dịch chờ thanh toán.</p>
+                              <p className="mt-1 leading-5">
+                                Hãy hoàn tất giao dịch hiện tại trước khi mua gói khác. Gói đang chờ:
+                                {' '}
+                                <span className="font-bold">{pendingPlateSub.package?.name ?? `#${pendingPlateSub.packageId}`}</span>.
+                              </p>
+                              <div className="mt-3 flex flex-wrap items-center gap-2">
+                                <span className="rounded-full border border-amber-300 bg-white px-3 py-1 text-xs font-black text-amber-800">
+                                  {pendingRemainingMs === null
+                                    ? 'Tự hủy sau khoảng 15 phút'
+                                    : pendingExpired
+                                      ? 'Đã hết 15 phút'
+                                      : `Còn ${formatRemaining(pendingRemainingMs)}`}
+                                </span>
+                                <span className="text-xs font-semibold text-amber-700">
+                                  Sau 15 phút backend sẽ tự hủy, có thể cần thêm vài phút để job dọn chạy.
+                                </span>
                               </div>
-                              <button
-                                type="button"
-                                onClick={() => setSlotModalOpen(true)}
-                                disabled={slotsLoading}
-                                className="inline-flex h-9 shrink-0 items-center justify-center rounded-xl border border-blue-200 bg-white px-3 text-xs font-bold text-blue-700 transition hover:border-blue-400 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
-                              >
-                                {selectedSlot ? 'Đổi ô' : 'Chọn'}
-                              </button>
+                              {(pendingExpired || pendingRemainingMs === null) && (
+                                <button
+                                  type="button"
+                                  onClick={refreshSubscriptions}
+                                  disabled={refreshingPending}
+                                  className="mt-3 inline-flex h-9 items-center gap-2 rounded-xl border border-amber-300 bg-white px-3 text-xs font-bold text-amber-800 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  {refreshingPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                                  Kiểm tra lại
+                                </button>
+                              )}
                             </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {plateValid && activeOtherVehicleSub && selectedPackage && (
+                        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                          <div className="flex gap-2">
+                            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                            <div>
+                              <p className="font-bold">Không thể mua gói khác loại xe cho cùng biển số.</p>
+                              <p className="mt-1 leading-5">
+                                Biển số này đang có gói {vehicleLabels[activeOtherVehicleSub.vehicleType].toLowerCase()} còn hạn đến
+                                {' '}
+                                <span className="font-bold">{formatDateOnly(activeOtherVehicleSub.endDate)}</span>.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {plateValid && activeSameVehicleSub && selectedPackage && !pendingPlateSub && (
+                        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                          <div className="flex gap-2">
+                            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+                            <div>
+                              <p className="font-bold">Gia hạn gói hiện tại</p>
+                              <p className="mt-1 leading-5">
+                                Sau khi thanh toán, {selectedPackage.durationDays} ngày sẽ được cộng vào hạn hiện tại
+                                {' '}
+                                <span className="font-bold">{formatDateOnly(activeSameVehicleSub.endDate)}</span>.
+                                {activeSameVehicleSub.slot ? ` Ô ${activeSameVehicleSub.slot.slotCode} sẽ được giữ nguyên.` : ''}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {needsSlot && (
+                        <div>
+                          <div className="mb-2 flex items-center justify-between gap-3">
+                            <span className="text-sm font-bold text-slate-700">Ô cư dân</span>
+                            {slotsLoading && <Loader2 className="h-4 w-4 animate-spin text-blue-600" />}
+                          </div>
+
+                          {residentSlots.length === 0 && !slotsLoading ? (
+                            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+                              Chưa có ô cư dân trống. Vui lòng kiểm tra cấu hình tầng/slot hoặc chọn gói xe máy.
+                            </div>
+                          ) : (
+                            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                              <div className="flex items-center gap-3">
+                                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-blue-600 shadow-sm">
+                                  <SquareParking className={cn('h-5 w-5', selectedSlot && 'text-emerald-500')} />
+                                </span>
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+                                    {selectedSlot ? 'Đã chọn' : 'Chưa chọn'}
+                                  </p>
+                                  <p className="mt-0.5 text-sm font-bold text-slate-950">
+                                    {selectedSlot ? selectedSlot.slotCode : `${residentSlots.length} ô trống`}
+                                  </p>
+                                  <p className="mt-0.5 text-[11px] text-slate-500">
+                                    {selectedSlot
+                                      ? `Tầng ${selectedSlot.floor?.floorNumber ?? '--'} · ${selectedSlot.floor?.building?.name ?? 'Resident'}`
+                                      : 'Mở danh sách để chọn ô phù hợp'}
+                                  </p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setSlotModalOpen(true)}
+                                  disabled={slotsLoading}
+                                  className="inline-flex h-9 shrink-0 items-center justify-center rounded-xl border border-blue-200 bg-white px-3 text-xs font-bold text-blue-700 transition hover:border-blue-400 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  {selectedSlot ? 'Đổi ô' : 'Chọn'}
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mt-3 rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Gói đã chọn</p>
+                          <p className="mt-0.5 text-sm font-black text-slate-950">{selectedPackage.name}</p>
+                        </div>
+                        <ShieldCheck className="h-5 w-5 text-blue-500" />
+                      </div>
+
+                      <div className="mt-2 space-y-1.5 text-sm">
+                        <div className="flex justify-between gap-3">
+                          <span className="text-slate-500">Biển số</span>
+                          <span className="font-bold tracking-widest text-slate-950">{plate || '--'}</span>
+                        </div>
+                        <div className="flex justify-between gap-3">
+                          <span className="text-slate-500">Phương tiện</span>
+                          <span className="font-bold text-slate-950">{vehicleLabels[selectedPackage.vehicleType]}</span>
+                        </div>
+                        {selectedSlot && (
+                          <div className="flex justify-between gap-3">
+                            <span className="text-slate-500">Ô đỗ</span>
+                            <span className="font-bold text-emerald-600">{selectedSlot.slotCode}</span>
+                          </div>
+                        )}
+                        {!selectedSlot && activeSameVehicleSub?.slot && (
+                          <div className="flex justify-between gap-3">
+                            <span className="text-slate-500">Ô hiện tại</span>
+                            <span className="font-bold text-emerald-600">{activeSameVehicleSub.slot.slotCode}</span>
                           </div>
                         )}
                       </div>
+
+                      <div className="mt-2 flex items-end justify-between gap-3 border-t border-slate-200 pt-2">
+                        <span className="text-sm font-semibold text-slate-500">Thành tiền</span>
+                        <motion.span
+                          key={selectedPackage.id}
+                          initial={{ opacity: 0, y: 6 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="text-xl font-black text-blue-600"
+                        >
+                          {formatCurrency(selectedPackage.price)}
+                        </motion.span>
+                      </div>
+                    </div>
+
+                    {submitError && (
+                      <div className="mt-3 flex gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                        <span>{submitError}</span>
+                      </div>
                     )}
+
+                    <button
+                      onClick={handleBuy}
+                      disabled={submitting || loading || !readyForPayment}
+                      className="mt-3 inline-flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}
+                      {submitting ? 'Đang tạo giao dịch VNPay...' : isRenewal ? 'Thanh toán gia hạn qua VNPay' : 'Thanh toán qua VNPay'}
+                    </button>
                   </div>
-
-                  <div className="mt-3 rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Gói đã chọn</p>
-                        <p className="mt-0.5 text-sm font-black text-slate-950">{selectedPackage.name}</p>
-                      </div>
-                      <ShieldCheck className="h-5 w-5 text-blue-500" />
-                    </div>
-
-                    <div className="mt-2 space-y-1.5 text-sm">
-                      <div className="flex justify-between gap-3">
-                        <span className="text-slate-500">Biển số</span>
-                        <span className="font-bold tracking-widest text-slate-950">{plate || '--'}</span>
-                      </div>
-                      <div className="flex justify-between gap-3">
-                        <span className="text-slate-500">Phương tiện</span>
-                        <span className="font-bold text-slate-950">{vehicleLabels[selectedPackage.vehicleType]}</span>
-                      </div>
-                      {selectedSlot && (
-                        <div className="flex justify-between gap-3">
-                          <span className="text-slate-500">Ô đỗ</span>
-                          <span className="font-bold text-emerald-600">{selectedSlot.slotCode}</span>
-                        </div>
-                      )}
-                      {!selectedSlot && activeSameVehicleSub?.slot && (
-                        <div className="flex justify-between gap-3">
-                          <span className="text-slate-500">Ô hiện tại</span>
-                          <span className="font-bold text-emerald-600">{activeSameVehicleSub.slot.slotCode}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="mt-2 flex items-end justify-between gap-3 border-t border-slate-200 pt-2">
-                      <span className="text-sm font-semibold text-slate-500">Thành tiền</span>
-                      <motion.span
-                        key={selectedPackage.id}
-                        initial={{ opacity: 0, y: 6 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="text-xl font-black text-blue-600"
-                      >
-                        {formatCurrency(selectedPackage.price)}
-                      </motion.span>
-                    </div>
-                  </div>
-
-                  {submitError && (
-                    <div className="mt-3 flex gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                      <span>{submitError}</span>
-                    </div>
-                  )}
-
-                  <button
-                    onClick={handleBuy}
-                    disabled={submitting || loading || !readyForPayment}
-                    className="mt-3 inline-flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}
-                    {submitting ? 'Đang tạo giao dịch VNPay...' : isRenewal ? 'Thanh toán gia hạn qua VNPay' : 'Thanh toán qua VNPay'}
-                  </button>
-                </div>
-              </aside>
-            )}
-          </section>
+                </aside>
+              )}
+            </section>
           </>
         ) : null}
 
