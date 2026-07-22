@@ -44,8 +44,8 @@ function BookingContent() {
     <div className="min-h-screen bg-[#f8fbff] pt-28 text-slate-950"><main className="container mx-auto px-6 pb-20 md:px-12">
       <BookingHero eyebrow="Đặt chỗ vãng lai" title="Giữ lịch gửi ô tô và thanh toán trước qua VNPay" description="Nhập biển số, chọn khung giờ gửi xe, hệ thống sẽ tạo booking theo tầng ô tô vãng lai phù hợp." />
       <section className="mx-auto mt-12 grid max-w-6xl gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <BookingForm values={booking.values} onChange={booking.updateField} isAuthenticated={booking.isAuthenticated} hasActiveSubscriptions={booking.ownPlates.length > 0} isOutsideSubscription={!booking.ownPlates.includes(booking.plate)} plateValid={booking.plateValid} emailValid={booking.emailValid} phoneValid={booking.phoneValid} />
-        <BookingSummary plate={booking.plate} customerEmail={booking.values.customerEmail} durationHours={booking.durationHours} estimatedAmount={booking.estimatedAmount} previewHours={booking.previewHours} previewAmount={booking.previewAmount} breakdown={booking.feeBreakdown} submitError={booking.submitError} submitting={booking.submitting} ready={booking.ready} onSubmit={booking.submit} />
+        <BookingForm values={booking.values} onChange={booking.updateField} errors={booking.fieldErrors} isAuthenticated={booking.isAuthenticated} hasActiveSubscriptions={booking.ownPlates.length > 0} isOutsideSubscription={!booking.ownPlates.includes(booking.plate)} plateValid={booking.plateValid} />
+        <BookingSummary values={booking.values} plate={booking.plate} durationHours={booking.durationHours} estimatedAmount={booking.estimatedAmount} previewHours={booking.previewHours} previewAmount={booking.previewAmount} breakdown={booking.feeBreakdown} submitError={booking.submitError} submitting={booking.submitting} ready={booking.ready} onSubmit={booking.submit} />
       </section>
     </main></div>
   );
