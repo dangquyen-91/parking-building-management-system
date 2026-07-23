@@ -79,7 +79,7 @@ export function StaffSidebar() {
             <div>
               <p className="text-xs font-semibold text-slate-400">Cổng nhân viên</p>
               <p className="mt-0.5 text-[11px] text-slate-600">
-                F1-F4 để chuyển nhanh
+                "SHIFT + F1-F4" để chuyển nhanh
               </p>
             </div>
           </div>

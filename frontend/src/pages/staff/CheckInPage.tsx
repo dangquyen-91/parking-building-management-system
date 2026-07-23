@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Activity, Car, Clock, HelpCircle, Motorbike } from 'lucide-react';
 import { KioskLayout } from '../../components/kiosk/KioskLayout';
@@ -6,7 +6,10 @@ import { PlateSearchBar } from '../../components/kiosk/PlateSearchBar';
 import { LookupResultPanel } from '../../components/kiosk/LookupResultPanel';
 import { SuccessOverlay } from '../../components/kiosk/SuccessOverlay';
 import { useKioskHotkeys } from '../../hooks/useKioskHotkeys';
-import { lookupVehicle } from '../../services/kiosk.service';
+import { lookupVehicle, getSessions } from '../../services/kiosk.service';
+import { floorService } from '../../services/floor.service';
+import { slotService } from '../../services/slot.service';
+import { parkingRowService } from '../../services/parking-row.service';
 import type { LookupApiResponse } from '../../types/kiosk';
 
 interface SuccessData {
@@ -15,6 +18,15 @@ interface SuccessData {
   licensePlate: string;
   slotCode: string;
   entryTime: string;
+}
+
+function useCurrentTime() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  return now;
 }
 
 function InfoCard({ icon: Icon, label, value, tone = 'blue' }: {
@@ -56,6 +68,67 @@ export default function CheckInPage() {
   const [focusTrigger, setFocusTrigger] = useState(0);
   const [resultKey, setResultKey] = useState(0);
 
+  const [totalActive, setTotalActive] = useState<number | null>(null);
+  const [availableCar, setAvailableCar] = useState<number | null>(null);
+  const [availableMoto, setAvailableMoto] = useState<number | null>(null);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const currentTime = useCurrentTime();
+
+  const loadStats = useCallback(async () => {
+    try {
+      const [activeRes, floorRes] = await Promise.all([
+        getSessions({ status: 'active', limit: 1 }),
+        floorService.getFloors({ limit: 200, isActive: true }),
+      ]);
+
+      setTotalActive(activeRes?.pagination?.total ?? 0);
+
+      const floorList = floorRes.floors;
+      const occupancyResults = await Promise.allSettled(
+        floorList.map(async (floor) => {
+          if (floor.vehicleType === 'car') {
+            const slotsRes = await slotService.getSlots({ floorId: floor.id, limit: 200 });
+            const slots = slotsRes.slots;
+            const used = floor.floorType === 'resident'
+              ? slots.filter(s => s.status === 'occupied' || s.status === 'reserved').length
+              : (activeRes?.pagination?.total ?? 0);
+            const capacity = floor.totalSlots || slots.length || 0;
+            return { vehicleType: 'car' as const, available: Math.max(0, capacity - used) };
+          } else {
+            const { rows } = await parkingRowService.getRows({ floorId: floor.id, limit: 200 });
+            const used = rows.reduce((s, r) => s + r.occupiedCount, 0);
+            const capacity = rows.reduce((s, r) => s + r.capacity, 0);
+            return { vehicleType: 'motorcycle' as const, available: Math.max(0, capacity - used) };
+          }
+        })
+      );
+
+      let carAvail = 0;
+      let motoAvail = 0;
+      for (const r of occupancyResults) {
+        if (r.status === 'fulfilled') {
+          if (r.value.vehicleType === 'car') carAvail += r.value.available;
+          else motoAvail += r.value.available;
+        }
+      }
+      setAvailableCar(carAvail);
+      setAvailableMoto(motoAvail);
+    } catch (err) {
+      console.error('[CheckIn] loadStats error:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadStats();
+    pollingRef.current = setInterval(() => {
+      if (document.visibilityState === 'visible') loadStats();
+    }, 30_000);
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
+  }, [loadStats]);
+
   const handleClear = useCallback(() => {
     setPlate('');
     setLookupResult(null);
@@ -85,8 +158,9 @@ export default function CheckInPage() {
   const handleSuccess = useCallback(
     (sessionId: number, licensePlate: string, slotCode: string, entryTime: string) => {
       setSuccess({ type: 'checkin', sessionId, licensePlate, slotCode, entryTime });
+      loadStats();
     },
-    []
+    [loadStats]
   );
 
   const handleDismissSuccess = useCallback(() => {
@@ -98,6 +172,8 @@ export default function CheckInPage() {
     onEscape: handleClear,
     onCtrlL: handleClear,
   });
+
+  const clockDisplay = currentTime.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
   return (
     <KioskLayout
@@ -184,10 +260,10 @@ export default function CheckInPage() {
 
         <div className="space-y-5">
           <div className="grid grid-cols-2 gap-4">
-            <InfoCard icon={Activity} label="Phiên đang hoạt động" value="—" tone="blue" />
-            <InfoCard icon={Car} label="Chỗ ô tô còn trống" value={lookupResult?.availableSlots.car ?? '—'} tone="emerald" />
-            <InfoCard icon={Motorbike} label="Tổng chỗ xe máy còn trống" value={lookupResult?.availableSlots.motorcycle ?? '—'} tone="amber" />
-            <InfoCard icon={Clock} label="Thời gian hiện tại" value={new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} tone="purple" />
+            <InfoCard icon={Activity} label="Phiên đang hoạt động" value={totalActive ?? '…'} tone="blue" />
+            <InfoCard icon={Car} label="Chỗ ô tô còn trống" value={availableCar ?? '…'} tone="emerald" />
+            <InfoCard icon={Motorbike} label="Tổng chỗ xe máy còn trống" value={availableMoto ?? '…'} tone="amber" />
+            <InfoCard icon={Clock} label="Thời gian hiện tại" value={clockDisplay} tone="purple" />
           </div>
 
           <motion.div
