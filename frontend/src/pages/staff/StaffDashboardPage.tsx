@@ -4,11 +4,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Activity,
   Car,
+  Clock,
   LogIn,
   LogOut,
   Motorbike,
   RefreshCw,
-  TrendingUp,
   Zap,
 } from 'lucide-react';
 import {
@@ -30,22 +30,9 @@ import { useKioskHotkeys } from '../../hooks/useKioskHotkeys';
 import { cn, compareFloorCode } from '../../lib/utils';
 import { floorService, type Floor } from '../../services/floor.service';
 import { slotService } from '../../services/slot.service';
-import type { ActiveSessionApiItem, ParkingRowApiItem } from '../../types/kiosk';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
-
-function authHeaders() {
-  const token = localStorage.getItem('accessToken');
-  return { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
-}
-
-async function fetchRows(params?: Record<string, string>): Promise<ParkingRowApiItem[]> {
-  const q = new URLSearchParams({ limit: '200', ...params });
-  const res = await fetch(`${API_BASE_URL}/parking-rows?${q.toString()}`, { headers: authHeaders() });
-  const json = await res.json();
-  if (!res.ok || !json.success) throw new Error(json.message ?? 'Lỗi tải hàng xe');
-  return json.data as ParkingRowApiItem[];
-}
+import { getSessions } from '../../services/kiosk.service';
+import { parkingRowService } from '../../services/parking-row.service';
+import type { ActiveSessionApiItem } from '../../types/kiosk';
 
 const formatTime = (iso: string) =>
   new Date(iso).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
@@ -70,6 +57,15 @@ interface FloorOccupancy {
 }
 
 interface PeakPoint { hour: string; count: number }
+
+function useCurrentTime() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  return now;
+}
 
 function KpiCard({
   icon: Icon,
@@ -384,7 +380,7 @@ function ActiveSessionsSection({ sessions, loading }: { sessions: ActiveSessionA
           <table className="w-full min-w-[560px] text-sm">
             <thead>
               <tr className="border-b border-white/[0.06]">
-                {['Biển số', 'Loại xe', 'Giờ vào', 'Thời gian', 'Nhân viên', ''].map((h) => (
+                {['Biển số', 'Loại xe', 'Giờ vào', 'Thời gian', 'Nhân viên', 'Thao tác'].map((h) => (
                   <th key={h} className="pb-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-slate-600 first:pl-0 last:text-right">
                     {h}
                   </th>
@@ -440,6 +436,8 @@ export default function StaffDashboardPage() {
   const [sessions, setSessions] = useState<ActiveSessionApiItem[]>([]);
   const [totalActive, setTotalActive] = useState(0);
   const [completedToday, setCompletedToday] = useState(0);
+  const [availableCar, setAvailableCar] = useState(0);
+  const [availableMoto, setAvailableMoto] = useState(0);
   const [floors, setFloors] = useState<FloorOccupancy[]>([]);
   const [peakHours, setPeakHours] = useState<PeakPoint[]>([]);
   const [loading, setLoading] = useState(true);
@@ -448,21 +446,20 @@ export default function StaffDashboardPage() {
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const currentTime = useCurrentTime();
+
   useKioskHotkeys();
 
   const loadDashboard = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
       const [activeRes, completedRes, floorRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/parking-sessions?status=active&limit=200`, { headers: authHeaders() })
-          .then(r => r.json()),
-        (() => {
-          const todayStart = new Date();
-          todayStart.setHours(0, 0, 0, 0);
-          const params = new URLSearchParams({ status: 'completed', limit: '1' });
-          return fetch(`${API_BASE_URL}/parking-sessions?${params}`, { headers: authHeaders() })
-            .then(r => r.json());
-        })(),
+        getSessions({ status: 'active', limit: 100 }),
+        getSessions({
+          status: 'completed',
+          limit: 1,
+          startDate: (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.toISOString(); })(),
+        }),
         floorService.getFloors({ limit: 200, isActive: true }),
       ]);
 
@@ -492,7 +489,7 @@ export default function StaffDashboardPage() {
               pct: Math.round((used / capacity) * 100),
             };
           } else {
-            const rows = await fetchRows({ floorId: String(floor.id) });
+            const { rows } = await parkingRowService.getRows({ floorId: floor.id, limit: 200 });
             const used = rows.reduce((s, r) => s + r.occupiedCount, 0);
             const capacity = rows.reduce((s, r) => s + r.capacity, 0) || 1;
             return {
@@ -508,12 +505,22 @@ export default function StaffDashboardPage() {
           }
         })
       );
-      setFloors(
-        occupancyResults
-          .filter((r): r is PromiseFulfilledResult<FloorOccupancy> => r.status === 'fulfilled')
-          .map(r => r.value)
-          .sort((a, b) => compareFloorCode(a.floorNumber, b.floorNumber))
-      );
+
+      const resolvedFloors = occupancyResults
+        .filter((r): r is PromiseFulfilledResult<FloorOccupancy> => r.status === 'fulfilled')
+        .map(r => r.value)
+        .sort((a, b) => compareFloorCode(a.floorNumber, b.floorNumber));
+
+      setFloors(resolvedFloors);
+
+      const carAvail = resolvedFloors
+        .filter(f => f.vehicleType === 'car')
+        .reduce((sum, f) => sum + Math.max(0, f.capacity - f.used), 0);
+      const motoAvail = resolvedFloors
+        .filter(f => f.vehicleType === 'motorcycle')
+        .reduce((sum, f) => sum + Math.max(0, f.capacity - f.used), 0);
+      setAvailableCar(carAvail);
+      setAvailableMoto(motoAvail);
 
       const buckets = Array.from({ length: 24 }, (_, h) => ({ hour: `${h}h`, count: 0 }));
       activeSessions.forEach(s => {
@@ -523,7 +530,8 @@ export default function StaffDashboardPage() {
       setPeakHours(buckets.slice(5));
 
       setLastUpdated(new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
-    } catch {
+    } catch (err) {
+      console.error('[Dashboard] loadDashboard error:', err);
     } finally {
       if (!silent) setLoading(false);
     }
@@ -563,6 +571,8 @@ export default function StaffDashboardPage() {
   const motos = sessions.filter(s => s.vehicleType === 'motorcycle').length;
   const cars = sessions.filter(s => s.vehicleType === 'car').length;
 
+  const clockDisplay = currentTime.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
   return (
     <KioskLayout
       eyebrow="Staff Kiosk"
@@ -597,10 +607,10 @@ export default function StaffDashboardPage() {
       <div className="space-y-6">
 
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <KpiCard icon={Zap} label="Xe đang gửi" value={loading ? '…' : totalActive} sub="Đang trong bãi" tone="blue" delay={0} />
-          <KpiCard icon={Motorbike} label="Xe máy đang gửi" value={loading ? '…' : motos} sub={`${totalActive > 0 ? Math.round((motos / totalActive) * 100) : 0}% tổng xe`} tone="amber" delay={0.05} />
-          <KpiCard icon={Car} label="Ô tô đang gửi" value={loading ? '…' : cars} sub={`${totalActive > 0 ? Math.round((cars / totalActive) * 100) : 0}% tổng xe`} tone="cyan" delay={0.1} />
-          <KpiCard icon={TrendingUp} label="Đã checkout hôm nay" value={loading ? '…' : completedToday} sub="Phiên đã hoàn tất" tone="emerald" delay={0.15} />
+          <KpiCard icon={Zap} label="Phiên đang hoạt động" value={loading ? '…' : totalActive} sub="Đang trong bãi" tone="blue" delay={0} />
+          <KpiCard icon={Car} label="Chỗ ô tô còn trống" value={loading ? '…' : availableCar} sub={`${completedToday} xe đã checkout hôm nay`} tone="cyan" delay={0.05} />
+          <KpiCard icon={Motorbike} label="Tổng chỗ xe máy còn trống" value={loading ? '…' : availableMoto} sub={`${motos} xe máy đang gửi`} tone="amber" delay={0.1} />
+          <KpiCard icon={Clock} label="Thời gian hiện tại" value={clockDisplay} sub="Cập nhật mỗi giây" tone="emerald" delay={0.15} />
         </section>
 
         <div className="grid gap-6 sm:grid-cols-2">

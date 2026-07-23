@@ -21,10 +21,10 @@ import {
 } from 'lucide-react';
 import { KioskLayout } from '../../components/kiosk/KioskLayout';
 import { useKioskHotkeys } from '../../hooks/useKioskHotkeys';
-import { getSessions, checkOut } from '../../services/kiosk.service';
+import { getSessions, checkOut, getCheckoutPreview } from '../../services/kiosk.service';
 import { floorService, type Floor } from '../../services/floor.service';
 import { cn } from '../../lib/utils';
-import type { ActiveSessionApiItem, PaymentMethod } from '../../types/kiosk';
+import type { ActiveSessionApiItem, PaymentMethod, CheckoutPreviewApiResponse } from '../../types/kiosk';
 
 
 
@@ -115,8 +115,36 @@ interface CheckoutModalProps {
 
 function CheckoutModal({ session, locationLabel, onConfirm, onCancel, isSubmitting }: CheckoutModalProps) {
   const [method, setMethod] = useState<PaymentMethod>('cash');
+  const [preview, setPreview] = useState<CheckoutPreviewApiResponse | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+
+  // Fetch preview each time the modal opens for a new session
+  useEffect(() => {
+    if (!session) {
+      setPreview(null);
+      setPreviewError(null);
+      return;
+    }
+    let cancelled = false;
+    setPreviewLoading(true);
+    setPreviewError(null);
+    setPreview(null);
+    getCheckoutPreview(session.id)
+      .then((data) => { if (!cancelled) setPreview(data); })
+      .catch((err) => { if (!cancelled) setPreviewError(err instanceof Error ? err.message : 'Không lấy được giá tiền.'); })
+      .finally(() => { if (!cancelled) setPreviewLoading(false); });
+    return () => { cancelled = true; };
+  }, [session?.id]);
 
   if (!session) return null;
+
+  const isFree = preview?.covered === true;
+  const feeDisplay = preview
+    ? isFree
+      ? 'Miễn phí'
+      : formatVND(preview.fee)
+    : null;
 
   return (
     <AnimatePresence>
@@ -144,7 +172,7 @@ function CheckoutModal({ session, locationLabel, onConfirm, onCancel, isSubmitti
               <X className="h-4 w-4" />
             </button>
 
-
+            {/* Header */}
             <div className="mb-5 flex items-center gap-3">
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-500/20">
                 <LogOut className="h-6 w-6 text-orange-400" />
@@ -155,8 +183,8 @@ function CheckoutModal({ session, locationLabel, onConfirm, onCancel, isSubmitti
               </div>
             </div>
 
-
-            <div className="mb-5 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
+            {/* Vehicle Info */}
+            <div className="mb-4 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
               <p className="text-2xl font-black tracking-widest text-white mb-1">{session.licensePlate}</p>
               <div className="flex flex-wrap gap-2 text-xs">
                 <span className="rounded-full bg-blue-500/15 px-2.5 py-1 text-blue-300 font-semibold">
@@ -171,37 +199,86 @@ function CheckoutModal({ session, locationLabel, onConfirm, onCancel, isSubmitti
               </div>
             </div>
 
-
-            <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-slate-500">
-              Hình thức thanh toán
-            </p>
-            <div className="mb-5 grid gap-3 grid-cols-2">
-              {([
-                { value: 'cash' as PaymentMethod, icon: Banknote, label: 'Tiền mặt', desc: 'Thu tiền tại cổng' },
-                { value: 'vnpay' as PaymentMethod, icon: CreditCard, label: 'VNPay', desc: 'Cổng thanh toán QR' },
-              ] as const).map(({ value, icon: Icon, label, desc }) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setMethod(value)}
-                  disabled={isSubmitting}
-                  className={cn(
-                    'flex items-start gap-2.5 rounded-2xl border px-3.5 py-3 text-left transition-all text-sm',
-                    method === value
-                      ? 'border-blue-400/60 bg-blue-500/15 text-white'
-                      : 'border-white/10 bg-white/[0.03] text-slate-300 hover:border-blue-400/30'
-                  )}
-                >
-                  <Icon className={cn('mt-0.5 h-4 w-4 shrink-0', method === value ? 'text-blue-300' : 'text-slate-500')} />
-                  <span>
-                    <span className="block font-bold">{label}</span>
-                    <span className="block text-xs text-slate-500">{desc}</span>
-                  </span>
-                </button>
-              ))}
+            {/* Fee Preview Box */}
+            <div className="mb-5 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-500">Phí gửi xe (tại thời điểm này)</p>
+              {previewLoading ? (
+                <div className="flex items-center gap-2 text-slate-400">
+                  <Loader2 className="h-4 w-4 animate-spin text-blue-300" />
+                  <span className="text-sm">Đang tính phí...</span>
+                </div>
+              ) : previewError ? (
+                <div className="flex items-center gap-2 text-red-300 text-sm">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  <span>{previewError}</span>
+                </div>
+              ) : preview ? (
+                <div className="flex items-end justify-between gap-3">
+                  <div>
+                    <p className={cn(
+                      'text-3xl font-black leading-none',
+                      isFree ? 'text-emerald-400' : 'text-white'
+                    )}>
+                      {feeDisplay}
+                    </p>
+                    {isFree && (
+                      <p className="mt-1 text-xs text-emerald-400/80">
+                        {preview.coveredBy === 'subscription' ? 'Được bao bởi gói cư dân' : 'Được bao bởi booking'}
+                      </p>
+                    )}
+                    {!isFree && preview.breakdown && (
+                      <p className="mt-1 text-xs text-slate-500">
+                        {preview.durationMinutes < 60
+                          ? `${preview.durationMinutes} phút`
+                          : `${Math.floor(preview.durationMinutes / 60)} giờ ${preview.durationMinutes % 60} phút`}
+                        {preview.prepaidHours
+                          ? ` · Đã trả trước ${preview.prepaidHours}h`
+                          : ''}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/15">
+                    <WalletCards className="h-5 w-5 text-amber-300" />
+                  </div>
+                </div>
+              ) : null}
             </div>
 
+            {/* Payment Method */}
+            {(!preview?.covered) && (
+              <>
+                <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-slate-500">
+                  Hình thức thanh toán
+                </p>
+                <div className="mb-5 grid gap-3 grid-cols-2">
+                  {([
+                    { value: 'cash' as PaymentMethod, icon: Banknote, label: 'Tiền mặt', desc: 'Thu tiền tại cổng' },
+                    { value: 'vnpay' as PaymentMethod, icon: CreditCard, label: 'VNPay', desc: 'Cổng thanh toán QR' },
+                  ] as const).map(({ value, icon: Icon, label, desc }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setMethod(value)}
+                      disabled={isSubmitting}
+                      className={cn(
+                        'flex items-start gap-2.5 rounded-2xl border px-3.5 py-3 text-left transition-all text-sm',
+                        method === value
+                          ? 'border-blue-400/60 bg-blue-500/15 text-white'
+                          : 'border-white/10 bg-white/[0.03] text-slate-300 hover:border-blue-400/30'
+                      )}
+                    >
+                      <Icon className={cn('mt-0.5 h-4 w-4 shrink-0', method === value ? 'text-blue-300' : 'text-slate-500')} />
+                      <span>
+                        <span className="block font-bold">{label}</span>
+                        <span className="block text-xs text-slate-500">{desc}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
 
+            {/* Action Buttons */}
             <div className="flex gap-3">
               <button
                 type="button"
@@ -214,17 +291,19 @@ function CheckoutModal({ session, locationLabel, onConfirm, onCancel, isSubmitti
               <button
                 type="button"
                 onClick={() => onConfirm(method)}
-                disabled={isSubmitting}
+                disabled={isSubmitting || previewLoading}
                 className={cn(
                   'flex-[2] h-11 rounded-xl text-sm font-bold text-white transition flex items-center justify-center gap-2',
-                  'bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-500 hover:to-red-500',
-                  'shadow-lg shadow-orange-600/20 disabled:opacity-50'
+                  isFree
+                    ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-lg shadow-emerald-600/20'
+                    : 'bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-500 hover:to-red-500 shadow-lg shadow-orange-600/20',
+                  'disabled:opacity-50'
                 )}
               >
                 {isSubmitting ? (
                   <><Loader2 className="h-4 w-4 animate-spin" /> Đang xử lý...</>
                 ) : (
-                  <><LogOut className="h-4 w-4" /> Checkout ngay</>
+                  <><LogOut className="h-4 w-4" /> {isFree ? 'Checkout (Miễn phí)' : 'Thanh toán & Checkout'}</>
                 )}
               </button>
             </div>

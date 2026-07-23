@@ -112,7 +112,12 @@ function AlertItem({
   );
 }
 
-export default function DashboardPage() {
+interface DashboardPageProps {
+  basePath?: '/admin' | '/manager';
+  audience?: 'admin' | 'manager';
+}
+
+export default function DashboardPage({ basePath = '/admin', audience = 'admin' }: DashboardPageProps) {
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
@@ -270,7 +275,7 @@ export default function DashboardPage() {
             <ReportCard
               title="Phiên gửi xe đang hoạt động"
               hint="Các xe mới nhất đang ở trong bãi"
-              action={<Link to="/admin/parking-sessions" className="text-xs font-semibold text-blue-300 hover:text-blue-200">Xem tất cả</Link>}
+              action={<Link to={`${basePath}/parking-sessions`} className="text-xs font-semibold text-blue-300 hover:text-blue-200">Xem tất cả</Link>}
             >
               {sessions.loading && !sessions.data ? <ChartSkeleton height={220} /> : sessions.error ? <ErrorBox message={sessions.error} /> : activeSessions.length === 0 ? <EmptyState label="Không có phiên nào đang hoạt động" /> : (
                 <div className="overflow-x-auto">
@@ -303,7 +308,7 @@ export default function DashboardPage() {
             <ReportCard
               title="Booking gần đây"
               hint="Theo dõi trạng thái đặt chỗ mới nhất"
-              action={<Link to="/admin/bookings" className="text-xs font-semibold text-blue-300 hover:text-blue-200">Xem tất cả</Link>}
+              action={<Link to={`${basePath}/bookings`} className="text-xs font-semibold text-blue-300 hover:text-blue-200">Xem tất cả</Link>}
             >
               {bookings.loading && !bookings.data ? <ChartSkeleton height={220} /> : bookings.error ? <ErrorBox message={bookings.error} /> : recentBookings.length === 0 ? <EmptyState label="Chưa có đặt chỗ nào" /> : (
                 <div className="overflow-x-auto">
@@ -337,7 +342,7 @@ export default function DashboardPage() {
             </ReportCard>
           </section>
 
-          <ReportCard title="Doanh thu hôm nay" hint="Tách theo nguồn thu để admin đối soát nhanh">
+          <ReportCard title="Doanh thu hôm nay" hint={`Tách theo nguồn thu để ${audience === 'manager' ? 'quản lý' : 'admin'} đối soát nhanh`}>
             <div className="grid gap-3 md:grid-cols-3">
               <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
                 <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-300">

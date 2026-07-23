@@ -13,9 +13,11 @@ export interface BookingFormValues {
   note: string;
 }
 
-// Phải khớp backend/src/constants/pricing.js (car: mode 'hourly')
-export const CAR_HOUR_PRICE = 20_000;       // giá mỗi giờ ban ngày
-export const CAR_NIGHT_SURCHARGE = 10_000;  // phụ thu mỗi giờ khung đêm
+export type BookingFieldErrors = Partial<Record<keyof BookingFormValues, string>>;
+
+// Must match backend/src/constants/pricing.js (car: mode 'hourly')
+export const CAR_HOUR_PRICE = 20_000;       // daytime rate per hour
+export const CAR_NIGHT_SURCHARGE = 10_000;  // surcharge per night hour
 export const CAR_NIGHT_START = 22;          // 22:00
 export const CAR_NIGHT_END = 5;             // 05:00
 export const BOOKING_MAX_HOURS = 24;
@@ -26,7 +28,7 @@ const isNightHour = (hour: number) =>
     ? hour >= CAR_NIGHT_START && hour < CAR_NIGHT_END
     : hour >= CAR_NIGHT_START || hour < CAR_NIGHT_END;
 
-export const CAR_NIGHT_HOUR_PRICE = CAR_HOUR_PRICE + CAR_NIGHT_SURCHARGE; // giá 1 giờ đêm (đã gồm phụ thu)
+export const CAR_NIGHT_HOUR_PRICE = CAR_HOUR_PRICE + CAR_NIGHT_SURCHARGE; // total rate per night hour (includes surcharge)
 
 export interface CarFeeBreakdown {
   hours: number;
@@ -37,7 +39,7 @@ export interface CarFeeBreakdown {
   total: number;
 }
 
-/** Ước tính phí ô tô theo giờ + phụ thu đêm — khớp calcCarFeeHourly ở backend. */
+/** Estimates car parking fee by hour + night surcharge — matches calcCarFeeHourly on the backend. */
 export function carFeeBreakdown(startTime: string, durationHours: number): CarFeeBreakdown {
   const hours = Math.max(1, Math.ceil(durationHours || 0));
   let nightHours = 0;
@@ -72,6 +74,39 @@ function createDefaultWindow() {
 
 export const normalizePlate = (value: string) => value.toUpperCase().replace(/\s/g, '').trim();
 
+function validateBookingValues(values: BookingFormValues): BookingFieldErrors {
+  const errors: BookingFieldErrors = {};
+  const plate = normalizePlate(values.licensePlate);
+  const name = values.customerName.trim();
+  const phone = values.customerPhone.trim();
+  const email = values.customerEmail.trim();
+  const note = values.note.trim();
+  const start = new Date(values.startTime);
+  const now = Date.now();
+
+  if (!plate) errors.licensePlate = 'Vui lòng nhập biển số xe.';
+  else if (!platePattern.test(plate)) errors.licensePlate = 'Biển số chỉ gồm chữ, số, dấu gạch ngang và dài 4–20 ký tự.';
+
+  if (name && name.length < 2) errors.customerName = 'Tên khách hàng phải có ít nhất 2 ký tự.';
+  else if (name.length > 100) errors.customerName = 'Tên khách hàng không được vượt quá 100 ký tự.';
+
+  if (phone && !/^\d{9,15}$/.test(phone)) errors.customerPhone = 'Số điện thoại phải có 9–15 chữ số.';
+
+  if (!email) errors.customerEmail = 'Vui lòng nhập email để nhận xác nhận booking.';
+  else if (!emailPattern.test(email)) errors.customerEmail = 'Email không hợp lệ.';
+
+  if (!values.startTime || Number.isNaN(start.getTime())) errors.startTime = 'Vui lòng chọn thời gian bắt đầu hợp lệ.';
+  else if (start.getTime() <= now) errors.startTime = 'Thời gian bắt đầu phải ở tương lai.';
+  else if (start.getTime() > now + 24 * 60 * 60 * 1000) errors.startTime = 'Chỉ được đặt trước tối đa 24 giờ.';
+
+  if (!Number.isInteger(values.durationHours) || values.durationHours < 1 || values.durationHours > BOOKING_MAX_HOURS) {
+    errors.durationHours = `Thời lượng đặt chỗ phải từ 1 đến ${BOOKING_MAX_HOURS} giờ.`;
+  }
+
+  if (note.length > 500) errors.note = 'Ghi chú không được vượt quá 500 ký tự.';
+  return errors;
+}
+
 export function useBookingForm() {
   const { isAuthenticated, user } = useAuth();
   const [values, setValues] = useState<BookingFormValues>(() => {
@@ -92,7 +127,7 @@ export function useBookingForm() {
     let cancelled = false;
     profileService.getMySubscriptions('active').then((subscriptions) => {
       if (!cancelled) setOwnPlates(subscriptions.map((item) => normalizePlate(item.licensePlate)));
-    }).catch(() => {});
+    }).catch(() => { });
     return () => { cancelled = true; };
   }, [isAuthenticated]);
 
@@ -108,13 +143,14 @@ export function useBookingForm() {
   }, [user]);
 
   const plate = normalizePlate(values.licensePlate);
-  const plateValid = platePattern.test(plate);
-  const emailValid = emailPattern.test(values.customerEmail.trim());
-  const phoneValid = !values.customerPhone.trim() || /^\d{9,15}$/.test(values.customerPhone.trim());
+  const fieldErrors = validateBookingValues(values);
+  const plateValid = !fieldErrors.licensePlate;
+  const emailValid = !fieldErrors.customerEmail;
+  const phoneValid = !fieldErrors.customerPhone;
   const durationHours = values.durationHours;
   const feeBreakdown = carFeeBreakdown(values.startTime, durationHours);
   const estimatedAmount = feeBreakdown.total;
-  const ready = plateValid && emailValid && phoneValid && !submitting;
+  const ready = Object.keys(fieldErrors).length === 0 && !submitting;
 
   const updateField = <K extends keyof BookingFormValues>(field: K, value: BookingFormValues[K]) => {
     setValues((current) => ({ ...current, [field]: value }));
@@ -122,9 +158,8 @@ export function useBookingForm() {
   };
 
   const submit = async () => {
-    if (!plateValid) return setSubmitError('Biển số chỉ gồm chữ, số, dấu gạch ngang và dài 4-20 ký tự.');
-    if (!phoneValid) return setSubmitError('Số điện thoại phải có 9-15 chữ số.');
-    if (!emailValid) return setSubmitError('Email không hợp lệ. Vui lòng nhập email cá nhân để nhận xác nhận booking.');
+    const firstError = Object.values(fieldErrors)[0];
+    if (firstError) return setSubmitError(firstError);
     if (ownPlates.includes(plate)) return setSubmitError('Biển số này đã có gói cư dân đang hoạt động, bạn không cần đặt chỗ vãng lai.');
 
     setSubmitting(true);
@@ -148,6 +183,8 @@ export function useBookingForm() {
     }
   };
 
-  return { values, updateField, isAuthenticated, ownPlates, plate, plateValid, emailValid, phoneValid,
-    durationHours, estimatedAmount, feeBreakdown, ready, submitting, submitError, previewAmount, previewHours, submit };
+  return {
+    values, updateField, fieldErrors, isAuthenticated, ownPlates, plate, plateValid, emailValid, phoneValid,
+    durationHours, estimatedAmount, feeBreakdown, ready, submitting, submitError, previewAmount, previewHours, submit
+  };
 }
