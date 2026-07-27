@@ -58,7 +58,7 @@ const policies = [
     icon: ShieldAlert,
     title: "Hủy booking và hoàn tiền",
     description:
-      "Có thể hủy khi đang chờ hoặc đã xác nhận; booking đã thanh toán không được hoàn tiền.",
+      "Chỉ người dùng đã đăng nhập và sở hữu booking mới có thể hủy khi đang chờ hoặc đã xác nhận. Booking tạo khi chưa đăng nhập không thể tự hủy; booking đã thanh toán không được hoàn tiền.",
     iconClass: "bg-amber-100 text-amber-700",
   },
   {
