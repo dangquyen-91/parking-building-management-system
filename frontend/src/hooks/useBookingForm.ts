@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
-import { useAuth } from './useAuth';
-import { bookingService } from '../services/booking.service';
-import { profileService } from '../services/profile.service';
+import { useEffect, useState } from "react";
+import { useAuth } from "./useAuth";
+import { bookingService } from "../services/booking.service";
+import { profileService } from "../services/profile.service";
 
 export interface BookingFormValues {
   licensePlate: string;
@@ -13,15 +13,20 @@ export interface BookingFormValues {
   note: string;
 }
 
-export type BookingFieldErrors = Partial<Record<keyof BookingFormValues, string>>;
+export type BookingFieldErrors = Partial<
+  Record<keyof BookingFormValues, string>
+>;
 
 // Must match backend/src/constants/pricing.js (car: mode 'hourly')
-export const CAR_HOUR_PRICE = 20_000;       // daytime rate per hour
-export const CAR_NIGHT_SURCHARGE = 10_000;  // surcharge per night hour
-export const CAR_NIGHT_START = 22;          // 22:00
-export const CAR_NIGHT_END = 5;             // 05:00
+export const CAR_HOUR_PRICE = 20_000; // daytime rate per hour
+export const CAR_NIGHT_SURCHARGE = 10_000; // surcharge per night hour
+export const CAR_NIGHT_START = 22; // 22:00
+export const CAR_NIGHT_END = 5; // 05:00
 export const BOOKING_MAX_HOURS = 24;
-export const BOOKING_DURATION_OPTIONS = Array.from({ length: BOOKING_MAX_HOURS }, (_, i) => i + 1);
+export const BOOKING_DURATION_OPTIONS = Array.from(
+  { length: BOOKING_MAX_HOURS },
+  (_, i) => i + 1,
+);
 
 const isNightHour = (hour: number) =>
   CAR_NIGHT_START <= CAR_NIGHT_END
@@ -40,7 +45,10 @@ export interface CarFeeBreakdown {
 }
 
 /** Estimates car parking fee by hour + night surcharge — matches calcCarFeeHourly on the backend. */
-export function carFeeBreakdown(startTime: string, durationHours: number): CarFeeBreakdown {
+export function carFeeBreakdown(
+  startTime: string,
+  durationHours: number,
+): CarFeeBreakdown {
   const hours = Math.max(1, Math.ceil(durationHours || 0));
   let nightHours = 0;
   const cursor = new Date(startTime);
@@ -53,26 +61,38 @@ export function carFeeBreakdown(startTime: string, durationHours: number): CarFe
   const dayHours = hours - nightHours;
   const dayFee = dayHours * CAR_HOUR_PRICE;
   const nightFee = nightHours * CAR_NIGHT_HOUR_PRICE;
-  return { hours, dayHours, nightHours, dayFee, nightFee, total: dayFee + nightFee };
+  return {
+    hours,
+    dayHours,
+    nightHours,
+    dayFee,
+    nightFee,
+    total: dayFee + nightFee,
+  };
 }
 
-export function estimateCarFee(startTime: string, durationHours: number): number {
+export function estimateCarFee(
+  startTime: string,
+  durationHours: number,
+): number {
   return carFeeBreakdown(startTime, durationHours).total;
 }
 
 const platePattern = /^[A-Z0-9-]{4,20}$/;
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const pad = (value: number) => String(value).padStart(2, '0');
+const pad = (value: number) => String(value).padStart(2, "0");
 
 function createDefaultWindow() {
-  const format = (date: Date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  const format = (date: Date) =>
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
   const start = new Date();
   start.setMinutes(0, 0, 0);
   start.setHours(start.getHours() + 2);
   return { startTime: format(start) };
 }
 
-export const normalizePlate = (value: string) => value.toUpperCase().replace(/\s/g, '').trim();
+export const normalizePlate = (value: string) =>
+  value.toUpperCase().replace(/\s/g, "").trim();
 
 function validateBookingValues(values: BookingFormValues): BookingFieldErrors {
   const errors: BookingFieldErrors = {};
@@ -84,26 +104,40 @@ function validateBookingValues(values: BookingFormValues): BookingFieldErrors {
   const start = new Date(values.startTime);
   const now = Date.now();
 
-  if (!plate) errors.licensePlate = 'Vui lòng nhập biển số xe.';
-  else if (!platePattern.test(plate)) errors.licensePlate = 'Biển số chỉ gồm chữ, số, dấu gạch ngang và dài 4–20 ký tự.';
+  if (!plate) errors.licensePlate = "Vui lòng nhập biển số xe.";
+  else if (!platePattern.test(plate))
+    errors.licensePlate =
+      "Biển số chỉ gồm chữ, số, dấu gạch ngang và dài 4–20 ký tự.";
 
-  if (name && name.length < 2) errors.customerName = 'Tên khách hàng phải có ít nhất 2 ký tự.';
-  else if (name.length > 100) errors.customerName = 'Tên khách hàng không được vượt quá 100 ký tự.';
+  if (name && name.length < 2)
+    errors.customerName = "Tên khách hàng phải có ít nhất 2 ký tự.";
+  else if (name.length > 100)
+    errors.customerName = "Tên khách hàng không được vượt quá 100 ký tự.";
 
-  if (phone && !/^\d{9,15}$/.test(phone)) errors.customerPhone = 'Số điện thoại phải có 9–15 chữ số.';
+  if (phone && !/^\d{9,15}$/.test(phone))
+    errors.customerPhone = "Số điện thoại phải có 9–15 chữ số.";
 
-  if (!email) errors.customerEmail = 'Vui lòng nhập email để nhận xác nhận booking.';
-  else if (!emailPattern.test(email)) errors.customerEmail = 'Email không hợp lệ.';
+  if (!email)
+    errors.customerEmail = "Vui lòng nhập email để nhận xác nhận booking.";
+  else if (!emailPattern.test(email))
+    errors.customerEmail = "Email không hợp lệ.";
 
-  if (!values.startTime || Number.isNaN(start.getTime())) errors.startTime = 'Vui lòng chọn thời gian bắt đầu hợp lệ.';
-  else if (start.getTime() <= now) errors.startTime = 'Thời gian bắt đầu phải ở tương lai.';
-  else if (start.getTime() > now + 24 * 60 * 60 * 1000) errors.startTime = 'Chỉ được đặt trước tối đa 24 giờ.';
+  if (!values.startTime || Number.isNaN(start.getTime()))
+    errors.startTime = "Vui lòng chọn thời gian bắt đầu hợp lệ.";
+  else if (start.getTime() <= now)
+    errors.startTime = "Thời gian bắt đầu phải ở tương lai.";
+  else if (start.getTime() > now + 24 * 60 * 60 * 1000)
+    errors.startTime = "Chỉ được đặt trước tối đa 24 giờ.";
 
-  if (!Number.isInteger(values.durationHours) || values.durationHours < 1 || values.durationHours > BOOKING_MAX_HOURS) {
+  if (
+    !Number.isInteger(values.durationHours) ||
+    values.durationHours < 1 ||
+    values.durationHours > BOOKING_MAX_HOURS
+  ) {
     errors.durationHours = `Thời lượng đặt chỗ phải từ 1 đến ${BOOKING_MAX_HOURS} giờ.`;
   }
 
-  if (note.length > 500) errors.note = 'Ghi chú không được vượt quá 500 ký tự.';
+  if (note.length > 500) errors.note = "Ghi chú không được vượt quá 500 ký tự.";
   return errors;
 }
 
@@ -112,8 +146,13 @@ export function useBookingForm() {
   const [values, setValues] = useState<BookingFormValues>(() => {
     const defaultWindow = createDefaultWindow();
     return {
-      licensePlate: '', customerName: user?.fullName ?? '', customerPhone: user?.phone ?? '',
-      customerEmail: user?.email ?? '', startTime: defaultWindow.startTime, durationHours: 2, note: '',
+      licensePlate: "",
+      customerName: user?.fullName ?? "",
+      customerPhone: user?.phone ?? "",
+      customerEmail: user?.email ?? "",
+      startTime: defaultWindow.startTime,
+      durationHours: 2,
+      note: "",
     };
   });
   const [submitting, setSubmitting] = useState(false);
@@ -125,20 +164,32 @@ export function useBookingForm() {
   useEffect(() => {
     if (!isAuthenticated) return;
     let cancelled = false;
-    profileService.getMySubscriptions('active').then((subscriptions) => {
-      if (!cancelled) setOwnPlates(subscriptions.map((item) => normalizePlate(item.licensePlate)));
-    }).catch(() => { });
-    return () => { cancelled = true; };
+    profileService
+      .getMySubscriptions("active")
+      .then((subscriptions) => {
+        if (!cancelled)
+          setOwnPlates(
+            subscriptions.map((item) => normalizePlate(item.licensePlate)),
+          );
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, [isAuthenticated]);
 
   useEffect(() => {
     if (!user) return;
-    const timeoutId = window.setTimeout(() => setValues((current) => ({
-      ...current,
-      customerName: current.customerName || user.fullName || '',
-      customerPhone: current.customerPhone || user.phone || '',
-      customerEmail: current.customerEmail || user.email || '',
-    })), 0);
+    const timeoutId = window.setTimeout(
+      () =>
+        setValues((current) => ({
+          ...current,
+          customerName: current.customerName || user.fullName || "",
+          customerPhone: current.customerPhone || user.phone || "",
+          customerEmail: current.customerEmail || user.email || "",
+        })),
+      0,
+    );
     return () => window.clearTimeout(timeoutId);
   }, [user]);
 
@@ -152,7 +203,10 @@ export function useBookingForm() {
   const estimatedAmount = feeBreakdown.total;
   const ready = Object.keys(fieldErrors).length === 0 && !submitting;
 
-  const updateField = <K extends keyof BookingFormValues>(field: K, value: BookingFormValues[K]) => {
+  const updateField = <K extends keyof BookingFormValues>(
+    field: K,
+    value: BookingFormValues[K],
+  ) => {
     setValues((current) => ({ ...current, [field]: value }));
     setSubmitError(null);
   };
@@ -160,7 +214,10 @@ export function useBookingForm() {
   const submit = async () => {
     const firstError = Object.values(fieldErrors)[0];
     if (firstError) return setSubmitError(firstError);
-    if (ownPlates.includes(plate)) return setSubmitError('Biển số này đã có gói cư dân đang hoạt động, bạn không cần đặt chỗ vãng lai.');
+    if (ownPlates.includes(plate))
+      return setSubmitError(
+        "Biển số này đã có gói cư dân đang hoạt động, bạn không cần đặt chỗ vãng lai.",
+      );
 
     setSubmitting(true);
     setSubmitError(null);
@@ -178,13 +235,31 @@ export function useBookingForm() {
       setPreviewHours(result.prepaidHours);
       window.location.href = result.paymentUrl;
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : 'Không thể tạo đặt chỗ.');
+      setSubmitError(
+        error instanceof Error ? error.message : "Không thể tạo đặt chỗ.",
+      );
       setSubmitting(false);
     }
   };
 
   return {
-    values, updateField, fieldErrors, isAuthenticated, ownPlates, plate, plateValid, emailValid, phoneValid,
-    durationHours, estimatedAmount, feeBreakdown, ready, submitting, submitError, previewAmount, previewHours, submit
+    values,
+    updateField,
+    fieldErrors,
+    isAuthenticated,
+    ownPlates,
+    plate,
+    plateValid,
+    emailValid,
+    phoneValid,
+    durationHours,
+    estimatedAmount,
+    feeBreakdown,
+    ready,
+    submitting,
+    submitError,
+    previewAmount,
+    previewHours,
+    submit,
   };
 }
