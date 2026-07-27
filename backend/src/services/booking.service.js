@@ -159,6 +159,7 @@ export const createBooking = async ({ body, requester, ipAddr }) => {
           licensePlate: plate,
           status: { [Op.in]: ['pending', 'confirmed'] },
           endTime: { [Op.gt]: new Date() },
+          sessionId: null, // booking đã check-in (có session) không còn "giữ chỗ" → cho đặt lại
         },
         transaction: t,
       });
