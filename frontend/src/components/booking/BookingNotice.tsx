@@ -10,7 +10,7 @@ import {
   ReceiptText,
   ShieldAlert,
   ArrowRight,
-} from 'lucide-react';
+} from "lucide-react";
 
 interface BookingNoticeProps {
   acceptanceRequired?: boolean;
@@ -22,57 +22,65 @@ interface BookingNoticeProps {
 const policies = [
   {
     icon: Car,
-    title: 'Dành cho ô tô vãng lai',
-    description: 'Thời gian bắt đầu phải ở tương lai và chỉ được đặt trước tối đa 24 giờ.',
-    iconClass: 'bg-sky-100 text-sky-700',
+    title: "Dành cho ô tô vãng lai",
+    description:
+      "Thời gian bắt đầu phải ở tương lai và chỉ được đặt trước tối đa 24 giờ.",
+    iconClass: "bg-sky-100 text-sky-700",
   },
   {
     icon: Hourglass,
-    title: 'Tối thiểu 1 giờ',
-    description: 'Mỗi booking phải có thời lượng gửi xe từ 1 giờ trở lên.',
-    iconClass: 'bg-cyan-100 text-cyan-700',
+    title: "Tối thiểu 1 giờ",
+    description: "Mỗi booking phải có thời lượng gửi xe từ 1 giờ trở lên.",
+    iconClass: "bg-cyan-100 text-cyan-700",
   },
   {
     icon: Clock3,
-    title: 'Thanh toán trong 15 phút',
-    description: 'Booking chỉ được xác nhận sau khi giao dịch VNPay thành công.',
-    iconClass: 'bg-blue-100 text-blue-700',
+    title: "Thanh toán trong 15 phút",
+    description:
+      "Booking chỉ được xác nhận sau khi giao dịch VNPay thành công.",
+    iconClass: "bg-blue-100 text-blue-700",
   },
   {
     icon: ReceiptText,
-    title: 'Một booking cho mỗi biển số',
-    description: 'Mỗi biển số chỉ được có một booking đang chờ thanh toán hoặc đã xác nhận.',
-    iconClass: 'bg-indigo-100 text-indigo-700',
+    title: "Một booking cho mỗi biển số",
+    description:
+      "Mỗi biển số chỉ được có một booking đang chờ thanh toán hoặc đã xác nhận.",
+    iconClass: "bg-indigo-100 text-indigo-700",
   },
   {
     icon: CalendarClock,
-    title: 'Đến sớm tối đa 30 phút',
-    description: 'Sau giờ kết thúc, booking sẽ hết hiệu lực nếu xe chưa vào bãi.',
-    iconClass: 'bg-emerald-100 text-emerald-700',
+    title: "Đến sớm tối đa 30 phút",
+    description:
+      "Sau giờ kết thúc, booking sẽ hết hiệu lực nếu xe chưa vào bãi.",
+    iconClass: "bg-emerald-100 text-emerald-700",
   },
   {
     icon: ShieldAlert,
-    title: 'Hủy booking và hoàn tiền',
-    description: 'Có thể hủy khi đang chờ hoặc đã xác nhận; booking đã thanh toán không được hoàn tiền.',
-    iconClass: 'bg-amber-100 text-amber-700',
+    title: "Hủy booking và hoàn tiền",
+    description:
+      "Có thể hủy khi đang chờ hoặc đã xác nhận; booking đã thanh toán không được hoàn tiền.",
+    iconClass: "bg-amber-100 text-amber-700",
   },
   {
     icon: BadgeDollarSign,
-    title: 'Phí gửi xe vượt giờ',
-    description: 'Thời gian vượt quá số giờ trả trước được tính theo giá xe vãng lai.',
-    iconClass: 'bg-violet-100 text-violet-700',
+    title: "Phí gửi xe vượt giờ",
+    description:
+      "Thời gian vượt quá số giờ trả trước được tính theo giá xe vãng lai.",
+    iconClass: "bg-violet-100 text-violet-700",
   },
   {
     icon: CircleParking,
-    title: 'Phụ thuộc sức chứa của bãi',
-    description: 'Booking chỉ được tiếp nhận khi khu vực xe vãng lai còn ít nhất 10 chỗ trống.',
-    iconClass: 'bg-orange-100 text-orange-700',
+    title: "Phụ thuộc sức chứa của bãi",
+    description:
+      "Booking chỉ được tiếp nhận khi khu vực xe vãng lai còn ít nhất 10 chỗ trống.",
+    iconClass: "bg-orange-100 text-orange-700",
   },
   {
     icon: Ban,
-    title: 'Không áp dụng cho gói cư dân',
-    description: 'Biển số có gói cư dân đang hoạt động không cần và không được booking vãng lai.',
-    iconClass: 'bg-rose-100 text-rose-700',
+    title: "Không áp dụng cho gói cư dân",
+    description:
+      "Biển số có gói cư dân đang hoạt động không cần và không được booking vãng lai.",
+    iconClass: "bg-rose-100 text-rose-700",
   },
 ] as const;
 
@@ -93,8 +101,13 @@ export function BookingNotice({
             <ShieldAlert className="h-5 w-5" />
           </div>
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-600">Chính sách người dùng</p>
-            <h2 id="booking-policy-title" className="mt-0.5 text-lg font-black text-slate-950">
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-600">
+              Chính sách người dùng
+            </p>
+            <h2
+              id="booking-policy-title"
+              className="mt-0.5 text-lg font-black text-slate-950"
+            >
               Lưu ý trước khi booking
             </h2>
           </div>
@@ -107,12 +120,19 @@ export function BookingNotice({
 
       <div className="grid gap-px bg-slate-200 sm:grid-cols-2 xl:grid-cols-3">
         {policies.map(({ icon: Icon, title, description, iconClass }) => (
-          <article key={title} className="bg-white p-5 transition-colors hover:bg-slate-50 md:p-6">
-            <div className={`flex h-10 w-10 items-center justify-center rounded-2xl ${iconClass}`}>
+          <article
+            key={title}
+            className="bg-white p-5 transition-colors hover:bg-slate-50 md:p-6"
+          >
+            <div
+              className={`flex h-10 w-10 items-center justify-center rounded-2xl ${iconClass}`}
+            >
               <Icon className="h-5 w-5" />
             </div>
             <h3 className="mt-4 text-sm font-black text-slate-900">{title}</h3>
-            <p className="mt-1.5 text-sm font-medium leading-6 text-slate-500">{description}</p>
+            <p className="mt-1.5 text-sm font-medium leading-6 text-slate-500">
+              {description}
+            </p>
           </article>
         ))}
       </div>
@@ -127,7 +147,8 @@ export function BookingNotice({
               className="mt-0.5 h-5 w-5 shrink-0 accent-blue-600"
             />
             <span>
-              Tôi đã đọc, hiểu và đồng ý tuân thủ toàn bộ chính sách booking ở trên.
+              Tôi đã đọc, hiểu và đồng ý tuân thủ toàn bộ chính sách booking ở
+              trên.
             </span>
           </label>
 
