@@ -39,7 +39,7 @@ export default function BookingsTab({ from, to }: { from: string; to: string }) 
           sub="Đã xác nhận, đã qua giờ kết thúc, nhưng chưa check-in"
         />
         <StatCard
-          icon={KeyRound} tone="green" label="Thuê bao đang hoạt động"
+          icon={KeyRound} tone="green" label="Người dùng gói đang hoạt động"
           value={s ? fmtNum(s.activeByPlan.reduce((a, p) => a + p.count, 0)) : '...'}
           sub={s ? <>Sắp hết hạn (7 ngày): <b className="text-amber-300">{fmtNum(s.expiringIn7Days)}</b></> : undefined}
         />
@@ -48,7 +48,7 @@ export default function BookingsTab({ from, to }: { from: string; to: string }) 
       {s && s.expiringIn7Days > 0 && (
         <div className="flex items-center gap-3 rounded-2xl border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
           <AlertTriangle className="h-4 w-4 shrink-0" />
-          <span><b className="text-white">{fmtNum(s.expiringIn7Days)} thuê bao</b> sẽ hết hạn trong 7 ngày tới. Nên gửi nhắc gia hạn.</span>
+          <span><b className="text-white">{fmtNum(s.expiringIn7Days)} người dùng gói</b> sẽ hết hạn trong 7 ngày tới. Nên gửi nhắc gia hạn.</span>
         </div>
       )}
 
@@ -66,7 +66,7 @@ export default function BookingsTab({ from, to }: { from: string; to: string }) 
       </ReportCard>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <ReportCard title="Gói thuê bao đang dùng" hint="Số thuê bao active theo gói">
+        <ReportCard title="Gói đang được sử dụng" hint="Số người dùng đang hoạt động theo gói">
           {subs.loading ? <ChartSkeleton height={180} /> : subs.error ? <ErrorBox message={subs.error} /> : !s || s.activeByPlan.length === 0 ? <EmptyState /> : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -89,7 +89,7 @@ export default function BookingsTab({ from, to }: { from: string; to: string }) 
           )}
         </ReportCard>
 
-        <ReportCard title="Đăng ký thuê bao mới" hint="Theo ngày trong kỳ">
+        <ReportCard title="Đăng ký gói mới" hint="Theo ngày trong kỳ">
           {subs.loading ? <ChartSkeleton height={180} /> : subs.error ? <ErrorBox message={subs.error} /> : !s || s.newSubscriptionsDaily.length === 0 ? <EmptyState /> : (
             <ResponsiveContainer width="100%" height={200}>
               <LineChart data={newSubsChart} margin={{ top: 6, right: 8, left: 0, bottom: 0 }}>

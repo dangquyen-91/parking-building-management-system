@@ -22,6 +22,6 @@ router.post('/', authorize('admin', 'manager'), validate(createParkingSlotSchema
 router.post('/bulk', authorize('admin', 'manager'), validate(bulkCreateParkingSlotSchema), parkingSlotController.bulkCreate);
 router.patch('/:id', authorize('admin', 'manager'), validate(updateParkingSlotSchema), parkingSlotController.update);
 
-router.delete('/:id', authorize('admin'), parkingSlotController.remove);
+router.delete('/:id', authorize('admin', 'manager'), parkingSlotController.remove);
 
 export default router;

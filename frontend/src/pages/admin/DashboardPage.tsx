@@ -361,7 +361,7 @@ export default function DashboardPage({ basePath = '/admin', audience = 'admin' 
               <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
                 <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-300">
                   <ShieldCheck className="h-4 w-4 text-purple-300" />
-                  Thuê bao
+                  Người dùng gói
                 </div>
                 <p className="text-2xl font-bold text-white tabular-nums">{s ? fmtShort(s.revenueToday.fromSubscriptions) : '...'}</p>
               </div>

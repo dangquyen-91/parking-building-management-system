@@ -69,6 +69,8 @@ export interface Booking {
 
 export interface BookingListParams {
   status?: BookingStatus;
+  floorId?: number;
+  holding?: boolean;
   licensePlate?: string;
   startDate?: string;
   endDate?: string;
@@ -89,6 +91,16 @@ export interface BookingListResult {
 export interface ExpireBookingsResult {
   pendingCancelled: number;
   expired: number;
+}
+
+export interface BookingAvailability {
+  floor: { id: number; floorNumber: string };
+  total: number;
+  activeSessions: number;
+  heldByBookings: number;
+  available: number;
+  minimumFree: number;
+  acceptingBookings: boolean;
 }
 
 async function parseDataResponse<T>(response: Response): Promise<T> {
@@ -112,6 +124,11 @@ function jsonHeaders(requireAuth = false) {
 }
 
 export const bookingService = {
+  async getAvailability(): Promise<BookingAvailability> {
+    const response = await fetch(`${API_BASE_URL}/bookings/availability`);
+    return parseDataResponse<BookingAvailability>(response);
+  },
+
   async createBooking(payload: BookingCreatePayload): Promise<BookingCreateResult> {
     const response = await fetch(`${API_BASE_URL}/bookings`, {
       method: 'POST',
@@ -137,6 +154,8 @@ export const bookingService = {
     query.set('page', String(params.page ?? 1));
     query.set('limit', String(params.limit ?? 10));
     if (params.status) query.set('status', params.status);
+    if (params.floorId) query.set('floorId', String(params.floorId));
+    if (params.holding !== undefined) query.set('holding', String(params.holding));
     if (params.licensePlate) {
       query.set('licensePlate', params.licensePlate.toUpperCase().replace(/\s/g, '').trim());
     }
