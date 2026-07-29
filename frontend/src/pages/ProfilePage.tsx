@@ -33,10 +33,14 @@ import {
   profileService,
   type MySubscription,
   type MyVehicle,
-  type VehiclePayload,
 } from '../services/profile.service';
 import type { UserProfile } from '../services/auth.service';
 import { authService } from '../services/auth.service';
+import {
+  getLicensePlateError,
+  isLicensePlateValid,
+  normalizeLicensePlate,
+} from '../utils/license-plate';
 
 const formatDate = (iso: string | null) =>
   iso
@@ -253,21 +257,37 @@ function VehicleModal({
 }) {
   const isEdit = !!initial;
   const [plate, setPlate] = useState(initial?.licensePlate ?? '');
+  const [plateTouched, setPlateTouched] = useState(false);
   const [type, setType] = useState<'car' | 'motorcycle'>(initial?.vehicleType ?? 'car');
   const [nickname, setNickname] = useState(initial?.nickname ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const normalizedPlate = normalizeLicensePlate(plate);
+  const plateError = !isEdit && plateTouched ? getLicensePlateError(plate) : null;
 
   const handleSave = async () => {
-    const trimmedPlate = plate.trim().toUpperCase();
-    if (!trimmedPlate) { setError('Vui lòng nhập biển số xe.'); return; }
+    if (!isEdit) {
+      setPlateTouched(true);
+      const validationError = getLicensePlateError(plate);
+      if (validationError) {
+        setError(null);
+        return;
+      }
+    }
+
     setSaving(true);
     setError(null);
     try {
-      const payload: VehiclePayload = { licensePlate: trimmedPlate, vehicleType: type, nickname: nickname.trim() || undefined };
       const result = isEdit
-        ? await profileService.updateVehicle(initial!.id, payload)
-        : await profileService.addVehicle(payload);
+        ? await profileService.updateVehicle(initial!.id, {
+          vehicleType: type,
+          nickname: nickname.trim() || undefined,
+        })
+        : await profileService.addVehicle({
+          licensePlate: normalizedPlate,
+          vehicleType: type,
+          nickname: nickname.trim() || undefined,
+        });
       onSaved(result);
       onClose();
     } catch (err) {
@@ -312,11 +332,28 @@ function VehicleModal({
             </label>
             <input
               value={plate}
-              onChange={e => setPlate(e.target.value.toUpperCase())}
-              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold uppercase tracking-widest text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              onChange={(event) => {
+                setPlate(normalizeLicensePlate(event.target.value));
+                setError(null);
+              }}
+              onBlur={() => setPlateTouched(true)}
+              className={cn(
+                'w-full rounded-2xl border bg-slate-50 px-4 py-3 text-sm font-bold uppercase tracking-widest text-slate-900 outline-none transition focus:ring-2',
+                plateError
+                  ? 'border-red-400 focus:border-red-500 focus:ring-red-100'
+                  : 'border-slate-200 focus:border-blue-500 focus:ring-blue-100',
+              )}
               placeholder="30A-12345"
+              maxLength={20}
+              aria-invalid={Boolean(plateError)}
               disabled={isEdit}
             />
+            {plateError && (
+              <p className="mt-1.5 flex items-start gap-1.5 text-xs font-medium text-red-600">
+                <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <span>{plateError}</span>
+              </p>
+            )}
             {isEdit && (
               <p className="mt-1 text-xs text-slate-400">Không thể thay đổi biển số sau khi đăng ký.</p>
             )}
@@ -372,7 +409,7 @@ function VehicleModal({
           </button>
           <button
             onClick={handleSave}
-            disabled={saving || !plate.trim()}
+            disabled={saving || (!isEdit && !isLicensePlateValid(plate))}
             className="flex-1 inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-blue-600 text-sm font-bold text-white transition hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
