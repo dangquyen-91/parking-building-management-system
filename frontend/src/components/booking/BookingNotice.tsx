@@ -72,7 +72,7 @@ const policies = [
     icon: CircleParking,
     title: "Phụ thuộc sức chứa của bãi",
     description:
-      "Booking chỉ được tiếp nhận khi khu vực xe vãng lai còn ít nhất 10 chỗ trống.",
+      "Hệ thống ngừng nhận booking khi khu vực xe vãng lai chỉ còn 10 chỗ trống hoặc ít hơn.",
     iconClass: "bg-orange-100 text-orange-700",
   },
   {

@@ -69,6 +69,9 @@ function BookingContent() {
             submitError={booking.submitError}
             submitting={booking.submitting}
             ready={booking.ready}
+            availability={booking.availability}
+            availabilityLoading={booking.availabilityLoading}
+            availabilityError={booking.availabilityError}
             onSubmit={booking.submit}
           />
         </section>
