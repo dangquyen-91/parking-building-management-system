@@ -19,18 +19,14 @@ import AdminBuildingsPage from '../pages/admin/BuildingsPage';
 import AdminFloorsPage from '../pages/admin/FloorsPage';
 import AdminSlotsPage from '../pages/admin/SlotsPage';
 import AdminPackagesPage from '../pages/admin/PackagesPage';
-import AdminPaymentsPage from '../pages/admin/PaymentsPage';
 import AdminReportsPage from '../pages/admin/ReportsPage';
 import AdminBookingsPage from '../pages/admin/BookingsPage';
 import AdminParkingSessionsPage from '../pages/admin/ParkingSessionsPage';
 import ManagerDashboardPage from '../pages/manager/DashboardPage';
-import ManagerUsersPage from '../pages/manager/UsersPage';
 import ManagerBuildingsPage from '../pages/manager/BuildingsPage';
 import ManagerFloorsPage from '../pages/manager/FloorsPage';
 import ManagerSlotsPage from '../pages/manager/SlotsPage';
 import ManagerPackagesPage from '../pages/manager/PackagesPage';
-import ManagerPaymentsPage from '../pages/manager/PaymentsPage';
-import ManagerStaffPage from '../pages/manager/StaffPage';
 import ManagerBookingsPage from '../pages/manager/BookingsPage';
 import ManagerParkingSessionsPage from '../pages/manager/ParkingSessionsPage';
 import ManagerParkingRowsPage from '../pages/manager/ParkingRowsPage';
@@ -132,7 +128,6 @@ export default function AppRoutes() {
       <Route path="/admin/buildings" element={<AdminRoute><AdminBuildingsPage /></AdminRoute>} />
       <Route path="/admin/floors" element={<AdminRoute><AdminFloorsPage /></AdminRoute>} />
       <Route path="/admin/slots" element={<AdminRoute><AdminSlotsPage /></AdminRoute>} />
-      <Route path="/admin/payments" element={<AdminRoute><AdminPaymentsPage /></AdminRoute>} />
       <Route path="/admin/packages" element={<AdminRoute><AdminPackagesPage /></AdminRoute>} />
       <Route path="/admin/users" element={<AdminRoute><AdminUsersPage /></AdminRoute>} />
       <Route path="/admin/reports" element={<AdminRoute><AdminReportsPage /></AdminRoute>} />
@@ -144,14 +139,11 @@ export default function AppRoutes() {
       <Route path="/manager/buildings" element={<ManagerRoute><ManagerBuildingsPage /></ManagerRoute>} />
       <Route path="/manager/floors" element={<ManagerRoute><ManagerFloorsPage /></ManagerRoute>} />
       <Route path="/manager/slots" element={<ManagerRoute><ManagerSlotsPage /></ManagerRoute>} />
-      <Route path="/manager/payments" element={<ManagerRoute><ManagerPaymentsPage /></ManagerRoute>} />
       <Route path="/manager/bookings" element={<ManagerRoute><ManagerBookingsPage /></ManagerRoute>} />
       <Route path="/manager/parking-sessions" element={<ManagerRoute><ManagerParkingSessionsPage /></ManagerRoute>} />
       <Route path="/manager/parking-rows" element={<ManagerRoute><ManagerParkingRowsPage /></ManagerRoute>} />
       <Route path="/manager/subscriptions" element={<ManagerRoute><ManagerSubscriptionsPage /></ManagerRoute>} />
       <Route path="/manager/packages" element={<ManagerRoute><ManagerPackagesPage /></ManagerRoute>} />
-      <Route path="/manager/users" element={<ManagerRoute><ManagerUsersPage /></ManagerRoute>} />
-      <Route path="/manager/staff" element={<ManagerRoute><ManagerStaffPage /></ManagerRoute>} />
       <Route path="/manager/reports" element={<ManagerRoute><AdminReportsPage /></ManagerRoute>} />
 
       <Route path="/staff" element={<Navigate to="/staff/dashboard" replace />} />
