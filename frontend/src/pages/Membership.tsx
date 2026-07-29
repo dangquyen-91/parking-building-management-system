@@ -24,6 +24,7 @@ import { getAvailableSlots } from '../services/kiosk.service';
 import type { ParkingSlotApiItem } from '../types/kiosk';
 import { subscriptionService, type ResidentSubscription } from '../services/subscription.service';
 import { profileService, type MyVehicle } from '../services/profile.service';
+import { isLicensePlateValid, normalizeLicensePlate } from '../utils/license-plate';
 
 type VehicleTab = 'motorcycle' | 'car';
 
@@ -36,8 +37,6 @@ const formatCurrency = (value: string | number) =>
     })
     .replace(/\s/g, '');
 
-const normalizePlate = (value: string) => value.toUpperCase().replace(/\s/g, '').trim();
-const platePattern = /^[A-Z0-9-]{4,20}$/;
 const pendingTtlMs = 15 * 60 * 1000;
 const isStillActive = (sub: ResidentSubscription) =>
   sub.status === 'active' && (!sub.endDate || new Date(sub.endDate).getTime() > Date.now());
@@ -111,10 +110,10 @@ export default function Membership() {
     [packages, selectedPackageId]
   );
 
-  const plate = normalizePlate(licensePlate);
-  const plateValid = platePattern.test(plate);
+  const plate = normalizeLicensePlate(licensePlate);
+  const plateValid = isLicensePlateValid(plate);
   const plateSubscriptions = useMemo(
-    () => (plate ? mySubscriptions.filter((sub) => normalizePlate(sub.licensePlate) === plate) : []),
+    () => (plate ? mySubscriptions.filter((sub) => normalizeLicensePlate(sub.licensePlate) === plate) : []),
     [mySubscriptions, plate]
   );
   const pendingPlateSub = plateValid ? plateSubscriptions.find((sub) => sub.status === 'pending') ?? null : null;
@@ -156,7 +155,7 @@ export default function Membership() {
       if (vehicle.vehicleType !== selectedPackage.vehicleType) return false;
       const hasActiveSub = mySubscriptions.some(
         (sub) =>
-          normalizePlate(sub.licensePlate) === normalizePlate(vehicle.licensePlate) &&
+          normalizeLicensePlate(sub.licensePlate) === normalizeLicensePlate(vehicle.licensePlate) &&
           isStillActive(sub)
       );
       return !hasActiveSub;
@@ -326,7 +325,7 @@ export default function Membership() {
       return;
     }
     if (!plateValid) {
-      setSubmitError('Biển số chỉ gồm chữ, số, dấu gạch ngang và dài 4-20 ký tự.');
+      setSubmitError('Biển số xe đã đăng ký không hợp lệ. Vui lòng kiểm tra lại trong mục Xe của tôi.');
       return;
     }
     if (pendingPlateSub) {

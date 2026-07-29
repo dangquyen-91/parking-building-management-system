@@ -6,6 +6,7 @@ import ParkingSlot from '../models/parking-slot.model.js';
 import Floor from '../models/floor.model.js';
 import SubscriptionPayment from '../models/subscription-payment.model.js';
 import User from '../models/user.model.js';
+import Vehicle from '../models/vehicle.model.js';
 import AppError from '../utils/appError.js';
 import * as vnpayService from './vnpay.service.js';
 
@@ -78,6 +79,20 @@ export const buyPackage = async ({ userId, packageId, licensePlate, slotId, ipAd
     .transaction(async (t) => {
       const pkg = await ParkingPackage.findByPk(packageId, { transaction: t });
       if (!pkg || !pkg.isActive) throw new AppError('Package not found or inactive', 404);
+
+      const registeredVehicle = await Vehicle.findOne({
+        where: { userId, licensePlate: plate },
+        transaction: t,
+      });
+      if (!registeredVehicle) {
+        throw new AppError('Biển số chưa được đăng ký trong mục Xe của tôi.', 400);
+      }
+      if (registeredVehicle.vehicleType !== pkg.vehicleType) {
+        throw new AppError(
+          `Xe đã đăng ký là ${registeredVehicle.vehicleType}, không thể mua gói ${pkg.vehicleType}.`,
+          409
+        );
+      }
 
       // Self-heal: huỷ pending đã quá hạn 15 phút cho plate này (kèm payment) trước khi chặn.
       await cancelStalePendingSubs(plate, t);

@@ -1,14 +1,13 @@
 import Joi from 'joi';
+import { LICENSE_PLATE_PATTERN, licensePlateMessages } from '../utils/licensePlate.js';
 
 const licensePlateBase = Joi.string()
   .trim()
-  .min(4)
-  .max(20)
+  .min(8)
+  .max(11)
   .uppercase()
-  .pattern(/^[A-Z0-9\-]+$/)
-  .messages({
-    'string.pattern.base': 'License plate only allows letters, numbers and hyphens',
-  });
+  .pattern(LICENSE_PLATE_PATTERN)
+  .messages(licensePlateMessages);
 
 const vehicleTypeField = Joi.string().valid('motorcycle', 'car');
 const nicknameField = Joi.string().trim().max(50).allow('');

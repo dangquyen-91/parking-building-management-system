@@ -1,15 +1,14 @@
 import Joi from 'joi';
+import { LICENSE_PLATE_PATTERN, licensePlateMessages } from '../utils/licensePlate.js';
 
 const licensePlateField = Joi.string()
   .trim()
-  .min(4)
-  .max(20)
+  .min(8)
+  .max(11)
   .uppercase()
-  .pattern(/^[A-Z0-9\-]+$/)
+  .pattern(LICENSE_PLATE_PATTERN)
   .required()
-  .messages({
-    'string.pattern.base': 'License plate only allows letters, numbers and hyphens',
-  });
+  .messages(licensePlateMessages);
 
 export const buyPackageSchema = Joi.object({
   packageId: Joi.number().integer().positive().required(),
