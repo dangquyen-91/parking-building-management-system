@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { AlertTriangle, Building2, CheckCircle2, ChevronLeft, ChevronRight, Edit3, Layers3, Plus, RefreshCw, Search, SquareParking, X } from 'lucide-react';
+import { AlertTriangle, Building2, CheckCircle2, ChevronLeft, ChevronRight, Edit3, Layers3, Plus, RefreshCw, Search, SquareParking, Trash2, X } from 'lucide-react';
 import { AdminLayout } from '../../components/dashboard/AdminLayout';
 import { cn } from '../../lib/utils';
 import { buildingService, type Building } from '../../services/building.service';
@@ -39,6 +39,7 @@ export default function SlotsPage() {
   const [status, setStatus] = useState<SlotStatus | ''>('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   const [editingSlot, setEditingSlot] = useState<ParkingSlot | null>(null);
   const [form, setForm] = useState<SlotPayload>(emptyForm);
   const [modalOpen, setModalOpen] = useState(false);
@@ -142,6 +143,29 @@ export default function SlotsPage() {
     }
   };
 
+  const handleDelete = async (slot: ParkingSlot) => {
+    if (slot.status === 'occupied') {
+      setSuccess(null);
+      setError(`Không thể xóa vị trí ${slot.slotCode} vì đang có xe đỗ`);
+      return;
+    }
+    if (!window.confirm(`Bạn có chắc muốn xóa vị trí ${slot.slotCode}?`)) return;
+
+    setDeletingId(slot.id);
+    setError(null);
+    setSuccess(null);
+    try {
+      await slotService.deleteSlot(slot.id);
+      setSuccess(`Đã xóa vị trí ${slot.slotCode}`);
+      const targetPage = slots.length === 1 && pagination.page > 1 ? pagination.page - 1 : pagination.page;
+      await loadSlots(targetPage);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Xóa vị trí đỗ xe thất bại');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   return (
     <AdminLayout
       eyebrow="Công suất bãi đỗ xe"
@@ -197,7 +221,14 @@ export default function SlotsPage() {
                     <td className="py-4 text-sm text-slate-300">Ô tô</td>
                     <td className="py-4"><span className={cn('inline-flex rounded-full border px-3 py-1 text-xs font-semibold', slotStatusClasses[slot.status])}>{slotStatusLabels[slot.status]}</span></td>
                     <td className="max-w-xs truncate py-4 text-sm text-slate-400">{slot.note || '--'}</td>
-                    <td className="py-4 text-right"><button onClick={() => openEditModal(slot)} className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-blue-400/20 bg-blue-400/10 text-blue-200 transition hover:border-blue-300/50 hover:bg-blue-400/20" title="Sửa vị trí"><Edit3 className="h-4 w-4" /></button></td>
+                    <td className="py-4 text-right">
+                      <div className="inline-flex items-center gap-2">
+                        <button onClick={() => openEditModal(slot)} disabled={deletingId === slot.id} className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-blue-400/20 bg-blue-400/10 text-blue-200 transition hover:border-blue-300/50 hover:bg-blue-400/20 disabled:opacity-40" title="Sửa vị trí"><Edit3 className="h-4 w-4" /></button>
+                        <button onClick={() => handleDelete(slot)} disabled={deletingId !== null} className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-red-400/20 bg-red-400/10 text-red-300 transition hover:border-red-300/50 hover:bg-red-400/20 disabled:cursor-not-allowed disabled:opacity-40" title="Xóa vị trí">
+                          {deletingId === slot.id ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                        </button>
+                      </div>
+                    </td>
                   </motion.tr>
                 ))}
               </tbody>

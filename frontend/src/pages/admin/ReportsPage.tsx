@@ -16,7 +16,7 @@ const PRESETS: Array<{ key: RangePreset; label: string }> = [
   { key: 'year', label: 'Năm nay' },
 ];
 
-const TABS = ['Doanh thu', 'Lưu lượng & Bãi', 'Đặt chỗ & Thuê bao', 'Nhân viên'];
+const TABS = ['Doanh thu', 'Lưu lượng & Bãi', 'Đặt chỗ & Người dùng gói', 'Nhân viên'];
 
 const FILTER_HINTS = [
   'Bộ lọc áp dụng cho các giao dịch trong khoảng thời gian đã chọn.',

@@ -40,7 +40,7 @@ export default function RevenueTab({ from, to, groupBy }: { from: string; to: st
       (m, r) => (!m || r.total > m.total ? { period: r.period, total: r.total } : m), null,
     );
     const srcEntries: Array<[string, number]> = [
-      ['thuê bao', t.subscription], ['vé lượt', t.session], ['đặt chỗ', t.booking],
+      ['người dùng gói', t.subscription], ['vé lượt', t.session], ['đặt chỗ', t.booking],
     ];
     const top = srcEntries.sort((a, b) => b[1] - a[1])[0];
     const topPct = t.total > 0 ? Math.round((top[1] / t.total) * 100) : 0;
@@ -120,7 +120,7 @@ export default function RevenueTab({ from, to, groupBy }: { from: string; to: st
                 <Legend wrapperStyle={{ fontSize: 12 }} />
                 <Area type="monotone" dataKey="session" name="Vé lượt" stackId="1" stroke={COLORS.session} fill={COLORS.session} fillOpacity={0.25} />
                 <Area type="monotone" dataKey="booking" name="Đặt chỗ" stackId="1" stroke={COLORS.booking} fill={COLORS.booking} fillOpacity={0.25} />
-                <Area type="monotone" dataKey="subscription" name="Thuê bao" stackId="1" stroke={COLORS.subscription} fill={COLORS.subscription} fillOpacity={0.25} />
+                <Area type="monotone" dataKey="subscription" name="Người dùng gói" stackId="1" stroke={COLORS.subscription} fill={COLORS.subscription} fillOpacity={0.25} />
               </AreaChart>
             </ResponsiveContainer>
           </>
