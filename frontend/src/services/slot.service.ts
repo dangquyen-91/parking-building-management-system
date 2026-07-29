@@ -108,4 +108,15 @@ export const slotService = {
     const result = await parseResponse<{ data: ParkingSlot }>(response);
     return result.data;
   },
+
+  async deleteSlot(id: number): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/parking-slots/${id}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    });
+    if (!response.ok) {
+      const result = await response.json().catch(() => ({ message: 'Invalid server response' }));
+      throw new Error(result.message || `API error with status ${response.status}`);
+    }
+  },
 };
