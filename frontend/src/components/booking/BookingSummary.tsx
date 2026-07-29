@@ -3,12 +3,14 @@ import {
   AlertCircle,
   CalendarClock,
   Check,
+  CircleParking,
   Clock3,
   CreditCard,
   Loader2,
   MapPin,
   Moon,
   ReceiptText,
+  ShieldAlert,
   ShieldCheck,
   Sun,
   X,
@@ -21,6 +23,7 @@ import {
   type BookingFormValues,
   type CarFeeBreakdown,
 } from "../../hooks/useBookingForm";
+import type { BookingAvailability } from "../../services/booking.service";
 
 interface Props {
   values: BookingFormValues;
@@ -33,6 +36,9 @@ interface Props {
   submitError: string | null;
   submitting: boolean;
   ready: boolean;
+  availability: BookingAvailability | null;
+  availabilityLoading: boolean;
+  availabilityError: string | null;
   onSubmit: () => void;
 }
 
@@ -47,6 +53,9 @@ export function BookingSummary({
   submitError,
   submitting,
   ready,
+  availability,
+  availabilityLoading,
+  availabilityError,
   onSubmit,
 }: Props) {
   const [confirming, setConfirming] = useState(false);
@@ -168,6 +177,83 @@ export function BookingSummary({
               </div>
             </div>
           </div>
+          <div
+            role="status"
+            className={`mt-4 overflow-hidden rounded-2xl border-2 shadow-sm ${
+              availability?.acceptingBookings
+                ? "border-emerald-300 bg-gradient-to-br from-emerald-50 to-white"
+                : "animate-pulse border-red-400 bg-gradient-to-br from-red-50 to-orange-50 shadow-red-100"
+            }`}
+          >
+            <div
+              className={`flex items-center gap-3 px-4 py-3 ${
+                availability?.acceptingBookings
+                  ? "bg-emerald-600 text-white"
+                  : "bg-red-600 text-white"
+              }`}
+            >
+              {availability?.acceptingBookings ? (
+                <CircleParking className="h-6 w-6 shrink-0" />
+              ) : (
+                <ShieldAlert className="h-6 w-6 shrink-0" />
+              )}
+              <p className="text-sm font-black uppercase tracking-wide">
+                {availabilityLoading
+                  ? "Đang kiểm tra sức chứa"
+                  : availability?.acceptingBookings
+                    ? "Bãi đang nhận booking"
+                    : "Tạm ngừng nhận booking"}
+              </p>
+            </div>
+            <div className="px-4 py-4">
+              {availabilityLoading ? (
+                <div className="flex items-center gap-2 font-bold text-slate-600">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  Vui lòng chờ trong giây lát…
+                </div>
+              ) : availabilityError ? (
+                <p className="font-bold text-red-700">
+                  Không kiểm tra được sức chứa: {availabilityError}
+                </p>
+              ) : (
+                <>
+                  <div className="flex items-end justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                        Chỗ còn lại
+                      </p>
+                      <p
+                        className={`mt-1 text-4xl font-black ${
+                          availability?.acceptingBookings
+                            ? "text-emerald-700"
+                            : "text-red-700"
+                        }`}
+                      >
+                        {availability?.available ?? 0}
+                        <span className="ml-1 text-lg text-slate-400">
+                          / {availability?.total ?? 0}
+                        </span>
+                      </p>
+                    </div>
+                    <span
+                      className={`rounded-full px-3 py-1.5 text-xs font-black ${
+                        availability?.acceptingBookings
+                          ? "bg-emerald-100 text-emerald-700"
+                          : "bg-red-100 text-red-700"
+                      }`}
+                    >
+                      Khóa khi còn {availability?.minimumFree ?? 10} chỗ
+                    </span>
+                  </div>
+                  {!availability?.acceptingBookings && (
+                    <p className="mt-3 border-t border-red-200 pt-3 text-sm font-bold text-red-700">
+                      Bãi đã chạm ngưỡng an toàn. Vui lòng đến trực tiếp để check-in.
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
           {submitError && (
             <div
               role="alert"
@@ -190,7 +276,9 @@ export function BookingSummary({
             )}
             {submitting
               ? "Đang tạo giao dịch VNPay..."
-              : "Kiểm tra và thanh toán"}
+              : availability?.acceptingBookings
+                ? "Kiểm tra và thanh toán"
+                : "Tạm ngừng nhận booking"}
           </button>
           <div className="mt-4 flex gap-2 text-xs text-slate-500">
             <Check className="h-4 w-4 shrink-0 text-emerald-500" />
