@@ -50,7 +50,7 @@ export default function SubscriptionsPage() {
       });
       setSubscriptions(result);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Không tải được danh sách thuê bao');
+      setError(err instanceof Error ? err.message : 'Không tải được danh sách người dùng gói');
     } finally {
       setLoading(false);
     }
@@ -61,7 +61,7 @@ export default function SubscriptionsPage() {
     subscriptionService.getAll()
       .then((result) => { if (active) setSubscriptions(result); })
       .catch((err) => {
-        if (active) setError(err instanceof Error ? err.message : 'Không tải được danh sách thuê bao');
+        if (active) setError(err instanceof Error ? err.message : 'Không tải được danh sách người dùng gói');
       })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
@@ -73,10 +73,10 @@ export default function SubscriptionsPage() {
     setSuccess(null);
     try {
       const result = await subscriptionService.expireSubscriptions();
-      setSuccess(`Đã hủy ${result.pendingCancelled} giao dịch chờ, hết hạn ${result.activeExpired} thuê bao và giải phóng ${result.orphanSlotsFreed} vị trí.`);
+      setSuccess(`Đã hủy ${result.pendingCancelled} giao dịch chờ, hết hạn ${result.activeExpired} người dùng gói và giải phóng ${result.orphanSlotsFreed} vị trí.`);
       await loadSubscriptions();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Không thể quét thuê bao hết hạn');
+      setError(err instanceof Error ? err.message : 'Không thể quét người dùng gói hết hạn');
     } finally {
       setExpiring(false);
     }
@@ -85,8 +85,8 @@ export default function SubscriptionsPage() {
   return (
     <AdminLayout
       eyebrow="Dịch vụ cư dân"
-      title="Quản lý thuê bao"
-      subtitle="Theo dõi gói gửi xe theo biển số và xử lý các thuê bao đã hết hạn."
+      title="Quản lý người dùng gói"
+      subtitle="Theo dõi gói gửi xe theo biển số và xử lý người dùng gói đã hết hạn."
       meta={<button onClick={expire} disabled={expiring} className="inline-flex items-center gap-2 rounded-2xl border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-sm font-semibold text-amber-200 disabled:opacity-50"><TimerOff className="h-4 w-4" />{expiring ? 'Đang quét...' : 'Quét hết hạn'}</button>}
     >
       <div className="space-y-5">
@@ -115,7 +115,7 @@ export default function SubscriptionsPage() {
             <table className="w-full min-w-[1050px] text-left">
               <thead className="text-xs uppercase tracking-wider text-slate-500"><tr><th className="pb-3">Biển số</th><th className="pb-3">Khách hàng</th><th className="pb-3">Gói</th><th className="pb-3">Vị trí</th><th className="pb-3">Thời hạn</th><th className="pb-3">Số tiền</th><th className="pb-3">Trạng thái</th></tr></thead>
               <tbody className="divide-y divide-white/[0.06]">
-                {loading ? <tr><td colSpan={7} className="py-12 text-center text-slate-400">Đang tải...</td></tr> : subscriptions.length === 0 ? <tr><td colSpan={7} className="py-12 text-center text-slate-400">Không có thuê bao phù hợp.</td></tr> : subscriptions.map((item) => {
+                {loading ? <tr><td colSpan={7} className="py-12 text-center text-slate-400">Đang tải...</td></tr> : subscriptions.length === 0 ? <tr><td colSpan={7} className="py-12 text-center text-slate-400">Không có người dùng gói phù hợp.</td></tr> : subscriptions.map((item) => {
                   const VehicleIcon = item.vehicleType === 'car' ? Car : Bike;
                   return <tr key={item.id} className="text-sm text-slate-300">
                     <td className="py-4"><span className="inline-flex items-center gap-2 font-bold tracking-wider text-white"><VehicleIcon className="h-4 w-4 text-blue-300" />{item.licensePlate}</span><p className="mt-1 text-xs text-slate-500">#{item.id}</p></td>

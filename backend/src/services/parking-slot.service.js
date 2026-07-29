@@ -132,8 +132,8 @@ const remove = async (id) => {
     include: [{ model: ParkingSession, as: 'sessions', where: { status: 'active' }, required: false }],
   });
   if (!slot) throw new AppError('Parking slot not found', 404);
-  if (slot.sessions && slot.sessions.length > 0) {
-    throw new AppError('Cannot delete slot with an active parking session', 409);
+  if (slot.status === 'occupied' || (slot.sessions && slot.sessions.length > 0)) {
+    throw new AppError('Không thể xóa vị trí đang có xe đỗ', 409);
   }
   await slot.destroy();
 };
