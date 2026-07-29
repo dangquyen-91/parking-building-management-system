@@ -19,6 +19,7 @@ import { KioskLayout } from '../../components/kiosk/KioskLayout';
 import { useKioskHotkeys } from '../../hooks/useKioskHotkeys';
 import { cn, compareFloorCode } from '../../lib/utils';
 import { buildingService, type Building } from '../../services/building.service';
+import { bookingService } from '../../services/booking.service';
 import { floorService, type Floor } from '../../services/floor.service';
 import { slotService, type ParkingSlot, type SlotStatus } from '../../services/slot.service';
 import { getActiveSessions } from '../../services/kiosk.service';
@@ -63,6 +64,7 @@ interface FloorData {
   slots: ParkingSlot[];
   rows: ParkingRowApiItem[];
   activeCount?: number;
+  heldBookingCount?: number;
   loading: boolean;
   error: string | null;
 }
@@ -98,16 +100,17 @@ function Legend() {
   );
 }
 
-function FloorStats({ slots, rows, floor, activeCount }: {
+function FloorStats({ slots, rows, floor, activeCount, heldBookingCount }: {
   slots: ParkingSlot[];
   rows: ParkingRowApiItem[];
   floor: Floor;
   activeCount?: number;
+  heldBookingCount?: number;
 }) {
   if (floor.vehicleType === 'car') {
     if (floor.floorType === 'visitor') {
       const total = floor.totalSlots;
-      const occupied = activeCount ?? 0;
+      const occupied = (activeCount ?? 0) + (heldBookingCount ?? 0);
       const empty = Math.max(0, total - occupied);
       const pct = total > 0 ? Math.round((occupied / total) * 100) : 0;
       return (
@@ -199,10 +202,14 @@ function CarResidentFloorGrid({ slots, onSelectSlot }: {
 }
 
 
-function CarVisitorFloorGrid({ floor, activeCount }: { floor: Floor; activeCount: number }) {
+function CarVisitorFloorGrid({ floor, activeCount, heldBookingCount }: {
+  floor: Floor;
+  activeCount: number;
+  heldBookingCount: number;
+}) {
 
   const total = floor.totalSlots;
-  const used = activeCount;
+  const used = activeCount + heldBookingCount;
   const empty = Math.max(0, total - used);
   const pct = total > 0 ? Math.round((used / total) * 100) : 0;
 
@@ -238,6 +245,11 @@ function CarVisitorFloorGrid({ floor, activeCount }: { floor: Floor; activeCount
             style={{ width: `${pct}%` }}
           />
         </div>
+        {heldBookingCount > 0 && (
+          <p className="mt-2 text-xs text-slate-500">
+            {activeCount} xe trong bãi + {heldBookingCount} booking đã giữ chỗ
+          </p>
+        )}
       </div>
     </div>
   );
@@ -298,7 +310,7 @@ function FloorPanel({
   onSelectSlot: (detail: SlotDetail) => void;
 }) {
   const [open, setOpen] = useState(true);
-  const { floor, slots, rows, activeCount, loading, error } = data;
+  const { floor, slots, rows, activeCount, heldBookingCount, loading, error } = data;
   const isCar = floor.vehicleType === 'car';
   const isResidentCar = isCar && floor.floorType === 'resident';
   const isVisitorCar = isCar && floor.floorType === 'visitor';
@@ -336,7 +348,13 @@ function FloorPanel({
           </p>
           {!loading && !error && (
             <div className="mt-1 pr-4">
-              <FloorStats slots={slots} rows={rows} floor={floor} activeCount={activeCount} />
+              <FloorStats
+                slots={slots}
+                rows={rows}
+                floor={floor}
+                activeCount={activeCount}
+                heldBookingCount={heldBookingCount}
+              />
             </div>
           )}
         </div>
@@ -368,7 +386,13 @@ function FloorPanel({
                 isResidentCar
                   ? <CarResidentFloorGrid slots={slots} onSelectSlot={onSelectSlot} />
                   : isVisitorCar
-                    ? <CarVisitorFloorGrid floor={floor} activeCount={activeCount ?? 0} />
+                    ? (
+                      <CarVisitorFloorGrid
+                        floor={floor}
+                        activeCount={activeCount ?? 0}
+                        heldBookingCount={heldBookingCount ?? 0}
+                      />
+                    )
                     : <MotoFloorGrid rows={rows} />
               )}
             </div>
@@ -622,13 +646,18 @@ export default function ParkingMapPage() {
           let slots: ParkingSlot[] = [];
           let rows: ParkingRowApiItem[] = [];
           let activeCount: number | undefined;
+          let heldBookingCount: number | undefined;
 
           if (floor.vehicleType === 'car') {
             const res = await slotService.getSlots({ floorId: floor.id, limit: 200 });
             slots = res.slots;
             if (floor.floorType === 'visitor') {
-              const active = await getActiveSessions({ floorId: floor.id, limit: 1 });
+              const [active, heldBookings] = await Promise.all([
+                getActiveSessions({ floorId: floor.id, limit: 1 }),
+                bookingService.getAll({ floorId: floor.id, holding: true, limit: 1 }),
+              ]);
               activeCount = active.pagination.total;
+              heldBookingCount = heldBookings.pagination.total;
             }
           } else {
             rows = await fetchRows(floor.id);
@@ -640,7 +669,9 @@ export default function ParkingMapPage() {
             next.set(
               floor.buildingId,
               list.map(fd =>
-                fd.floor.id === floor.id ? { ...fd, slots, rows, activeCount, loading: false } : fd,
+                fd.floor.id === floor.id
+                  ? { ...fd, slots, rows, activeCount, heldBookingCount, loading: false }
+                  : fd,
               ),
             );
             return next;
@@ -681,12 +712,17 @@ export default function ParkingMapPage() {
             let slots: ParkingSlot[] = [];
             let rows: ParkingRowApiItem[] = [];
             let activeCount: number | undefined;
+            let heldBookingCount: number | undefined;
             if (floor.vehicleType === 'car') {
               const res = await slotService.getSlots({ floorId: floor.id, limit: 200 });
               slots = res.slots;
               if (floor.floorType === 'visitor') {
-                const active = await getActiveSessions({ floorId: floor.id, limit: 1 });
+                const [active, heldBookings] = await Promise.all([
+                  getActiveSessions({ floorId: floor.id, limit: 1 }),
+                  bookingService.getAll({ floorId: floor.id, holding: true, limit: 1 }),
+                ]);
                 activeCount = active.pagination.total;
+                heldBookingCount = heldBookings.pagination.total;
               }
             } else {
               rows = await fetchRows(floor.id);
@@ -695,7 +731,9 @@ export default function ParkingMapPage() {
               const next = new Map(prev);
               const list = next.get(floor.buildingId) ?? [];
               next.set(floor.buildingId, list.map(fd =>
-                fd.floor.id === floor.id ? { ...fd, slots, rows, activeCount, loading: false, error: null } : fd
+                fd.floor.id === floor.id
+                  ? { ...fd, slots, rows, activeCount, heldBookingCount, loading: false, error: null }
+                  : fd
               ));
               return next;
             });

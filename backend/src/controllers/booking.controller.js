@@ -34,6 +34,15 @@ const getMine = async (req, res, next) => {
   }
 };
 
+const getAvailability = async (_req, res, next) => {
+  try {
+    const data = await bookingService.getAvailability();
+    response.success(res, data);
+  } catch (err) {
+    next(err);
+  }
+};
+
 const getOne = async (req, res, next) => {
   try {
     const data = await bookingService.getById(req.params.id, req.user);
@@ -70,4 +79,4 @@ const expire = async (_req, res, next) => {
   }
 };
 
-export { create, getMine, getOne, getAll, cancel, expire };
+export { create, getAvailability, getMine, getOne, getAll, cancel, expire };

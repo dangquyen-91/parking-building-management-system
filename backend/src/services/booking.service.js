@@ -50,7 +50,7 @@ const findVisitorCarFloor = async (floorId, t) => {
   return floor;
 };
 
-const checkFloorCapacity = async (floor, t) => {
+const getFloorCapacity = async (floor, t) => {
   const total = floor.totalSlots;
   if (!total || total <= 0) throw new AppError('Tầng không có sức chứa', 400);
 
@@ -72,13 +72,30 @@ const checkFloorCapacity = async (floor, t) => {
   });
 
   const available = Math.max(0, total - activeSessions - heldByBookings);
-  if (available < MIN_FREE_FOR_BOOKING) {
+  return { total, activeSessions, heldByBookings, available };
+};
+
+const checkFloorCapacity = async (floor, t) => {
+  const capacity = await getFloorCapacity(floor, t);
+  const { available } = capacity;
+  if (available <= MIN_FREE_FOR_BOOKING) {
     throw new AppError(
-      `Bãi chỉ còn ${available} chỗ trống (cần ≥ ${MIN_FREE_FOR_BOOKING} để nhận booking). Vui lòng đến bãi và check-in trực tiếp.`,
+      `Bãi chỉ còn ${available} chỗ trống (phải còn trên ${MIN_FREE_FOR_BOOKING} chỗ mới nhận booking). Vui lòng đến bãi và check-in trực tiếp.`,
       409
     );
   }
-  return { total, activeSessions, heldByBookings, available };
+  return capacity;
+};
+
+export const getAvailability = async () => {
+  const floor = await findVisitorCarFloor();
+  const capacity = await getFloorCapacity(floor);
+  return {
+    floor: { id: floor.id, floorNumber: floor.floorNumber },
+    ...capacity,
+    minimumFree: MIN_FREE_FOR_BOOKING,
+    acceptingBookings: capacity.available > MIN_FREE_FOR_BOOKING,
+  };
 };
 
 const validateTimeWindow = (startTime) => {
@@ -291,6 +308,12 @@ export const getById = async (id, requester) => {
 export const getAll = async (filters = {}) => {
   const where = {};
   if (filters.status) where.status = filters.status;
+  if (filters.floorId) where.floorId = filters.floorId;
+  if (filters.holding) {
+    where.status = 'confirmed';
+    where.sessionId = null;
+    where.endTime = { [Op.gt]: new Date() };
+  }
   if (filters.licensePlate) where.licensePlate = normalizePlate(filters.licensePlate);
   if (filters.startDate || filters.endDate) {
     where.startTime = {};

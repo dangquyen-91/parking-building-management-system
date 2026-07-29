@@ -42,6 +42,8 @@ export const createBookingSchema = Joi.object({
 
 export const listBookingsSchema = Joi.object({
   status: Joi.string().valid('pending', 'confirmed', 'cancelled', 'expired'),
+  floorId: Joi.number().integer().positive(),
+  holding: Joi.boolean(),
   licensePlate: Joi.string().trim().uppercase(),
   startDate: Joi.date().iso(),
   endDate: Joi.date().iso(),

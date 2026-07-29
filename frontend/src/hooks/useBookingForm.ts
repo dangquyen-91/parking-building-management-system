@@ -158,6 +158,36 @@ export function useBookingForm() {
   const [previewAmount, setPreviewAmount] = useState<number | null>(null);
   const [previewHours, setPreviewHours] = useState<number | null>(null);
   const [ownPlates, setOwnPlates] = useState<string[]>([]);
+  const [availability, setAvailability] = useState<Awaited<ReturnType<typeof bookingService.getAvailability>> | null>(null);
+  const [availabilityLoading, setAvailabilityLoading] = useState(true);
+  const [availabilityError, setAvailabilityError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadAvailability = async () => {
+      try {
+        const result = await bookingService.getAvailability();
+        if (!cancelled) {
+          setAvailability(result);
+          setAvailabilityError(null);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setAvailabilityError(
+            error instanceof Error ? error.message : "Không tải được sức chứa bãi xe.",
+          );
+        }
+      } finally {
+        if (!cancelled) setAvailabilityLoading(false);
+      }
+    };
+    loadAvailability();
+    const intervalId = window.setInterval(loadAvailability, 30_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, []);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -201,7 +231,11 @@ export function useBookingForm() {
   const durationHours = values.durationHours;
   const feeBreakdown = carFeeBreakdown(values.startTime, durationHours);
   const estimatedAmount = feeBreakdown.total;
-  const ready = Object.keys(fieldErrors).length === 0 && !submitting;
+  const ready =
+    Object.keys(fieldErrors).length === 0 &&
+    !submitting &&
+    !availabilityLoading &&
+    availability?.acceptingBookings === true;
 
   const updateField = <K extends keyof BookingFormValues>(
     field: K,
@@ -212,6 +246,13 @@ export function useBookingForm() {
   };
 
   const submit = async () => {
+    if (!availability?.acceptingBookings) {
+      return setSubmitError(
+        availability
+          ? `Bãi chỉ còn ${availability.available} chỗ trống, hệ thống tạm ngừng nhận booking.`
+          : "Chưa kiểm tra được sức chứa bãi xe. Vui lòng thử lại.",
+      );
+    }
     const firstError = Object.values(fieldErrors)[0];
     if (firstError) return setSubmitError(firstError);
     if (ownPlates.includes(plate))
@@ -260,6 +301,9 @@ export function useBookingForm() {
     submitError,
     previewAmount,
     previewHours,
+    availability,
+    availabilityLoading,
+    availabilityError,
     submit,
   };
 }
