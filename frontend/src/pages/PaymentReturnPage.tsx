@@ -30,7 +30,7 @@ const VT_LABEL: Record<string, string> = { car: 'Ô tô', motorcycle: 'Xe máy' 
 
 export default function PaymentReturnPage() {
   const [params] = useSearchParams();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const orderId = params.get('orderId') ?? '';
   const returnStatus = params.get('status') ?? '';
   const optimisticSuccess = returnStatus === 'success';
@@ -46,6 +46,7 @@ export default function PaymentReturnPage() {
   const isBooking = paymentType === 'booking';
   const isSubscription = paymentType === 'subscription';
   const isSession = paymentType === 'session';
+  const isStaff = user?.role === 'staff';
 
   const resolvedSuccess = payment?.status === 'success';
   const resolvedFailed = payment?.status === 'failed' || payment?.status === 'cancelled';
@@ -126,6 +127,12 @@ export default function PaymentReturnPage() {
   }, [isChecking, isAuthenticated, isFailed, isBooking, isSubscription]);
 
   const ctas = useMemo<{ primary: { to: string; label: string }; secondary: { to: string; label: string } | null }>(() => {
+    if (isSession || isStaff) {
+      return {
+        primary: { to: '/staff/dashboard', label: 'Quay về trang quản lý Staff' },
+        secondary: null,
+      };
+    }
     if (!isAuthenticated) {
       return {
         primary: isBooking ? { to: '/booking', label: 'Đặt chỗ khác' } : { to: '/login', label: 'Đăng nhập lại' },
@@ -141,7 +148,7 @@ export default function PaymentReturnPage() {
     if (isBooking) return { primary: { to: '/my-bookings', label: 'Xem booking của tôi' }, secondary: { to: '/booking', label: 'Đặt chỗ khác' } };
     if (isSubscription) return { primary: { to: '/profile?tab=packages', label: 'Xem gói của tôi' }, secondary: { to: '/', label: 'Về trang chủ' } };
     return { primary: { to: '/', label: 'Về trang chủ' }, secondary: null };
-  }, [isAuthenticated, isFailed, isBooking, isSubscription]);
+  }, [isAuthenticated, isStaff, isSession, isFailed, isBooking, isSubscription]);
 
   return (
     <div className="min-h-screen bg-slate-50 px-6 pt-32 pb-20">
