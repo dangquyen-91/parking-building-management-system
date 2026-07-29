@@ -2,6 +2,10 @@ import { useEffect, useState } from "react";
 import { useAuth } from "./useAuth";
 import { bookingService } from "../services/booking.service";
 import { profileService } from "../services/profile.service";
+import {
+  getLicensePlateError,
+  normalizeLicensePlate,
+} from "../utils/license-plate";
 
 export interface BookingFormValues {
   licensePlate: string;
@@ -78,7 +82,6 @@ export function estimateCarFee(
   return carFeeBreakdown(startTime, durationHours).total;
 }
 
-const platePattern = /^[A-Z0-9-]{4,20}$/;
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const pad = (value: number) => String(value).padStart(2, "0");
 
@@ -91,12 +94,9 @@ function createDefaultWindow() {
   return { startTime: format(start) };
 }
 
-export const normalizePlate = (value: string) =>
-  value.toUpperCase().replace(/\s/g, "").trim();
-
 function validateBookingValues(values: BookingFormValues): BookingFieldErrors {
   const errors: BookingFieldErrors = {};
-  const plate = normalizePlate(values.licensePlate);
+  const plate = normalizeLicensePlate(values.licensePlate);
   const name = values.customerName.trim();
   const phone = values.customerPhone.trim();
   const email = values.customerEmail.trim();
@@ -104,10 +104,8 @@ function validateBookingValues(values: BookingFormValues): BookingFieldErrors {
   const start = new Date(values.startTime);
   const now = Date.now();
 
-  if (!plate) errors.licensePlate = "Vui lòng nhập biển số xe.";
-  else if (!platePattern.test(plate))
-    errors.licensePlate =
-      "Biển số chỉ gồm chữ, số, dấu gạch ngang và dài 4–20 ký tự.";
+  const plateError = getLicensePlateError(plate);
+  if (plateError) errors.licensePlate = plateError;
 
   if (name && name.length < 2)
     errors.customerName = "Tên khách hàng phải có ít nhất 2 ký tự.";
@@ -169,7 +167,9 @@ export function useBookingForm() {
       .then((subscriptions) => {
         if (!cancelled)
           setOwnPlates(
-            subscriptions.map((item) => normalizePlate(item.licensePlate)),
+            subscriptions.map((item) =>
+              normalizeLicensePlate(item.licensePlate),
+            ),
           );
       })
       .catch(() => {});
@@ -193,7 +193,7 @@ export function useBookingForm() {
     return () => window.clearTimeout(timeoutId);
   }, [user]);
 
-  const plate = normalizePlate(values.licensePlate);
+  const plate = normalizeLicensePlate(values.licensePlate);
   const fieldErrors = validateBookingValues(values);
   const plateValid = !fieldErrors.licensePlate;
   const emailValid = !fieldErrors.customerEmail;

@@ -1,18 +1,17 @@
 import Joi from 'joi';
 import { getPricingFor } from '../constants/pricing.js';
+import { LICENSE_PLATE_PATTERN, licensePlateMessages } from '../utils/licensePlate.js';
 
 const CAR_PRICING = getPricingFor('car');
 
 const licensePlateField = Joi.string()
   .trim()
-  .min(4)
-  .max(20)
+  .min(8)
+  .max(11)
   .uppercase()
-  .pattern(/^[A-Z0-9\-]+$/)
+  .pattern(LICENSE_PLATE_PATTERN)
   .required()
-  .messages({
-    'string.pattern.base': 'License plate only allows letters, numbers and hyphens',
-  });
+  .messages(licensePlateMessages);
 
 const phoneField = Joi.string()
   .trim()

@@ -1,16 +1,15 @@
 import Joi from 'joi';
 import { VEHICLE_TYPES } from '../models/floor.model.js';
+import { LICENSE_PLATE_PATTERN, licensePlateMessages } from '../utils/licensePlate.js';
 
 const licensePlateField = Joi.string()
   .trim()
-  .min(4)
-  .max(20)
+  .min(8)
+  .max(11)
   .uppercase()
-  .pattern(/^[A-Z0-9\-]+$/)
+  .pattern(LICENSE_PLATE_PATTERN)
   .required()
-  .messages({
-    'string.pattern.base': 'License plate only allows letters, numbers and hyphens',
-  });
+  .messages(licensePlateMessages);
 
 export const checkInSchema = Joi.object({
   vehicleType: Joi.string().valid(...VEHICLE_TYPES).required(),
@@ -28,16 +27,7 @@ export const checkInSchema = Joi.object({
 });
 
 export const lookupSchema = Joi.object({
-  licensePlate: Joi.string()
-    .trim()
-    .min(4)
-    .max(20)
-    .uppercase()
-    .pattern(/^[A-Z0-9\-]+$/)
-    .required()
-    .messages({
-      'string.pattern.base': 'License plate only allows letters, numbers and hyphens',
-    }),
+  licensePlate: licensePlateField,
 });
 
 export const listSessionsSchema = Joi.object({
