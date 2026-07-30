@@ -2,24 +2,40 @@ import { PRICING } from '../constants/pricing.js';
 
 const HOUR_MS = 3_600_000;
 
+// Bảng giá neo theo giờ Việt Nam (UTC+7, không có DST). getHours()/setHours() đọc theo
+// timezone của process — server deploy chạy UTC nên sẽ lệch 7 tiếng và áp sai khung giá.
+// Vì vậy mọi phép tính giờ trong file này đổi sang "đồng hồ VN" rồi dùng getUTC*/setUTC*.
+const VN_OFFSET_MS = 7 * HOUR_MS;
+
+// Instant thật → Date mà getUTC*/setUTC* đọc ra đúng giờ VN.
+const toVNClock = (date) => new Date(new Date(date).getTime() + VN_OFFSET_MS);
+
+// Giờ VN (0–23) của một instant.
+const vnHour = (date) => toVNClock(date).getUTCHours();
+
 const countBlockCrossings = (entry, exit, startHour, endHour) => {
   if (exit <= entry) return 0;
 
-  let count = 0;
-  const cursor = new Date(entry);
-  cursor.setDate(cursor.getDate() - 1);
-  cursor.setHours(0, 0, 0, 0);
+  // So sánh trên đồng hồ VN: entry/exit dịch cùng một lượng nên thứ tự và độ dài
+  // khoảng thời gian không đổi.
+  const entryVN = toVNClock(entry);
+  const exitVN = toVNClock(exit);
 
-  while (cursor <= exit) {
+  let count = 0;
+  const cursor = new Date(entryVN);
+  cursor.setUTCDate(cursor.getUTCDate() - 1);
+  cursor.setUTCHours(0, 0, 0, 0);
+
+  while (cursor <= exitVN) {
     const winStart = new Date(cursor);
-    winStart.setHours(startHour, 0, 0, 0);
+    winStart.setUTCHours(startHour, 0, 0, 0);
 
     const winEnd = new Date(cursor);
-    if (startHour >= endHour) winEnd.setDate(winEnd.getDate() + 1);
-    winEnd.setHours(endHour, 0, 0, 0);
+    if (startHour >= endHour) winEnd.setUTCDate(winEnd.getUTCDate() + 1);
+    winEnd.setUTCHours(endHour, 0, 0, 0);
 
-    if (entry < winEnd && exit > winStart) count += 1;
-    cursor.setDate(cursor.getDate() + 1);
+    if (entryVN < winEnd && exitVN > winStart) count += 1;
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
   }
   return count;
 };
@@ -38,23 +54,23 @@ const calcMotorcycleFee = (entry, exit, cfg) => {
   return { baseFee, overnightFee: 0, detail: { mode: 'time_block', blocks: breakdown } };
 };
 
-// Giờ (0–23) có nằm trong khung đêm không (khung có thể vắt qua nửa đêm, vd 22→5).
+// Giờ VN (0–23) có nằm trong khung đêm không (khung có thể vắt qua nửa đêm, vd 22→5).
 const isNightHour = (hour, nightStart, nightEnd) =>
   nightStart <= nightEnd
     ? hour >= nightStart && hour < nightEnd
     : hour >= nightStart || hour < nightEnd;
 
 // Ô tô: tính THEO GIỜ, làm tròn lên và tối thiểu 1 giờ. Mỗi giờ nằm trong khung đêm
-// (22:00–05:00) chịu thêm phụ thu. Phân loại ngày/đêm theo giờ bắt đầu của từng block 1 tiếng.
+// (22:00–05:00 giờ VN) chịu thêm phụ thu. Phân loại ngày/đêm theo giờ VN bắt đầu của
+// từng block 1 tiếng.
 const calcCarFeeHourly = (entry, exit, cfg) => {
   const durationMs = Math.max(0, exit - entry);
   const hours = Math.max(1, Math.ceil(durationMs / HOUR_MS));
 
   let nightHours = 0;
-  const cursor = new Date(entry);
   for (let i = 0; i < hours; i += 1) {
-    if (isNightHour(cursor.getHours(), cfg.nightStart, cfg.nightEnd)) nightHours += 1;
-    cursor.setHours(cursor.getHours() + 1);
+    const hour = vnHour(entry.getTime() + i * HOUR_MS);
+    if (isNightHour(hour, cfg.nightStart, cfg.nightEnd)) nightHours += 1;
   }
 
   return {
@@ -100,8 +116,7 @@ export const calculateFee = (entryTime, exitTime, vehicleType) => {
 };
 
 export const calculateExcessFee = (entryTime, exitTime, vehicleType, prepaidHours) => {
-  const prepaidEnd = new Date(entryTime);
-  prepaidEnd.setHours(prepaidEnd.getHours() + (prepaidHours || 0));
+  const prepaidEnd = new Date(new Date(entryTime).getTime() + (prepaidHours || 0) * HOUR_MS);
   if (new Date(exitTime) <= prepaidEnd) {
     return { baseFee: 0, overnightFee: 0, totalFee: 0, mode: 'covered', durationMinutes: 0 };
   }
