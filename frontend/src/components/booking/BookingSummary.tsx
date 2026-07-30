@@ -103,7 +103,7 @@ export function BookingSummary({
                 value={`${previewHours ?? (durationHours || "--")} giờ`}
               />
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-4">
+            <div className="rounded-2xl border border-slate-200 bg-linear-to-br from-slate-50 to-white p-4">
               <div className="flex justify-between">
                 <div>
                   <Label>Biển số</Label>
@@ -181,8 +181,8 @@ export function BookingSummary({
             role="status"
             className={`mt-4 overflow-hidden rounded-2xl border-2 shadow-sm ${
               availability?.acceptingBookings
-                ? "border-emerald-300 bg-gradient-to-br from-emerald-50 to-white"
-                : "animate-pulse border-red-400 bg-gradient-to-br from-red-50 to-orange-50 shadow-red-100"
+                ? "border-emerald-300 bg-linear-to-br from-emerald-50 to-white"
+                : "animate-pulse border-red-400 bg-linear-to-br from-red-50 to-orange-50 shadow-red-100"
             }`}
           >
             <div
@@ -291,7 +291,7 @@ export function BookingSummary({
           role="dialog"
           aria-modal="true"
           aria-labelledby="booking-confirm-title"
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-100 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) setConfirming(false);
           }}
@@ -407,7 +407,7 @@ function ConfirmRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="grid grid-cols-[130px_1fr] gap-3 py-3 text-sm">
       <span className="font-semibold text-slate-500">{label}</span>
-      <span className="break-words text-right font-bold text-slate-900">
+      <span className="wrap-break-word text-right font-bold text-slate-900">
         {value}
       </span>
     </div>
