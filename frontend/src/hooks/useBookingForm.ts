@@ -32,6 +32,12 @@ export const BOOKING_DURATION_OPTIONS = Array.from(
   (_, i) => i + 1,
 );
 
+const HOUR_MS = 3_600_000;
+// Khung đêm neo theo giờ VN (UTC+7, không DST) — phải khớp calcCarFeeHourly ở backend,
+// nếu dùng getHours() của trình duyệt thì máy khác múi giờ sẽ xem trước lệch với số thu.
+const VN_OFFSET_MS = 7 * HOUR_MS;
+const vnHour = (timestamp: number) => new Date(timestamp + VN_OFFSET_MS).getUTCHours();
+
 const isNightHour = (hour: number) =>
   CAR_NIGHT_START <= CAR_NIGHT_END
     ? hour >= CAR_NIGHT_START && hour < CAR_NIGHT_END
@@ -55,11 +61,10 @@ export function carFeeBreakdown(
 ): CarFeeBreakdown {
   const hours = Math.max(1, Math.ceil(durationHours || 0));
   let nightHours = 0;
-  const cursor = new Date(startTime);
-  if (!Number.isNaN(cursor.getTime())) {
+  const start = new Date(startTime);
+  if (!Number.isNaN(start.getTime())) {
     for (let i = 0; i < hours; i += 1) {
-      if (isNightHour(cursor.getHours())) nightHours += 1;
-      cursor.setHours(cursor.getHours() + 1);
+      if (isNightHour(vnHour(start.getTime() + i * HOUR_MS))) nightHours += 1;
     }
   }
   const dayHours = hours - nightHours;
